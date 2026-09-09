@@ -21,5 +21,16 @@
   "subtitles.vanillawheels.skid": "Tires skid",
   "subtitles.vanillawheels.thud": "Something is hit",
   "subtitles.vanillawheels.wrench": "Wrench clanks",
-  "subtitles.vanillawheels.fuel": "Fuel pours"
+  "subtitles.vanillawheels.fuel": "Fuel pours",
+  "block.vanillawheels.mechanic_lift": "Mechanic Lift",
+  "block.vanillawheels.mechanic_lift_part": "Mechanic Lift",
+  "vanillawheels.lift.build": "Build",
+  "vanillawheels.lift.paint": "Paint",
+  "vanillawheels.lift.no_room": "The lift needs a clear, level five by seven with two blocks of headroom",
+  "vanillawheels.lift.status.busy": "The rams are working...",
+  "vanillawheels.lift.status.build_ready": "Ready to build",
+  "vanillawheels.lift.status.paint_ready": "Ready to paint the vehicle",
+  "vanillawheels.lift.status.no_dye": "Add a dye to paint it",
+  "vanillawheels.lift.status.occupied": "Clear the deck to build",
+  "vanillawheels.lift.status.parts": "Chassis + wheels + engine"
 }

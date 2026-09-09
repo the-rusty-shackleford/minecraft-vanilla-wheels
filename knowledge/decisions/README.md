@@ -15,3 +15,4 @@ tags: [index]
 | D-0001 | A vehicle is data: one entity type, a flat profile, mirrored once at load |
 | D-0002 | The driver's client drives; climbing is vanilla's step; rolling resistance |
 | D-0003 | The mesh renderer: our OBJ parser, normals from geometry, paint as vertex colour |
+| D-0004 | The Mechanic Lift: the assembly is the profile; a 5 x 7 deck; the index finds the controller |

@@ -50,6 +50,12 @@ public final class VanillaWheelsClient {
     @SubscribeEvent
     public static void onRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModContent.VEHICLE_ENTITY.get(), VehicleRenderer::new);
+        event.registerBlockEntityRenderer(ModContent.LIFT_BE.get(), com.chunkworks.vanillawheels.client.lift.LiftRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
+        event.register(ModContent.LIFT_MENU.get(), com.chunkworks.vanillawheels.client.lift.LiftScreen::new);
     }
 
     @SubscribeEvent

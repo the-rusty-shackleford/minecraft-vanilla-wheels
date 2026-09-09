@@ -140,6 +140,14 @@ dependencies {
             prefer "1.0.0"
         }
     }
+    // Metals and Materials supplies the steel the part recipes take
+    // (#c:ingots/steel and #c:storage_blocks/steel). Nested the same way.
+    jarJar(implementation("com.chunkworks.metalsandmaterials:metalsandmaterials")) {
+        version {
+            strictly "[1.0,2.0)"
+            prefer "1.0.0"
+        }
+    }
 
     implementation sourceSets.domain.output
 

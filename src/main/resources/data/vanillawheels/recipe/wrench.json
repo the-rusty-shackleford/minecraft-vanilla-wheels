@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S",
+    "SI",
+    "I "
+  ],
+  "key": {
+    "S": {
+      "tag": "c:ingots/steel"
+    },
+    "I": {
+      "tag": "c:ingots/iron"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "vanillawheels:wrench"
+  }
+}

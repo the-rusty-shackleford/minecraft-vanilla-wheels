@@ -25,16 +25,19 @@ oriented outward per convex piece and parts by `Selector`, `Transform`/`Rotation
 JSON split into `Look`/`Kit` map codecs to stay under the sixteen-field limit, its RI in
 the compact constructor), the single `Vehicle` entity (vanilla's `VehicleEntity`, NeoForge
 `PartEntity` hit boxes, `ContainerEntity` chest, `HasCustomInventoryScreen`), the items,
-payloads, config, and the client (renderer, mesh library with placeholder on a bad OBJ,
-keys with a riding-only conflict context, engine loop, radio, Luminance headlamps).
-`gametest`: the box car, ten gametests, the photo booth.
+payloads, config, the `lift` package (controller and part blocks with the index in the
+state, one block entity, a menu whose verdicts ride data slots, the placing item), and
+the client (renderer, mesh library with placeholder on a bad OBJ, keys with a riding-only
+conflict context, engine loop, radio, Luminance headlamps, the lift renderer and screen).
+`gametest`: the box car, sixteen gametests, the photo booth.
 
 ## How it is verified
 
-`./gradlew check`: 35 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); ten gametests on a headless server driving a scripted box car; the photo booth
-on a real client (paint, the dash from the driver's seat, the lamps at night with the beam
-through Luminance), read off the frame.
+`./gradlew check`: 45 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+fixtures); sixteen gametests on a headless server driving a scripted box car and working
+a lift through a mock player; the photo booth on a real client (paint, the dash from the
+driver's seat, the lamps at night with the beam through Luminance, the lift placed, its
+menu, raised with the built car, painted), read off the frame.
 
 ## Decisions
 
@@ -42,10 +45,11 @@ D-0001 the contract: one entity type, data-only vehicles, flat JSON, mirrored on
 load. D-0002 authority and climbing: the driver's client drives, the server re-runs the
 same step, `maxUpStep` climbs and the suspension hides it; rolling resistance stops a
 coasting car. D-0003 the renderer: OBJ through our own parser, normals from geometry not
-winding, paint as vertex colour.
+winding, paint as vertex colour. D-0004 the lift: the assembly is the profile's own part
+list, not a recipe type; a 5 x 7 deck; the index in the part's state finds the controller.
 
 ## Next
 
-1.0.0 (2026-09-09): the core. Then the Mechanic Lift (parts, recipes, the multi-block,
-paint on the lift), towing and animals (`cargo`, `doors`, `hitch` are already decoded),
-and the Trailblazer and Trailer repos with their art pipeline (the cab repair).
+1.0.0 (2026-09-09): the core. 1.1.0 (2026-09-09): the Mechanic Lift and the recipes.
+Then towing and animals (`cargo`, `doors`, `hitch` are already decoded), and the
+Trailblazer and Trailer repos with their art pipeline (the cab repair).

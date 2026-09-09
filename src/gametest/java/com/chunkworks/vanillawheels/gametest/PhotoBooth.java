@@ -17,7 +17,18 @@
  */
 package com.chunkworks.vanillawheels.gametest;
 
+import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
+import com.chunkworks.vanillawheels.client.lift.LiftScreen;
+import com.chunkworks.vanillawheels.domain.LiftMotion;
+import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
+import com.chunkworks.vanillawheels.lift.LiftMenu;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.phys.BlockHitResult;
 import com.mojang.blaze3d.platform.NativeImage;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +70,9 @@ import org.slf4j.LoggerFactory;
  * the driver's seat looking down at the dash the red needles are in view
  * (the physical gauges, in first person); at night the ground ahead is
  * dark with the lamps off, and with them on the lamp faces glow and the
- * ground ahead is lit (the lamps through Luminance). One {@code booth:
+ * ground ahead is lit (the lamps through Luminance); a Mechanic Lift is
+ * placed through its item and drawn, its menu opens, Build raises the deck
+ * with the car on it, Paint turns it red. One {@code booth:
  * PASS} or {@code booth: FAIL} line per check; the Gradle task reads them.
  * Client only, active only under {@code vanillawheels.photobooth}.
  *
@@ -90,6 +103,7 @@ public final class PhotoBooth {
     private static int tick = 0;
     private static List<Step> steps;
     private static UUID car;
+    private static BlockPos liftPos = BlockPos.ZERO;
     private static double groundDark = -1.0;
 
     @SubscribeEvent
@@ -258,12 +272,112 @@ public final class PhotoBooth {
             // Two 4 x 3 px lamp faces five blocks off are about 100 pixels each at 480 rows.
             verdict("with the lamps on the lamp faces glow", () -> lamps > 30 ? null : "glowing lamp pixels " + lamps);
         }));
+        // The Mechanic Lift: noon again, the car gone, a lift placed through
+        // the real item facing the player, who hovers over its front.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            ServerLevel level = sp.serverLevel();
+            level.setDayTime(6000L);
+            if (level.getEntity(car) instanceof Vehicle old) {
+                old.discard();
+            }
+            double y = level.getMinBuildHeight() + 5;
+            sp.teleportTo(level, X, y + 3.5, Z - 1.0, 0.0f, 35.0f);
+            sp.setYRot(0.0f);
+            ItemStack lift = new ItemStack(ModContent.LIFT_ITEM.get());
+            sp.setItemInHand(InteractionHand.MAIN_HAND, lift);
+            // The ground's top block is the one under the player's feet.
+            BlockPos floor = BlockPos.containing(X, y, Z + 4.0).below();
+            while (level.getBlockState(floor).canBeReplaced()) {
+                floor = floor.below();
+            }
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(floor).add(0, 0.5, 0), Direction.UP, floor, false);
+            BlockPlaceContext ctx = new BlockPlaceContext(level, sp, InteractionHand.MAIN_HAND, lift, hit);
+            liftPos = ctx.getClickedPos();
+            InteractionResult r = ModContent.LIFT_ITEM.get().place(ctx);
+            if (!r.consumesAction()) {
+                LOG.error("booth: FAIL the lift is placed -- {}", r);
+            }
+            sp.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        })));
+        s.add(new Step(t += SETTLE, () -> {
+            int steel = count(mc, PhotoBooth::steel);
+            int hazard = count(mc, PhotoBooth::hazard);
+            shoot(mc, "booth-lift");
+            verdict("the lift is drawn: a steel deck", () -> steel > 3000 ? null : "steel pixels " + steel);
+            verdict("with its hazard stripe", () -> hazard > 100 ? null : "hazard pixels " + hazard);
+        }));
+        // Its menu, opened the way a click opens it.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            if (sp.serverLevel().getBlockEntity(liftPos) instanceof LiftBlockEntity lift) {
+                sp.openMenu(lift);
+            } else {
+                LOG.error("booth: FAIL the lift's block entity is at {} -- {}", liftPos, sp.serverLevel().getBlockState(liftPos));
+            }
+        })));
+        s.add(new Step(t += 20, () -> {
+            shoot(mc, "booth-lift-menu");
+            verdict("the lift's screen opens", () -> mc.screen instanceof LiftScreen ? null : "screen " + mc.screen);
+        }));
+        // Build the box car from its parts, through the menu's own button, and photograph the deck up mid-job.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            if (sp.containerMenu instanceof LiftMenu menu) {
+                menu.getSlot(LiftMenu.CHASSIS).set(ModContent.chassisStack(BOX_CAR));
+                menu.getSlot(LiftMenu.WHEELS).set(new ItemStack(ModContent.WHEEL.get(), 4));
+                menu.getSlot(LiftMenu.ENGINE).set(new ItemStack(ModContent.ENGINE.get()));
+                menu.broadcastChanges();
+                if (!menu.clickMenuButton(sp, LiftMenu.BUILD_BUTTON)) {
+                    LOG.error("booth: FAIL build is accepted -- status {}", menu.buildStatus());
+                }
+                sp.closeContainer();
+            } else {
+                LOG.error("booth: FAIL the menu is open on the server -- {}", sp.containerMenu);
+            }
+        })));
+        s.add(new Step(t += LiftMotion.UP + 5, () -> {
+            double up = mc.level != null && mc.level.getBlockEntity(liftPos) instanceof LiftBlockEntity lift ? lift.raise(0.0f) : -1.0;
+            int blue = count(mc, PhotoBooth::lightBlue);
+            shoot(mc, "booth-lift-raised");
+            verdict("the client draws the deck up mid-job", () -> up > LiftMotion.LIFT * 0.9 ? null : "raise " + up);
+            verdict("with the built car on it", () -> blue > 300 ? null : "light-blue pixels " + blue);
+        }));
+        // Paint it red through the menu.
+        s.add(new Step(t += LiftMotion.JOB, () -> onServer(mc, sp -> {
+            if (sp.serverLevel().getBlockEntity(liftPos) instanceof LiftBlockEntity lift) {
+                sp.openMenu(lift);
+                if (sp.containerMenu instanceof LiftMenu menu) {
+                    menu.getSlot(LiftMenu.DYE).set(new ItemStack(Items.RED_DYE));
+                    menu.broadcastChanges();
+                    if (!menu.clickMenuButton(sp, LiftMenu.PAINT_BUTTON)) {
+                        LOG.error("booth: FAIL paint is accepted -- status {}", menu.paintStatus());
+                    }
+                    sp.closeContainer();
+                }
+            }
+        })));
+        s.add(new Step(t += LiftMotion.JOB + 10, () -> {
+            int red = count(mc, PhotoBooth::red);
+            int blue = count(mc, PhotoBooth::lightBlue);
+            shoot(mc, "booth-lift-painted");
+            verdict("the lift painted the car red", () -> red > 300 && blue < 150 ? null : "red " + red + ", light-blue " + blue);
+        }));
         s.add(new Step(t += 20, () -> {
             LOG.info("booth: PASS all checks ran");
             phase = Phase.DONE;
             mc.stop();
         }));
         return s;
+    }
+
+    /** The lift's steel: a grey with little tint, mid-bright, lit by day. */
+    private static boolean steel(int rgb) {
+        int r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
+        return r > 60 && r < 200 && Math.abs(r - g) < 14 && b > r - 4 && b < r + 30;
+    }
+
+    /** The hazard stripe's yellow. */
+    private static boolean hazard(int rgb) {
+        int r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
+        return r > 170 && g > 120 && b < 90 && r > b + 100;
     }
 
     private static int carId(Minecraft mc) {
@@ -286,10 +400,10 @@ public final class PhotoBooth {
         return b > r + 50 && g > r + 20 && b > 90;
     }
 
-    /** The same swatch under red dye, on a lit or a shaded face. */
+    /** The same swatch under red dye, on a lit or a shaded face; not the hazard stripe's yellow. */
     private static boolean red(int rgb) {
         int r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
-        return r > 80 && r > g + 40 && r > b + 40;
+        return r > 80 && g < 110 && r > g + 40 && r > b + 40;
     }
 
     /** The needle swatch (220, 40, 40), lit by the cab's daylight. */

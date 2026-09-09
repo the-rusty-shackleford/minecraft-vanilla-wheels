@@ -19,6 +19,11 @@ package com.chunkworks.vanillawheels;
 
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
+import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
+import com.chunkworks.vanillawheels.lift.LiftControllerBlock;
+import com.chunkworks.vanillawheels.lift.LiftMenu;
+import com.chunkworks.vanillawheels.lift.LiftPartBlock;
+import com.chunkworks.vanillawheels.lift.MechanicLiftItem;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentType;
@@ -33,7 +38,14 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -52,6 +64,9 @@ public final class ModContent {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(VanillaWheelsMod.MOD_ID);
     private static final DeferredRegister<DataComponentType<?>> COMPONENTS = DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, VanillaWheelsMod.MOD_ID);
     private static final DeferredRegister<SoundEvent> SOUNDS = DeferredRegister.create(Registries.SOUND_EVENT, VanillaWheelsMod.MOD_ID);
+    private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(VanillaWheelsMod.MOD_ID);
+    private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, VanillaWheelsMod.MOD_ID);
+    private static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, VanillaWheelsMod.MOD_ID);
 
     /** The one entity type: which vehicle it is, is the profile it carries. */
     public static final DeferredHolder<EntityType<?>, EntityType<Vehicle>> VEHICLE_ENTITY = ENTITIES.register("vehicle",
@@ -85,6 +100,22 @@ public final class ModContent {
     /** Takes a vehicle back into the hand. */
     public static final DeferredItem<Item> WRENCH = ITEMS.registerItem("wrench", WrenchItem::new, new Item.Properties().stacksTo(1));
 
+    /** The Mechanic Lift's front-centre block, with the block entity; the item places the whole lift through it. */
+    public static final DeferredBlock<LiftControllerBlock> LIFT_CONTROLLER = BLOCKS.registerBlock("mechanic_lift", LiftControllerBlock::new, liftProperties());
+    /** Every other cell of a lift. */
+    public static final DeferredBlock<LiftPartBlock> LIFT_PART = BLOCKS.registerBlock("mechanic_lift_part", LiftPartBlock::new, liftProperties());
+    /** The lift in the hand. */
+    public static final DeferredItem<MechanicLiftItem> LIFT_ITEM = ITEMS.registerItem("mechanic_lift", props -> new MechanicLiftItem(LIFT_CONTROLLER.get(), props), new Item.Properties().stacksTo(1));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LiftBlockEntity>> LIFT_BE = BLOCK_ENTITIES.register("mechanic_lift",
+            () -> BlockEntityType.Builder.of(LiftBlockEntity::new, LIFT_CONTROLLER.get()).build(null));
+    /** The client's copy needs no position: it reads the server's verdicts from the data slots. */
+    public static final DeferredHolder<MenuType<?>, MenuType<LiftMenu>> LIFT_MENU = MENUS.register("mechanic_lift",
+            () -> new MenuType<>((id, inventory) -> new LiftMenu(id, inventory, net.minecraft.world.inventory.ContainerLevelAccess.NULL), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
+
+    private static BlockBehaviour.Properties liftProperties() {
+        return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0f, 6.0f).sound(SoundType.METAL).noOcclusion().noLootTable().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK);
+    }
+
     public static final DeferredHolder<SoundEvent, SoundEvent> HORN_TRUCK = sound("horn.truck");
     public static final DeferredHolder<SoundEvent, SoundEvent> ENGINE_PETROL = sound("engine.petrol");
     public static final DeferredHolder<SoundEvent, SoundEvent> SKID = sound("skid");
@@ -99,9 +130,12 @@ public final class ModContent {
     /** effects: registers everything on {@code modBus} */
     public static void register(IEventBus modBus) {
         ENTITIES.register(modBus);
+        BLOCKS.register(modBus);
         ITEMS.register(modBus);
         COMPONENTS.register(modBus);
         SOUNDS.register(modBus);
+        BLOCK_ENTITIES.register(modBus);
+        MENUS.register(modBus);
     }
 
     /** effects: returns a vehicle item for {@code vehicle} */
@@ -119,7 +153,7 @@ public final class ModContent {
     }
 
     /**
-     * effects: puts the parts in Ingredients and Tools, and one vehicle
+     * effects: puts the parts in Ingredients, the wrench in Tools, the lift in Functional Blocks, and one vehicle
      * item and one chassis per registered profile in Transportation, so a
      * vehicle mod's creative presence is automatic
      */
@@ -129,8 +163,8 @@ public final class ModContent {
             event.accept(ENGINE);
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(WRENCH);
-        } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS || event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            // (the Mechanic Lift block joins here in its own phase)
+        } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
+            event.accept(LIFT_ITEM);
         }
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             for (Holder.Reference<VehicleProfile> profile : event.getParameters().holders().lookupOrThrow(VanillaWheels.VEHICLES).listElements().toList()) {

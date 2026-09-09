@@ -1,4 +1,4 @@
-"""The art, as code: the part icons, and the box car the gametests and the booth drive.
+"""The art, as code: the part icons, the lift's textures, the sounds, and the box car the gametests and the booth drive.
 
 Run from the repository root:
 
@@ -126,7 +126,111 @@ def wrench_icon():
     return px
 
 
-ICONS = {"wheel": wheel_icon, "engine": engine_icon, "wrench": wrench_icon}
+def lift_icon():
+    """The lift from the front: a deck plate on two posts, hazard-striped."""
+    px, put = _canvas()
+    for x in range(1, 15):
+        put(x, 9, STEEL_LIGHT)
+        put(x, 10, (230, 180, 40) if (x // 2) % 2 else RUBBER)
+        put(x, 11, STEEL_DARK)
+    for x in (2, 3, 12, 13):
+        for y in range(3, 9):
+            put(x, y, STEEL if x in (2, 12) else STEEL_DARK)
+        put(x, 12, STEEL_DARK)
+        put(x, 13, STEEL_DARK)
+    for x in range(1, 15):
+        put(x, 14, STEEL_DARK)
+    return px
+
+
+ICONS = {"wheel": wheel_icon, "engine": engine_icon, "wrench": wrench_icon, "mechanic_lift": lift_icon}
+
+
+# ---------------------------------------------------------------- the lift's textures
+
+def lift_plate():
+    """A steel plate with rivets in the corners: the posts and the deck's sides."""
+    noise = Noise(0x11F7)
+    px = [[(0, 0, 0, 255) for _ in range(16)] for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            c = shade(STEEL, int((noise.next() - 0.5) * 18))
+            if x == 0 or y == 0:
+                c = STEEL_LIGHT
+            if x == 15 or y == 15:
+                c = STEEL_DARK
+            if (x, y) in ((2, 2), (13, 2), (2, 13), (13, 13)):
+                c = STEEL_DARK
+            if (x, y) in ((3, 3), (14, 3), (3, 14), (14, 14)):
+                c = STEEL_LIGHT
+            px[y][x] = (*c, 255)
+    return px
+
+
+def lift_deck():
+    """The deck's top: diamond plate."""
+    noise = Noise(0xDECC)
+    px = [[(0, 0, 0, 255) for _ in range(16)] for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            c = shade(STEEL, int((noise.next() - 0.5) * 14))
+            if (x + y) % 4 == 0 and (x - y) % 4 == 0:
+                c = STEEL_LIGHT
+            elif (x + y) % 4 == 1 and (x - y) % 4 == 1:
+                c = STEEL_DARK
+            px[y][x] = (*c, 255)
+    return px
+
+
+def lift_stripe():
+    """A hazard band, diagonal yellow and black, running along U: laid along the deck's outer edge."""
+    px = [[(0, 0, 0, 255) for _ in range(16)] for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            c = (230, 180, 40) if ((x + y) // 4) % 2 == 0 else (30, 30, 34)
+            px[y][x] = (*c, 255)
+    return px
+
+
+def lift_gui():
+    """The menu's background: a 176 x 184 panel on a 256 x 256 sheet, slots at the menu's positions."""
+    W, H = 176, 184
+    px = [[(0, 0, 0, 0) for _ in range(256)] for _ in range(256)]
+    panel, light, dark, slot = (198, 198, 198), (255, 255, 255), (85, 85, 85), (139, 139, 139)
+    for y in range(H):
+        for x in range(W):
+            c = panel
+            if x < 3 or y < 3:
+                c = light if not ((x < 3 and y >= H - 3) or (y < 3 and x >= W - 3)) else panel
+            if x >= W - 3 or y >= H - 3:
+                c = dark if not ((x >= W - 3 and y < 3) or (y >= H - 3 and x < 3)) else panel
+            if (x, y) in ((0, 0), (0, 1), (1, 0), (W - 1, H - 1), (W - 2, H - 1), (W - 1, H - 2), (0, H - 1), (W - 1, 0)):
+                c = None
+            if c is not None:
+                px[y][x] = (*c, 255)
+
+    def slot_at(sx, sy):
+        for y in range(18):
+            for x in range(18):
+                c = slot
+                if x == 0 or y == 0:
+                    c = dark
+                if x == 17 or y == 17:
+                    c = light
+                px[sy - 1 + y][sx - 1 + x] = (*c, 255)
+
+    for sx in (26, 62, 98, 134):
+        slot_at(sx, 24)
+    for row in range(3):
+        for col in range(9):
+            slot_at(8 + col * 18, 102 + row * 18)
+    for col in range(9):
+        slot_at(8 + col * 18, 160)
+    # the job bar's groove
+    for y in range(80, 86):
+        for x in range(17, 159):
+            px[y][x] = (*(dark if y in (80, 85) or x in (17, 158) else (160, 160, 160)), 255)
+    return px
 
 
 # ---------------------------------------------------------------- the box car
@@ -348,7 +452,11 @@ def main(argv) -> None:
     if "icons" in want:
         for name, draw in ICONS.items():
             write_png(ASSETS / f"textures/item/{name}.png", 16, 16, draw())
-        print("wrote the icons")
+        write_png(ASSETS / "textures/block/mechanic_lift.png", 16, 16, lift_plate())
+        write_png(ASSETS / "textures/block/mechanic_lift_deck.png", 16, 16, lift_deck())
+        write_png(ASSETS / "textures/block/mechanic_lift_stripe.png", 16, 16, lift_stripe())
+        write_png(ASSETS / "textures/gui/mechanic_lift.png", 256, 256, lift_gui())
+        print("wrote the icons and the lift's textures")
     if "boxcar" in want:
         frame, wheel = box_car()
         mesh_dir = TEST_ASSETS / "vanillawheels/mesh"

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "LLL",
+    "LSL",
+    "LLL"
+  ],
+  "key": {
+    "L": {
+      "item": "minecraft:leather"
+    },
+    "S": {
+      "tag": "c:ingots/steel"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "vanillawheels:wheel"
+  }
+}

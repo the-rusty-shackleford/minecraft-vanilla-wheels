@@ -39,3 +39,11 @@ Vehicle mods nest this jar inside their own; the loader keeps one copy.
     versionRange="[1.0,2.0)"
     ordering="AFTER"
     side="CLIENT"
+
+# Steel for the part recipes.
+[[dependencies.${mod_id}]]
+    modId="metalsandmaterials"
+    type="required"
+    versionRange="[1.0,2.0)"
+    ordering="AFTER"
+    side="BOTH"

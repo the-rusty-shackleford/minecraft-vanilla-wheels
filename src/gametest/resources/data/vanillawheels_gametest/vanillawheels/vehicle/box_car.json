@@ -1,0 +1,182 @@
+{
+  "mesh": "vanillawheels_gametest:box_car",
+  "wheel_mesh": "vanillawheels_gametest:box_wheel",
+  "texture": "vanillawheels_gametest:textures/entity/box_car.png",
+  "scale": 0.0625,
+  "handedness": "right",
+  "body": {
+    "width": 1.5,
+    "length": 3.0,
+    "height": 1.6,
+    "parts": [
+      {
+        "at": [
+          0,
+          6,
+          18
+        ],
+        "width": 1.5,
+        "height": 0.6
+      },
+      {
+        "at": [
+          0,
+          6,
+          -16
+        ],
+        "width": 1.5,
+        "height": 0.9
+      }
+    ]
+  },
+  "seats": [
+    {
+      "at": [
+        6,
+        6,
+        2
+      ],
+      "driver": true
+    },
+    {
+      "at": [
+        -6,
+        6,
+        2
+      ]
+    }
+  ],
+  "wheels": {
+    "radius": 6,
+    "positions": [
+      {
+        "forward": 16,
+        "right": -12,
+        "steers": true
+      },
+      {
+        "forward": 16,
+        "right": 12,
+        "steers": true
+      },
+      {
+        "forward": -16,
+        "right": -12
+      },
+      {
+        "forward": -16,
+        "right": 12
+      }
+    ]
+  },
+  "engine": {
+    "max_speed": 0.9,
+    "acceleration": 0.02,
+    "reverse_speed": 0.3,
+    "brake": 0.05,
+    "drag": 0.01
+  },
+  "handling": {
+    "grip": 0.85,
+    "steer_degrees": 32,
+    "drift_grip": 0.4,
+    "drift_boost": 0.3,
+    "drift_charge_ticks": 40
+  },
+  "climb": 2.0,
+  "mass": 1.0,
+  "fuel": {
+    "capacity": 24000
+  },
+  "storage": {
+    "rows": 3,
+    "region": {
+      "z_max": -8
+    }
+  },
+  "gauges": [
+    {
+      "kind": "speed",
+      "part": {
+        "material": "needle",
+        "x_max": 0
+      },
+      "pivot": [
+        -6,
+        16,
+        9.2
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "zero": 0.3,
+      "sweep": -3.0
+    },
+    {
+      "kind": "fuel",
+      "part": {
+        "material": "needle",
+        "x_min": 0
+      },
+      "pivot": [
+        6,
+        16,
+        9.2
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "zero": -0.3,
+      "sweep": 3.0
+    }
+  ],
+  "headlights": {
+    "at": [
+      [
+        -8,
+        10.5,
+        24.5
+      ],
+      [
+        8,
+        10.5,
+        24.5
+      ]
+    ],
+    "part": {
+      "material": "lamp"
+    },
+    "range": 10
+  },
+  "horn": "vanillawheels:horn.truck",
+  "radio": {
+    "at": [
+      0,
+      15,
+      9
+    ]
+  },
+  "hitch": {
+    "rear": [
+      0,
+      7,
+      -26
+    ]
+  },
+  "paint": {
+    "part": {
+      "material": "body"
+    },
+    "default": "light_blue"
+  },
+  "glass": {
+    "material": "glass"
+  },
+  "sounds": {
+    "engine": "vanillawheels:engine.petrol"
+  }
+}

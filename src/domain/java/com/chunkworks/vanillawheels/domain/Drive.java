@@ -69,6 +69,13 @@ public record Drive(double speed, double heading, double motion, double steer, d
     public static final double BOOST_CAP = 1.3;
     /** Below this speed with no throttle the vehicle is stopped. */
     public static final double STOPPED = 0.005;
+    /**
+     * Rolling resistance: what a tick with no throttle takes off the speed
+     * on the ground, blocks per tick, on top of drag. Drag alone leaves a
+     * car rolling for a quarter of a minute; this is the engine braking
+     * that brings it to rest in a few seconds.
+     */
+    public static final double ROLLING = 0.008;
 
     public Drive {
         if (driftCharge < 0 || driftCharge > 1) {
@@ -108,7 +115,8 @@ public record Drive(double speed, double heading, double motion, double steer, d
      * effects: returns this state one tick on under {@code in} and
      * {@code t}: throttle changes speed toward the top (forward) or reverse
      * speed, or brakes when it opposes the motion, and does nothing without
-     * fuel or off the ground; drag always takes its fraction; the wheels
+     * fuel or off the ground; drag always takes its fraction and rolling
+     * resistance a fixed amount whenever the throttle is off; the wheels
      * ease toward the lock the steer asks for, scaled down with speed; the
      * heading turns by the bicycle rule; the motion follows the heading at
      * the grip's rate, or the drift grip's while drifting; a drift begins
@@ -132,9 +140,12 @@ public record Drive(double speed, double heading, double motion, double steer, d
                 v = v > 0 ? Math.max(0.0, v - t.brake()) : Math.max(-t.reverseSpeed(), v - t.acceleration() * 0.6);
             }
         }
-        // Drag, and a stop when there is nothing left.
+        // Drag, rolling resistance off the throttle, and a stop when there is nothing left.
         if (driving) {
             v *= 1.0 - t.drag();
+            if (in.throttle() == 0) {
+                v = Math.signum(v) * Math.max(0.0, Math.abs(v) - ROLLING);
+            }
         }
         if (in.throttle() == 0 && Math.abs(v) < STOPPED) {
             v = 0.0;

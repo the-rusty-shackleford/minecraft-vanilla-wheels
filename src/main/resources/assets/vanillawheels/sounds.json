@@ -1,0 +1,8 @@
+{
+  "horn.truck": { "subtitle": "subtitles.vanillawheels.horn", "sounds": [ "vanillawheels:horn_truck" ] },
+  "engine.petrol": { "subtitle": "subtitles.vanillawheels.engine", "sounds": [ { "name": "vanillawheels:engine_petrol", "stream": false } ] },
+  "skid": { "subtitle": "subtitles.vanillawheels.skid", "sounds": [ "vanillawheels:skid" ] },
+  "thud": { "subtitle": "subtitles.vanillawheels.thud", "sounds": [ "vanillawheels:thud" ] },
+  "wrench": { "subtitle": "subtitles.vanillawheels.wrench", "sounds": [ "vanillawheels:wrench" ] },
+  "fuel": { "subtitle": "subtitles.vanillawheels.fuel", "sounds": [ "vanillawheels:fuel" ] }
+}

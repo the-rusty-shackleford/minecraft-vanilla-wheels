@@ -28,8 +28,9 @@ import org.junit.jupiter.api.Test;
  * Partitions. Throttle {-1, 0, 1} x fuel {empty, some} x ground {on, off}:
  * forward gains to the top and no further, reverse to its own top, the
  * brake stops before reversing, no fuel stalls, in the air nothing changes
- * but the boost decays. Drag: a coasting car slows and stops without ever
- * reversing. Steering: none at rest, a turn at low speed, a smaller turn
+ * but the boost decays. Drag and rolling: a coasting car slows and stops
+ * without ever reversing, within the ticks rolling resistance alone allows;
+ * rolling bites only off the throttle and only on the ground. Steering: none at rest, a turn at low speed, a smaller turn
  * per block at top speed; left and right symmetric; the wheels ease to the
  * lock and back. Drift: refused below the floor, refused without steer,
  * held: grip drops and the charge fills to one and stops, a skid is
@@ -86,16 +87,34 @@ final class DriveTest {
     }
 
     @Test
-    void aCoastingCarSlowsAndStopsWithoutReversing() {
+    void aCoastingCarSlowsAndStopsWithoutReversingWithinAFewSeconds() {
         Drive d = run(Drive.atRest(0.0), GAS, 100);
+        assertTrue(d.speed() > T.maxSpeed() * 0.97, "at the top after 100 ticks of gas: " + d.speed());
         Drive coasting = d;
         double last = coasting.speed();
-        for (int i = 0; i < 2000 && coasting.speed() > 0; i++) {
+        int ticks = 0;
+        for (; ticks < 2000 && coasting.speed() > 0; ticks++) {
             coasting = coasting.step(Input.NONE, T).next();
             assertTrue(coasting.speed() <= last && coasting.speed() >= 0, "monotone to rest");
             last = coasting.speed();
         }
         assertEquals(0.0, coasting.speed(), "stopped");
+        assertTrue(ticks <= T.maxSpeed() / Drive.ROLLING + 1, "rolling resistance alone bounds the stop: " + ticks);
+        assertTrue(ticks >= 40, "but a car at the top does roll on for a couple of seconds: " + ticks);
+        // Reverse coasts to rest the same way, never past zero.
+        Drive backing = run(Drive.atRest(0.0), REVERSE, 100);
+        assertTrue(backing.speed() < 0, "backing up");
+        Drive stopped = run(backing, Input.NONE, 200);
+        assertEquals(0.0, stopped.speed(), "reverse rolls to rest too");
+    }
+
+    @Test
+    void rollingResistanceOnlyBitesOffTheThrottle() {
+        Drive d = run(Drive.atRest(0.0), GAS, 100);
+        Drive held = d.step(GAS, T).next();
+        assertEquals(d.speed(), held.speed(), 1e-9, "the throttle holds the top speed against drag and rolling");
+        Drive airborne = d.step(Input.coasting(false, true), T).next();
+        assertEquals(d.speed(), airborne.speed(), 1e-12, "nothing rolls in the air");
     }
 
     @Test

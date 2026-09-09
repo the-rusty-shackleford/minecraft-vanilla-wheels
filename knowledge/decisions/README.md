@@ -1,0 +1,17 @@
+---
+title: Vanilla Wheels — decisions log
+type: index
+layer: store
+tags: [index]
+---
+
+# Vanilla Wheels — decisions log
+
+**Append-only.** Never edit an entry's rationale; supersede via a new entry with
+`supersedes: D-NNNN`. Every entry has a status: `Active` / `Superseded` / `Rejected`.
+
+| Id | Topic |
+|----|-------|
+| D-0001 | A vehicle is data: one entity type, a flat profile, mirrored once at load |
+| D-0002 | The driver's client drives; climbing is vanilla's step; rolling resistance |
+| D-0003 | The mesh renderer: our OBJ parser, normals from geometry, paint as vertex colour |

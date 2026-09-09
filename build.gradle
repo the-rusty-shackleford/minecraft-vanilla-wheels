@@ -1,0 +1,260 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.144'
+    id 'idea'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Mojang ships Java 21 to end users in 1.21.1, so mods must target Java 21.
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// ModDevGradle registers only the NeoForged and Mojang repositories. JUnit
+// lives on Central; Luminance, until it has a real repository, on Local.
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+// Three layers, one direction of dependency:
+//
+//   domain   <--  main (adapters)  <--  gametest (a real server)
+//     ^
+//     +----  test (plain JUnit; no Minecraft on its classpath at all)
+//
+// `domain` is the pure layer: the decisions this mod makes -- how a car
+// moves under its driver's input, how its body rides the ground, what a
+// collision costs, what a tank holds, what a mesh is -- over plain numbers. It is compiled against nothing but the JDK, so a
+// `net.minecraft` import there is a compile error rather than something a
+// reviewer has to catch. `gametest` is the only source set besides `main`
+// that receives the modding dependencies; `test` never does.
+sourceSets {
+    domain
+    gametest
+}
+
+// In a dev run SharedConstants.IS_RUNNING_IN_IDE is true, so the structure
+// template manager reads gametest templates from <cwd>/gameteststructures/
+// rather than from a resource pack. The templates are kept under devtools/
+// and copied into place before the run.
+var copyGameTestStructures = tasks.register("copyGameTestStructures", Copy) {
+    from "devtools/gameteststructures"
+    into "run/gameteststructures"
+}
+
+// The booth has its own game directory, run/booth. It makes its own flat
+// world and its own vehicle, so there are no fixtures to write; only the
+// old photos and the save are cleared. Jars dropped in run/booth/mods load
+// (a shader pack's mods, say); jars on the classpath are not discovered as
+// mods by a dev launch.
+var prepareBooth = tasks.register("prepareBooth") {
+    def booth = layout.projectDirectory.dir('run/booth').asFile
+    outputs.upToDateWhen { false }
+    doLast {
+        new File(booth, 'screenshots').deleteDir()
+        new File(booth, 'saves').deleteDir()
+    }
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        // A dedicated server with NeoForge's gametest framework enabled; it
+        // runs every @GameTest in the enabled namespaces and exits with the
+        // number of failed required tests. `type` maps straight onto the run
+        // type name NeoForge publishes.
+        gameTestServer {
+            type = "gameTestServer"
+            sourceSet = sourceSets.gametest
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+            taskBefore copyGameTestStructures
+        }
+        // Eyes for the art: a client that makes a flat world, puts the test
+        // vehicle on it, drives it and photographs it -- see PhotoBooth in
+        // the gametest source set. Needs a display.
+        photoBooth {
+            client()
+            sourceSet = sourceSets.gametest
+            gameDirectory = file('run/booth')
+            systemProperty 'vanillawheels.photobooth', 'true'
+            taskBefore prepareBooth
+        }
+        configureEach {
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.domain)
+            sourceSet(sourceSets.main)
+        }
+        // The gametests are a mod of their own, as in the sibling repos: they
+        // exercise the mod from outside, as a pack would, and carry the photo
+        // booth, which is never shipped.
+        "${mod_id}_gametest" {
+            sourceSet(sourceSets.gametest)
+        }
+    }
+
+    // Deliberately not `domain` and not `test` -- see the layering comment.
+    addModdingDependenciesTo(sourceSets.gametest)
+}
+
+// The gametest mod is for the gametest run and the photo booth only.
+neoForge.runs.matching { it.name != 'gameTestServer' && it.name != 'photoBooth' }.configureEach {
+    loadedMods = neoForge.mods.matching { it.name != "${mod_id}_gametest" }
+}
+
+configurations {
+    gametestImplementation.extendsFrom implementation
+    gametestRuntimeOnly.extendsFrom runtimeOnly
+}
+
+dependencies {
+    // Luminance lights the headlamps. Compiled against, and nested
+    // Jar-in-Jar so the pack needs no separate jar; it is a client-only mod
+    // and inert on the server. The loader deduplicates nested copies.
+    jarJar(implementation("com.chunkworks.luminance:luminance")) {
+        version {
+            strictly "[1.0,2.0)"
+            prefer "1.0.0"
+        }
+    }
+
+    implementation sourceSets.domain.output
+
+    gametestImplementation sourceSets.main.output
+    gametestImplementation sourceSets.domain.output
+
+    // Plain JUnit 5 against the pure layer only. Gradle 9 no longer injects
+    // the platform launcher, so it is declared.
+    testImplementation sourceSets.domain.output
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testRuntimeOnly    'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+    testRuntimeOnly    'org.junit.platform:junit-platform-launcher:1.9.2'
+}
+
+tasks.named('test', Test) {
+    // Gradle enables -ea for Test tasks by default; the domain layer's rep
+    // invariants are `assert`s and rely on it.
+    useJUnitPlatform()
+}
+
+// The shipped jar is main + domain. gametest is never shipped.
+jar {
+    from sourceSets.domain.output
+}
+
+// Vehicle mods compile against and nest this artifact. Until a real Maven
+// repository exists, `./gradlew publishToMavenLocal` is how it is shared.
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+
+// The gametest server's exit code is the number of failed *required* tests,
+// which is also zero when no test ran at all -- a mod the loader refused, a
+// namespace typo, an empty holder class. So the exit code is not the
+// assertion. The assertion is the framework's own summary line in the log,
+// and the task fails without it. `check` runs the gate unless asked not to
+// (`-PskipGameTests`) for fast iteration on the pure tests.
+tasks.named('runGameTestServer') { task ->
+    // Resolved now, not in the action: the configuration cache forbids the
+    // action from touching the project.
+    def logFile = layout.projectDirectory.file('run/logs/latest.log').asFile
+    task.doLast {
+        def text = logFile.exists() ? logFile.text : ''
+        if (text =~ /Missing or unsupported mandatory|Mod loading has failed/) {
+            throw new GradleException("gametest: the loader refused a mod; see ${logFile}")
+        }
+        def passed = (text =~ /All (\d+) required tests passed/)
+        if (!passed.find()) {
+            throw new GradleException("gametest: no 'required tests passed' line in ${logFile}")
+        }
+        task.logger.lifecycle("gametest: all ${passed.group(1)} required tests passed")
+    }
+}
+if (!project.hasProperty('skipGameTests')) {
+    tasks.named('check') {
+        dependsOn 'runGameTestServer'
+    }
+}
+
+// The booth's verdict lines are the assertion, as the gametest server's
+// summary line is. It needs a display and a gametest world to load, so
+// `check` runs it after the gametest server unless asked not to
+// (`-PskipBooth`).
+tasks.named('runPhotoBooth') { task ->
+    def logFile = layout.projectDirectory.file('run/booth/logs/latest.log').asFile
+    task.doLast {
+        def text = logFile.exists() ? logFile.text : ''
+        if (text =~ /Missing or unsupported mandatory|Mod loading has failed/) {
+            throw new GradleException("booth: the loader refused a mod; see ${logFile}")
+        }
+        def failures = text.readLines().findAll { it.contains('booth: FAIL') }
+        if (!failures.isEmpty()) {
+            throw new GradleException("booth: ${failures.size()} failed check(s):\n" + failures.join('\n'))
+        }
+        if (!(text =~ /booth: PASS/)) {
+            throw new GradleException("booth: no verdict in ${logFile} -- the booth never ran")
+        }
+        task.logger.lifecycle("booth: " + (text =~ /booth: PASS.*/)[0])
+    }
+}
+if (!project.hasProperty('skipBooth') && !project.hasProperty('skipGameTests')) {
+    tasks.named('runPhotoBooth') { mustRunAfter 'runGameTestServer' }
+    tasks.named('check') { dependsOn 'runPhotoBooth' }
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

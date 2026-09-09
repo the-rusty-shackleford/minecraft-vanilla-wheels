@@ -1,0 +1,17 @@
+# The gametests and the photo booth, as a mod of their own; never shipped.
+modLoader="javafml"
+loaderVersion="[1,)"
+license="AGPL-3.0-or-later"
+
+[[mods]]
+modId="vanillawheels_gametest"
+version="1.0.0"
+displayName="Vanilla Wheels gametests"
+description='''The gametests, the test vehicle they drive, and the photo booth.'''
+
+[[dependencies.vanillawheels_gametest]]
+    modId="vanillawheels"
+    type="required"
+    versionRange="[1.0,)"
+    ordering="AFTER"
+    side="BOTH"

@@ -1,0 +1,41 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+issueTrackerURL="https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/issues"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="Rusty Shackleford, nfx"
+description='''
+A vehicle protocol. A vehicle is a datapack entry and a mesh: this mod owns
+the driving, the seats, the fuel, the storage, the headlights, the horn, the
+radio, what running into things does, towing, painting, and the Mechanic
+Lift that builds vehicles from a chassis, wheels and an engine.
+Vehicle mods nest this jar inside their own; the loader keeps one copy.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="[${neo_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+# Headlamps light the world through Luminance. Nested in this jar, client
+# only; the server never loads it and a client without it just has lamps
+# that glow without casting.
+[[dependencies.${mod_id}]]
+    modId="luminance"
+    type="optional"
+    versionRange="[1.0,2.0)"
+    ordering="AFTER"
+    side="CLIENT"

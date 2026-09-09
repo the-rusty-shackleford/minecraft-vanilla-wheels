@@ -1,0 +1,111 @@
+{
+  "mesh": "vanillawheels_gametest:box_trailer",
+  "wheel_mesh": "vanillawheels_gametest:box_wheel",
+  "texture": "vanillawheels_gametest:textures/entity/box_car.png",
+  "scale": 0.0625,
+  "handedness": "right",
+  "body": {
+    "width": 1.25,
+    "length": 3.5,
+    "height": 1.45,
+    "parts": [
+      {
+        "at": [
+          0,
+          6,
+          0
+        ],
+        "width": 1.25,
+        "height": 1.0
+      },
+      {
+        "at": [
+          0,
+          6,
+          26
+        ],
+        "width": 0.4,
+        "height": 0.3
+      }
+    ]
+  },
+  "seats": [],
+  "wheels": {
+    "radius": 6,
+    "positions": [
+      {
+        "forward": -4,
+        "right": -11
+      },
+      {
+        "forward": -4,
+        "right": 11
+      }
+    ]
+  },
+  "climb": 2.0,
+  "mass": 0.8,
+  "hitch": {
+    "front": [
+      0,
+      8,
+      34
+    ]
+  },
+  "cargo": {
+    "adults": 2,
+    "young": 4,
+    "slots": [
+      [
+        -4,
+        8,
+        2
+      ],
+      [
+        4,
+        8,
+        2
+      ]
+    ]
+  },
+  "doors": [
+    {
+      "part": {
+        "group": "door_left"
+      },
+      "hinge": [
+        10,
+        15,
+        -20.5
+      ],
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "open": -1.9
+    },
+    {
+      "part": {
+        "group": "door_right"
+      },
+      "hinge": [
+        -10,
+        15,
+        -20.5
+      ],
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "open": 1.9
+    }
+  ],
+  "paint": {
+    "part": {
+      "material": "body"
+    },
+    "default": "white"
+  }
+}

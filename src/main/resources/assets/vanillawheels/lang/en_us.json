@@ -32,5 +32,7 @@
   "vanillawheels.lift.status.paint_ready": "Ready to paint the vehicle",
   "vanillawheels.lift.status.no_dye": "Add a dye to paint it",
   "vanillawheels.lift.status.occupied": "Clear the deck to build",
-  "vanillawheels.lift.status.parts": "Chassis + wheels + engine"
+  "vanillawheels.lift.status.parts": "Chassis + wheels + engine",
+  "vanillawheels.doors_shut": "Open the doors first",
+  "vanillawheels.trailer_full": "No room for another"
 }

@@ -432,6 +432,15 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     }
 
     /** effects: returns {@code v} (mesh units, mesh frame) as blocks in the local frame */
+    /** effects: returns how far ahead of the origin the wheels' axles are on average, blocks, in the local frame */
+    public double axleForward() {
+        double sum = 0.0;
+        for (WheelPosition w : wheels().positions()) {
+            sum += w.forward();
+        }
+        return blocks(sum / wheels().positions().size());
+    }
+
     public Vec localBlocks(Vec v) {
         return toLocal().apply(v).times(scale());
     }

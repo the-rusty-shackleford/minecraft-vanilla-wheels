@@ -26,6 +26,8 @@ import com.chunkworks.vanillawheels.lift.LiftMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.phys.BlockHitResult;
@@ -72,7 +74,8 @@ import org.slf4j.LoggerFactory;
  * dark with the lamps off, and with them on the lamp faces glow and the
  * ground ahead is lit (the lamps through Luminance); a Mechanic Lift is
  * placed through its item and drawn, its menu opens, Build raises the deck
- * with the car on it, Paint turns it red. One {@code booth:
+ * with the car on it, Paint turns it red; a trailer hitched behind a car
+ * with its doors open and two cows aboard. One {@code booth:
  * PASS} or {@code booth: FAIL} line per check; the Gradle task reads them.
  * Client only, active only under {@code vanillawheels.photobooth}.
  *
@@ -86,6 +89,7 @@ public final class PhotoBooth {
     private static final Logger LOG = LoggerFactory.getLogger("Vanilla Wheels booth");
     private static final boolean ACTIVE = Boolean.getBoolean("vanillawheels.photobooth");
     private static final ResourceLocation BOX_CAR = ResourceLocation.fromNamespaceAndPath(GameTestMod.MOD_ID, "box_car");
+    private static final ResourceLocation BOX_TRAILER = ResourceLocation.fromNamespaceAndPath(GameTestMod.MOD_ID, "box_trailer");
 
     private enum Phase { TITLE, LOADING, PLACING, RUNNING, DONE }
 
@@ -104,6 +108,7 @@ public final class PhotoBooth {
     private static List<Step> steps;
     private static UUID car;
     private static BlockPos liftPos = BlockPos.ZERO;
+    private static UUID trailerId;
     private static double groundDark = -1.0;
 
     @SubscribeEvent
@@ -359,6 +364,51 @@ public final class PhotoBooth {
             int blue = count(mc, PhotoBooth::lightBlue);
             shoot(mc, "booth-lift-painted");
             verdict("the lift painted the car red", () -> red > 300 && blue < 150 ? null : "red " + red + ", light-blue " + blue);
+        }));
+        // The trailer: hitched behind a car off to the east, doors open, two cows aboard, seen from the side.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            ServerLevel level = sp.serverLevel();
+            double y = level.getMinBuildHeight() + 5;
+            double x = X + 24.0;
+            sp.teleportTo(level, x, y + 1.5, Z - 1.0, 0.0f, 18.0f);
+            Vehicle car = Vehicle.create(level, BOX_CAR, new Vec3(x + 3.0, y, Z + 6.0), -90.0f);
+            Vehicle trailer = Vehicle.create(level, BOX_TRAILER, new Vec3(x + 3.0 - 26 / 16.0 - 34 / 16.0, y, Z + 6.0), -90.0f);
+            if (car == null || trailer == null) {
+                LOG.error("booth: FAIL the box car and trailer are registered");
+                return;
+            }
+            level.addFreshEntity(car);
+            level.addFreshEntity(trailer);
+            car.hitch(trailer);
+            trailer.toggleDoors();
+            for (int i = 0; i < 2; i++) {
+                Cow cow = EntityType.COW.create(level);
+                if (cow != null) {
+                    cow.setPos(trailer.getX(), trailer.getY(), trailer.getZ());
+                    cow.setNoAi(true);
+                    level.addFreshEntity(cow);
+                    if (!cow.startRiding(trailer, true)) {
+                        LOG.error("booth: FAIL a cow boards the trailer");
+                    }
+                }
+            }
+            car = null;
+            trailerId = trailer.getUUID();
+        })));
+        s.add(new Step(t += SETTLE, () -> {
+            Vehicle trailer = null;
+            if (mc.level != null) {
+                for (var e : mc.level.entitiesForRendering()) {
+                    if (e instanceof Vehicle v && e.getUUID().equals(trailerId)) {
+                        trailer = v;
+                    }
+                }
+            }
+            Vehicle found = trailer;
+            shoot(mc, "booth-trailer");
+            verdict("the client sees the trailer hitched to the car", () -> found != null && found.tower() != null ? null : "trailer " + found + ", tower " + (found == null ? null : found.tower()));
+            verdict("its doors are swung open", () -> found != null && found.doorSwing(1.0f) > 0.9f ? null : "swing " + (found == null ? null : found.doorSwing(1.0f)));
+            verdict("with two cows aboard", () -> found != null && found.animals().size() == 2 ? null : "animals " + (found == null ? null : found.animals()));
         }));
         s.add(new Step(t += 20, () -> {
             LOG.info("booth: PASS all checks ran");

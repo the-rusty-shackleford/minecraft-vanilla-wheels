@@ -16,3 +16,4 @@ tags: [index]
 | D-0002 | The driver's client drives; climbing is vanilla's step; rolling resistance |
 | D-0003 | The mesh renderer: our OBJ parser, normals from geometry, paint as vertex colour |
 | D-0004 | The Mechanic Lift: the assembly is the profile; a 5 x 7 deck; the index finds the controller |
+| D-0005 | Towing: the server follows its own tower; the axle chases the hitch; animals are passengers |

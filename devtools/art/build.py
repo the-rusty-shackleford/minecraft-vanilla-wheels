@@ -309,6 +309,21 @@ def box_car():
     return frame, wheel.text()
 
 
+def box_trailer():
+    """A two-wheeled box on a tongue: walls, a roof, two rear doors on hinges at the outer edges."""
+    w = ObjWriter()
+    w.box("trim", "floor", -10, 6, -20, 10, 8, 16)               # the floor
+    w.box("body", "wall", 9, 8, -20, 10, 22, 16)                 # left wall (+X)
+    w.box("body", "wall", -10, 8, -20, -9, 22, 16)               # right wall
+    w.box("body", "wall", -10, 8, 15, 10, 22, 16)                # front wall
+    w.box("trim", "roof", -10, 22, -20, 10, 23, 16)              # the roof
+    w.box("body", "door_left", 0.5, 8, -21, 10, 22, -20)         # left door, hinge at x = 10
+    w.box("body", "door_right", -10, 8, -21, -0.5, 22, -20)      # right door, hinge at x = -10
+    w.box("trim", "tongue", -1, 7, 16, 1, 9, 34)                 # the tongue
+    w.box("hub", "tongue", -1.5, 6.5, 33, 1.5, 9.5, 35)          # the coupler: hitch at (0, 8, 34)
+    return w.text()
+
+
 BOX_CAR_PROFILE = {
     "mesh": "vanillawheels_gametest:box_car",
     "wheel_mesh": "vanillawheels_gametest:box_wheel",
@@ -442,6 +457,27 @@ SOUNDS = {
 }
 
 
+# The trailer: no engine, no seats, a tongue in front, two cows or four calves behind two doors.
+BOX_TRAILER_PROFILE = {
+    "mesh": "vanillawheels_gametest:box_trailer",
+    "wheel_mesh": "vanillawheels_gametest:box_wheel",
+    "texture": "vanillawheels_gametest:textures/entity/box_car.png",
+    "scale": 0.0625,
+    "handedness": "right",
+    "body": {"width": 1.25, "length": 3.5, "height": 1.45,
+             "parts": [{"at": [0, 6, 0], "width": 1.25, "height": 1.0}, {"at": [0, 6, 26], "width": 0.4, "height": 0.3}]},
+    "seats": [],
+    "wheels": {"radius": 6, "positions": [{"forward": -4, "right": -11}, {"forward": -4, "right": 11}]},
+    "climb": 2.0,
+    "mass": 0.8,
+    "hitch": {"front": [0, 8, 34]},
+    "cargo": {"adults": 2, "young": 4, "slots": [[-4, 8, 2], [4, 8, 2]]},
+    "doors": [{"part": {"group": "door_left"}, "hinge": [10, 15, -20.5], "axis": [0, 1, 0], "open": -1.9},
+              {"part": {"group": "door_right"}, "hinge": [-10, 15, -20.5], "axis": [0, 1, 0], "open": 1.9}],
+    "paint": {"part": {"material": "body"}, "default": "white"},
+}
+
+
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -463,9 +499,11 @@ def main(argv) -> None:
         mesh_dir.mkdir(parents=True, exist_ok=True)
         (mesh_dir / "box_car.obj").write_text(frame, encoding="utf-8")
         (mesh_dir / "box_wheel.obj").write_text(wheel, encoding="utf-8")
+        (mesh_dir / "box_trailer.obj").write_text(box_trailer(), encoding="utf-8")
+        write_json(ROOT / "src/gametest/resources/data/vanillawheels_gametest/vanillawheels/vehicle/box_trailer.json", BOX_TRAILER_PROFILE)
         write_png(TEST_ASSETS / "textures/entity/box_car.png", 64, 64, atlas())
         write_json(ROOT / "src/gametest/resources/data/vanillawheels_gametest/vanillawheels/vehicle/box_car.json", BOX_CAR_PROFILE)
-        write_json(TEST_ASSETS / "lang/en_us.json", {"vehicle.vanillawheels_gametest.box_car": "Box Car"})
+        write_json(TEST_ASSETS / "lang/en_us.json", {"vehicle.vanillawheels_gametest.box_car": "Box Car", "vehicle.vanillawheels_gametest.box_trailer": "Box Trailer"})
         print("wrote the box car")
     if "sounds" in want:
         for name, build in SOUNDS.items():

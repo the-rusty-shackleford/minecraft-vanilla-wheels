@@ -24,13 +24,16 @@ import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.Suspension;
+import com.chunkworks.vanillawheels.domain.Cargo;
 import com.chunkworks.vanillawheels.domain.Tank;
+import com.chunkworks.vanillawheels.domain.Tow;
 import com.chunkworks.vanillawheels.domain.Tuning;
 import com.chunkworks.vanillawheels.domain.Vec;
 import com.google.common.collect.Lists;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
@@ -42,6 +45,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Containers;
@@ -54,6 +58,7 @@ import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.ContainerEntity;
 import net.minecraft.world.entity.vehicle.DismountHelper;
@@ -64,6 +69,7 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -103,6 +109,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private static final EntityDataAccessor<Float> DATA_STEER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> DATA_DRIFTING = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<ItemStack> DATA_DISC = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.ITEM_STACK);
+    /** The entity id of the vehicle towing this one, -1 for none. */
+    private static final EntityDataAccessor<Integer> DATA_TOWER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
+    /** The entity id of the trailer this one tows, -1 for none. */
+    private static final EntityDataAccessor<Integer> DATA_TRAILER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> DATA_DOORS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
+    /** How close a tongue must come to a hitch to catch, blocks; how far it may stretch before it lets go. */
+    public static final double CATCH = 0.5;
+    public static final double STRETCH = 1.0;
 
     /** Headlight modes, in the order the key cycles them. */
     public enum Lights { OFF, ON, AUTO }
@@ -133,6 +147,12 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private final Int2IntOpenHashMap hitAt = new Int2IntOpenHashMap();
     private NonNullList<ItemStack> items = NonNullList.withSize(0, ItemStack.EMPTY);
     @Nullable private ResourceKey<LootTable> lootTable;
+    /** The tow links as saved: entity ids do not survive a reload, so the server re-finds them by these. */
+    @Nullable private UUID towerUuid;
+    @Nullable private UUID trailerUuid;
+    /** The doors' swing on the client, 0 shut to 1 open, eased toward the synced state. */
+    private float doorSwing;
+    private float doorSwingO;
     private long lootTableSeed;
     /** The most hit boxes a profile may add beyond the body's own square. */
     public static final int MAX_PARTS = 4;
@@ -248,6 +268,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_STEER, 0.0f);
         builder.define(DATA_DRIFTING, false);
         builder.define(DATA_DISC, ItemStack.EMPTY);
+        builder.define(DATA_TOWER, -1);
+        builder.define(DATA_TRAILER, -1);
+        builder.define(DATA_DOORS, false);
     }
 
     @Override
@@ -386,15 +409,73 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     // --- riders ----------------------------------------------------------
 
+    /**
+     * effects: a person may board while a seat is free; an animal while the
+     * doors are open and the cargo has room for it; nothing else boards
+     */
     @Override
     protected boolean canAddPassenger(Entity passenger) {
         VehicleProfile p = profile();
-        return p != null && getPassengers().size() < p.seats().size();
+        if (p == null) {
+            return false;
+        }
+        if (passenger instanceof Animal animal) {
+            return p.cargo().isPresent() && doorsOpen() && cargo().accepts(animal.isBaby());
+        }
+        return riders().size() < p.seats().size();
+    }
+
+    /** effects: returns the passengers in seats, in boarding order: everyone who is not an animal in the cargo */
+    private List<Entity> riders() {
+        return getPassengers().stream().filter(e -> !(e instanceof Animal)).toList();
+    }
+
+    /** effects: returns the animals aboard, in boarding order */
+    public List<Animal> animals() {
+        return getPassengers().stream().filter(Animal.class::isInstance).map(Animal.class::cast).toList();
+    }
+
+    /** effects: returns what the cargo holds now, against the profile's room; a vehicle with no cargo holds nothing in no room */
+    public Cargo cargo() {
+        VehicleProfile p = profile();
+        if (p == null || p.cargo().isEmpty()) {
+            return Cargo.empty(1, 1).with(false);
+        }
+        VehicleProfile.Cargo room = p.cargo().get();
+        int adults = 0, young = 0;
+        for (Animal a : animals()) {
+            if (a.isBaby()) {
+                young++;
+            } else {
+                adults++;
+            }
+        }
+        try {
+            return new Cargo(room.adults(), room.young(), adults, young);
+        } catch (IllegalArgumentException overfull) {
+            return new Cargo(room.adults(), room.young(), room.adults(), 0);
+        }
+    }
+
+    public boolean doorsOpen() {
+        return entityData.get(DATA_DOORS);
+    }
+
+    /** effects: returns the doors' swing, 0 shut to 1 open, for drawing */
+    public float doorSwing(float partialTick) {
+        return Mth.lerp(partialTick, doorSwingO, doorSwing);
+    }
+
+    /** effects: opens the doors if shut, shuts them if open */
+    public void toggleDoors() {
+        boolean open = !doorsOpen();
+        entityData.set(DATA_DOORS, open);
+        level().playSound(null, getX(), getY(), getZ(), open ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.IRON_DOOR_CLOSE, SoundSource.NEUTRAL, 0.8f, 1.1f);
     }
 
     /** effects: returns the seat {@code passenger} is in, by order of boarding; the driver's seat goes to whoever boards first if it is free */
     private int seatOf(Entity passenger) {
-        return getPassengers().indexOf(passenger);
+        return riders().indexOf(passenger);
     }
 
     @Override
@@ -405,7 +486,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return null;
         }
         int driverSeat = driverSeat(p);
-        List<Entity> riders = getPassengers();
+        List<Entity> riders = riders();
         if (driverSeat >= 0 && driverSeat < riders.size() && riders.get(driverSeat) instanceof LivingEntity living) {
             return living;
         }
@@ -424,11 +505,23 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     @Override
     protected Vec3 getPassengerAttachmentPoint(Entity entity, EntityDimensions dimensions, float partialTick) {
         VehicleProfile p = profile();
-        int seat = seatOf(entity);
-        if (p == null || seat < 0 || seat >= p.seats().size()) {
+        if (p == null) {
             return super.getPassengerAttachmentPoint(entity, dimensions, partialTick);
         }
-        Vec local = p.localBlocks(p.seats().get(seat).at());
+        Vec local;
+        if (entity instanceof Animal && p.cargo().isPresent()) {
+            // Animals stand on the cargo slots in boarding order; past the last slot they double up, a little to the side.
+            List<Vec> slots = p.cargo().get().slots();
+            int k = Math.max(0, animals().indexOf(entity));
+            Vec slot = p.localBlocks(slots.get(k % slots.size()));
+            local = k < slots.size() ? slot : slot.plus(new Vec(-0.35, 0.0, 0.0));
+        } else {
+            int seat = seatOf(entity);
+            if (seat < 0 || seat >= p.seats().size()) {
+                return super.getPassengerAttachmentPoint(entity, dimensions, partialTick);
+            }
+            local = p.localBlocks(p.seats().get(seat).at());
+        }
         Vec3 at = rotate(local);
         Suspension s = suspension(partialTick);
         return new Vec3(at.x, at.y + s.lift(), at.z);
@@ -484,6 +577,164 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return super.getDismountLocationForPassenger(rider);
     }
 
+    // --- towing ----------------------------------------------------------
+
+    /** effects: returns the vehicle towing this one, if it is loaded here */
+    @Nullable
+    public Vehicle tower() {
+        int id = entityData.get(DATA_TOWER);
+        return id < 0 ? null : level().getEntity(id) instanceof Vehicle v ? v : null;
+    }
+
+    /** effects: returns the trailer this one tows, if it is loaded here */
+    @Nullable
+    public Vehicle trailer() {
+        int id = entityData.get(DATA_TRAILER);
+        return id < 0 ? null : level().getEntity(id) instanceof Vehicle v ? v : null;
+    }
+
+    /** effects: returns whether this can be towed: it has a tongue */
+    public boolean hasTongue() {
+        VehicleProfile p = profile();
+        return p != null && p.hitch().front().isPresent();
+    }
+
+    /** effects: returns where the tongue is in the world, or null without one */
+    @Nullable
+    public Vec3 tongue() {
+        VehicleProfile p = profile();
+        return p == null || p.hitch().front().isEmpty() ? null : position().add(rotate(p.localBlocks(p.hitch().front().get())));
+    }
+
+    /** effects: returns where the rear hitch is in the world, or null without one */
+    @Nullable
+    public Vec3 hitchPoint() {
+        VehicleProfile p = profile();
+        return p == null || p.hitch().rear().isEmpty() ? null : position().add(rotate(p.localBlocks(p.hitch().rear().get())));
+    }
+
+    /**
+     * A trailer goes where its tower goes, so it is controlled by whoever
+     * controls its tower: the driver's client moves it and the server moves
+     * its own copy from its own copy of the tower.
+     */
+    @Override
+    public boolean isControlledByLocalInstance() {
+        Vehicle tower = tower();
+        return tower != null ? tower.isControlledByLocalInstance() : super.isControlledByLocalInstance();
+    }
+
+    /** effects: links {@code trailer} behind this vehicle, both ways, with a clunk */
+    public void hitch(Vehicle trailer) {
+        entityData.set(DATA_TRAILER, trailer.getId());
+        trailer.entityData.set(DATA_TOWER, getId());
+        trailerUuid = trailer.getUUID();
+        trailer.towerUuid = getUUID();
+        Vec3 at = trailer.tongue() == null ? trailer.position() : trailer.tongue();
+        level().playSound(null, at.x, at.y, at.z, SoundEvents.CHAIN_PLACE, SoundSource.NEUTRAL, 1.0f, 0.8f);
+    }
+
+    /** effects: lets go of the tower, if any; the trailer rolls on and stops by itself */
+    public void unhitch() {
+        Vehicle tower = tower();
+        if (tower != null) {
+            tower.entityData.set(DATA_TRAILER, -1);
+            tower.trailerUuid = null;
+        }
+        if (entityData.get(DATA_TOWER) >= 0 || towerUuid != null) {
+            entityData.set(DATA_TOWER, -1);
+            towerUuid = null;
+            Vec3 at = tongue() == null ? position() : tongue();
+            level().playSound(null, at.x, at.y, at.z, SoundEvents.CHAIN_BREAK, SoundSource.NEUTRAL, 1.0f, 0.8f);
+        }
+    }
+
+    /**
+     * effects: one tick of being towed by {@code tower}: the tongue is put
+     * on the tower's hitch by {@link Tow}, the body moved there through the
+     * world (so it climbs and falls like anything else), turned to the new
+     * heading, its wheels rolled; if the world held it back so far that the
+     * tongue is STRETCH from the hitch, the server lets go. Tows its own
+     * trailer on in turn.
+     */
+    void follow(Vehicle tower) {
+        VehicleProfile p = profile();
+        Vec3 hitch = tower.hitchPoint();
+        if (p == null || hitch == null || p.hitch().front().isEmpty()) {
+            return;
+        }
+        Vec tongueLocal = p.localBlocks(p.hitch().front().get());
+        double axleZ = p.axleForward();
+        double length = Math.hypot(tongueLocal.x(), tongueLocal.z() - axleZ);
+        if (length <= 0.05) {
+            return;
+        }
+        double yBefore = getY();
+        Vec3 axle = position().add(rotate(new Vec(0.0, 0.0, axleZ)));
+        Tow.Follow f = Tow.follow(hitch.x, hitch.z, axle.x, axle.z, Math.toRadians(getYRot()), length, Math.toRadians(tower.getYRot()));
+        Vec3 axleOffset = new Vec3(0.0, 0.0, axleZ).yRot((float) -f.heading());
+        double nx = f.axleX() - axleOffset.x;
+        double nz = f.axleZ() - axleOffset.z;
+        Vec3 motion = getDeltaMovement();
+        double vy = onGround() && motion.y <= 0 ? -0.04 : motion.y - 0.08;
+        setDeltaMovement(nx - getX(), vy, nz - getZ());
+        move(MoverType.SELF, getDeltaMovement());
+        if (onGround() && getDeltaMovement().y < 0) {
+            setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
+        }
+        setYRot((float) Math.toDegrees(f.heading()));
+        drive = new Drive(f.travelled(), f.heading(), f.heading(), 0.0, 0.0, false);
+        wheelTravel += f.travelled();
+        entityData.set(DATA_SPEED, (float) f.travelled());
+        entityData.set(DATA_STEER, 0.0f);
+        double dy = getY() - yBefore;
+        if (Math.abs(dy) > 0.3 && Math.abs(dy) <= Suspension.MAX_LIFT) {
+            suspension = suspension.jumped(dy);
+        }
+        if (!level().isClientSide()) {
+            Vec3 tongue = tongue();
+            if (tongue != null && tongue.distanceTo(tower.hitchPoint()) > STRETCH) {
+                unhitch();
+            }
+        }
+        Vehicle next = trailer();
+        if (next != null) {
+            next.follow(this);
+        }
+    }
+
+    /** effects: on the server, catches an unhitched trailer whose tongue has come within CATCH of this vehicle's hitch */
+    private void catchTrailer(VehicleProfile p) {
+        Vec3 hitch = hitchPoint();
+        if (hitch == null || trailer() != null || Math.abs(entityData.get(DATA_SPEED)) < 0.02) {
+            return;
+        }
+        for (Vehicle other : level().getEntitiesOfClass(Vehicle.class, getBoundingBox().inflate(4.0), v -> v != this && v.hasTongue() && v.tower() == null && v.towerUuid == null)) {
+            Vec3 tongue = other.tongue();
+            if (tongue != null && tongue.distanceTo(hitch) < CATCH && other.trailer() != this) {
+                hitch(other);
+                return;
+            }
+        }
+    }
+
+    /** effects: on the server, re-finds a tow link saved by UUID whose entity id was lost to a reload */
+    private void relink() {
+        if (!(level() instanceof ServerLevel server)) {
+            return;
+        }
+        if (towerUuid != null && tower() == null && server.getEntity(towerUuid) instanceof Vehicle t) {
+            entityData.set(DATA_TOWER, t.getId());
+            t.entityData.set(DATA_TRAILER, getId());
+            t.trailerUuid = getUUID();
+        }
+        if (trailerUuid != null && trailer() == null && server.getEntity(trailerUuid) instanceof Vehicle t) {
+            entityData.set(DATA_TRAILER, t.getId());
+            t.entityData.set(DATA_TOWER, getId());
+            t.towerUuid = getUUID();
+        }
+    }
+
     // --- the tick --------------------------------------------------------
 
     @Override
@@ -493,11 +744,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         tickLerp();
         suspensionO = suspension;
         wheelTravelO = wheelTravel;
+        doorSwingO = doorSwing;
         if (p == null) {
             return;
         }
+        if (level().isClientSide()) {
+            doorSwing = Mth.clamp(doorSwing + (doorsOpen() ? 0.15f : -0.15f), 0.0f, 1.0f);
+        }
         double yBefore = getY();
-        if (isControlledByLocalInstance()) {
+        Vehicle tower = tower();
+        boolean towedHere = tower != null && (!level().isClientSide() || isControlledByLocalInstance());
+        if (tower == null && isControlledByLocalInstance()) {
             Input in = level().isClientSide() ? Controls.input(this)
                     : scripted != null ? new Input(scripted.throttle(), scripted.steer(), scripted.drift(), onGround(), hasFuel())
                     : Input.coasting(onGround(), hasFuel());
@@ -525,7 +782,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             } else {
                 syncDriveData();
             }
-        } else {
+        } else if (!towedHere) {
             setDeltaMovement(Vec3.ZERO);
             wheelTravel += entityData.get(DATA_SPEED);
         }
@@ -534,6 +791,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             suspension = suspension.jumped(dy);
         }
         suspension = suspension.step(0.0, 0.0, 0.0, 0.0, tuning.wheelBase(), p.track());
+        // The trailer goes where this went, this very tick, wherever this is moved: the driver's client or the server.
+        Vehicle trailer = trailer();
+        if (trailer != null && tower == null && (!level().isClientSide() || isControlledByLocalInstance())) {
+            trailer.follow(this);
+        }
         placeParts();
         if (!level().isClientSide()) {
             serverTick(p);
@@ -608,6 +870,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             hornTicks = 0;
         }
         runOver(p);
+        if (tickCount % 5 == 0) {
+            relink();
+            catchTrailer(p);
+        }
     }
 
     /** effects: hurts and shoves every living thing in the body's path this tick, once each per half second */
@@ -791,6 +1057,26 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         ItemStack held = player.getItemInHand(hand);
         if (player.isSecondaryUseActive()) {
+            // The tongue, when hitched: let go.
+            if (held.isEmpty() && tower() != null && p.hitch().front().isPresent() && inRegion(p, p.hitch().front().get(), 0.9, hit)) {
+                if (!level().isClientSide()) {
+                    unhitch();
+                }
+                return InteractionResult.sidedSuccess(level().isClientSide());
+            }
+            // A door, empty-handed: open it; open with animals aboard, let them out; open and empty, shut it.
+            if (held.isEmpty() && nearADoor(p, hit)) {
+                if (!level().isClientSide()) {
+                    if (!doorsOpen()) {
+                        toggleDoors();
+                    } else if (!animals().isEmpty()) {
+                        unload();
+                    } else {
+                        toggleDoors();
+                    }
+                }
+                return InteractionResult.sidedSuccess(level().isClientSide());
+            }
             if (held.is(ModContent.WRENCH.get())) {
                 if (!level().isClientSide()) {
                     pickUp(player);
@@ -834,6 +1120,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
+        // Animals on a lead board through the open doors.
+        if (p.cargo().isPresent() && held.is(Items.LEAD)) {
+            if (!level().isClientSide()) {
+                load(player);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
         if (p.fuel().isPresent() && !held.isEmpty()) {
             int burn = held.getBurnTime(null);
             if (burn > 0) {
@@ -863,6 +1156,61 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         return canAddPassenger(player) ? InteractionResult.SUCCESS : InteractionResult.PASS;
+    }
+
+    /** effects: returns whether {@code hit} is within a block and a half of any door's hinge */
+    private boolean nearADoor(VehicleProfile p, Vec3 hit) {
+        for (VehicleProfile.Door d : p.doors()) {
+            if (inRegion(p, d.hinge(), 1.5, hit)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * effects: every animal {@code player} holds on a lead within ten
+     * blocks boards, one by one, while the cargo has room and the doors
+     * are open; each lead comes back to the player; the player is told
+     * when the doors are shut or the trailer is full
+     */
+    private void load(Player player) {
+        if (!doorsOpen()) {
+            player.displayClientMessage(Component.translatable("vanillawheels.doors_shut"), true);
+            return;
+        }
+        List<Animal> led = level().getEntitiesOfClass(Animal.class, player.getBoundingBox().inflate(10.0), a -> a.getLeashHolder() == player);
+        int boarded = 0;
+        for (Animal a : led) {
+            if (!canAddPassenger(a)) {
+                continue;
+            }
+            a.dropLeash(true, false);
+            player.getInventory().placeItemBackInInventory(new ItemStack(Items.LEAD));
+            if (a.startRiding(this, true)) {
+                boarded++;
+            }
+        }
+        if (boarded == 0 && !led.isEmpty()) {
+            player.displayClientMessage(Component.translatable("vanillawheels.trailer_full"), true);
+        }
+    }
+
+    /** effects: every animal aboard steps off behind the vehicle, spread across its width */
+    private void unload() {
+        VehicleProfile p = profile();
+        List<Animal> aboard = animals();
+        if (p == null || aboard.isEmpty()) {
+            return;
+        }
+        double back = -(p.body().length() / 2.0 + 1.0);
+        for (int i = 0; i < aboard.size(); i++) {
+            Animal a = aboard.get(i);
+            double across = (i - (aboard.size() - 1) / 2.0) * 0.9;
+            Vec3 at = position().add(rotate(new Vec(across, 0.0, back - (i / 3) * 1.2)));
+            a.stopRiding();
+            a.setPos(at.x, at.y + 0.1, at.z);
+        }
     }
 
     /** effects: returns whether {@code hit} (relative to the body's position) is inside the storage's region, or anywhere if none is named */
@@ -1056,6 +1404,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     public void remove(Entity.RemovalReason reason) {
         if (!level().isClientSide() && reason.shouldDestroy()) {
             Containers.dropContents(level(), this, this);
+            // Gone for good: whatever was hitched to it is on its own.
+            unhitch();
+            Vehicle trailer = trailer();
+            if (trailer != null) {
+                trailer.unhitch();
+            }
+            trailerUuid = null;
         }
         super.remove(reason);
     }
@@ -1078,6 +1433,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (!disc().isEmpty()) {
             tag.put("Disc", disc().save(registryAccess()));
         }
+        if (towerUuid != null) {
+            tag.putUUID("Tower", towerUuid);
+        }
+        if (trailerUuid != null) {
+            tag.putUUID("Trailer", trailerUuid);
+        }
+        tag.putBoolean("DoorsOpen", doorsOpen());
         addChestVehicleSaveData(tag, registryAccess());
     }
 
@@ -1090,6 +1452,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (tag.contains("Disc")) {
             entityData.set(DATA_DISC, ItemStack.parse(registryAccess(), tag.getCompound("Disc")).orElse(ItemStack.EMPTY));
         }
+        towerUuid = tag.hasUUID("Tower") ? tag.getUUID("Tower") : null;
+        trailerUuid = tag.hasUUID("Trailer") ? tag.getUUID("Trailer") : null;
+        entityData.set(DATA_DOORS, tag.getBoolean("DoorsOpen"));
+        doorSwing = doorsOpen() ? 1.0f : 0.0f;
+        doorSwingO = doorSwing;
         if (id != null) {
             setProfile(id);
         }

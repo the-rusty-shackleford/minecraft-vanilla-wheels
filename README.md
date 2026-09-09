@@ -107,7 +107,11 @@ generator's OBJ has no groups and another's has them. The mesh is Wavefront OBJ 
 texture coordinates (normals are computed, n-gons fanned); face winding may be
 inconsistent, since normals are oriented away from each convex piece's centre. Paint
 parts are drawn with the dye as the vertex colour, so grey swatches take the colour.
-`assets/<ns>/lang/en_us.json` names the vehicle under `vehicle.<ns>.<name>`.
+`assets/<ns>/lang/en_us.json` names the vehicle under `vehicle.<ns>.<name>`. Keep every
+texture coordinate inside its swatch: the body is drawn through the cutout shader, and a
+coordinate on a swatch's edge samples the neighbour or the atlas's empty padding, whose
+alpha is zero, which drops the whole face -- a generator's polygon caps, which carry one
+coordinate on a corner for every vertex, vanish that way.
 
 ## Towing and animals
 

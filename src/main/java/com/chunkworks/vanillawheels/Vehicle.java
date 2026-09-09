@@ -870,9 +870,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             hornTicks = 0;
         }
         runOver(p);
-        if (tickCount % 5 == 0) {
+        catchTrailer(p);
+        if (tickCount % 20 == 0) {
             relink();
-            catchTrailer(p);
         }
     }
 

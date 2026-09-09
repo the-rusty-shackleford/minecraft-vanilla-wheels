@@ -34,7 +34,7 @@ conflict context, engine loop, radio, Luminance headlamps, the lift renderer and
 
 ## How it is verified
 
-`./gradlew check`: 52 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+`./gradlew check`: 53 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
 fixtures); nineteen gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
@@ -55,5 +55,6 @@ trailer's axle follows the hitch line; animals are passengers on cargo slots.
 ## Next
 
 1.0.0 (2026-09-09): the core. 1.1.0 (2026-09-09): the Mechanic Lift and the recipes.
-1.2.0 (2026-09-09): towing, doors, animals. Then the Trailblazer and Trailer repos with
-their art pipeline (the cab repair), and a tuning session with Rusty.
+1.2.0 (2026-09-09): towing, doors, animals. 1.2.1: a trailer is caught every tick, not
+every fifth, so a hitch that starts within reach of a tongue cannot slip past the check.
+The Trailblazer and Trailer repos exist and tow; a tuning session with Rusty is next.

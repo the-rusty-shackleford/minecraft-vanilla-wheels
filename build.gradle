@@ -59,6 +59,14 @@ var prepareBooth = tasks.register("prepareBooth") {
     doLast {
         new File(booth, 'screenshots').deleteDir()
         new File(booth, 'saves').deleteDir()
+        // A fresh game directory opens on the accessibility onboarding screen,
+        // which the booth would wait behind forever; a seeded options file
+        // takes the client straight to the title screen.
+        def options = new File(booth, 'options.txt')
+        if (!options.exists()) {
+            booth.mkdirs()
+            options.text = "onboardAccessibility:false\nnarrator:0\n"
+        }
     }
 }
 

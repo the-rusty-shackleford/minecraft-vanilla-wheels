@@ -93,9 +93,14 @@ public final class BbModel {
             materials.add("texture");
         }
 
-        // The outliner: element uuid -> folder path.
+        // The outliner: element uuid -> folder path. A format-5 project keeps its folders' names in a "groups"
+        // list keyed by uuid and leaves the outliner's nodes nameless; an older one names the nodes themselves.
+        Map<String, String> groupNames = new HashMap<>();
+        for (Object g : Json.list(Json.get(root, "groups"))) {
+            groupNames.put(Json.string(Json.get(g, "uuid"), ""), Json.string(Json.get(g, "name"), "group"));
+        }
         Map<String, String> paths = new HashMap<>();
-        walk(Json.list(Json.get(root, "outliner")), "", paths);
+        walk(Json.list(Json.get(root, "outliner")), "", paths, groupNames);
 
         List<Vec> positions = new ArrayList<>();
         List<Uv> uvs = new ArrayList<>();
@@ -125,13 +130,14 @@ public final class BbModel {
         return new Parsed(Mesh.of(positions, uvs, faces), Optional.ofNullable(image), imageW, imageH, List.copyOf(warnings));
     }
 
-    private static void walk(List<Object> nodes, String path, Map<String, String> paths) {
+    private static void walk(List<Object> nodes, String path, Map<String, String> paths, Map<String, String> groupNames) {
         for (Object n : nodes) {
             if (n instanceof String uuid) {
                 paths.put(uuid, path);
             } else {
-                String name = Json.string(Json.get(n, "name"), "group");
-                walk(Json.list(Json.get(n, "children")), path.isEmpty() ? name : path + "/" + name, paths);
+                Object named = Json.get(n, "name");
+                String name = named != null ? Json.string(named, "group") : groupNames.getOrDefault(Json.string(Json.get(n, "uuid"), ""), "group");
+                walk(Json.list(Json.get(n, "children")), path.isEmpty() ? name : path + "/" + name, paths, groupNames);
             }
         }
     }

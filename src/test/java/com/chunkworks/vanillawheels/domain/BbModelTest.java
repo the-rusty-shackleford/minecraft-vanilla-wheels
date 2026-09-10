@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  * material per face by texture name, the group as the folder path, UVs
  * as fractions of the resolution with rows counted from the bottom, the
  * north face's texture running to the viewer's right, every normal out
- * of the cube. A rotated cube: its corners turn about the origin.
+ * of the cube. A format-5 project: folder names from its groups list. A rotated cube: its corners turn about the origin.
  * An invisible cube: skipped. A mesh element: a face per polygon with a
  * UV per corner. The embedded texture: decoded bytes and size. Not JSON,
  * and JSON without elements: refused.
@@ -110,6 +110,21 @@ final class BbModelTest {
         assertEquals(8, p.texture().get().length);
         assertEquals(64, p.textureWidth());
         assertEquals(32, p.textureHeight());
+    }
+
+    @Test
+    void aFormatFiveProjectNamesItsFoldersInAGroupsList() {
+        // Blockbench 5 writes the folders' names into "groups", keyed by uuid, and leaves the outliner nodes nameless.
+        String project = """
+            {"meta": {"format_version": "5.0", "model_format": "free"}, "resolution": {"width": 16, "height": 16},
+             "elements": [{"name": "lens", "type": "cube", "uuid": "a", "from": [0, 0, 0], "to": [1, 1, 1],
+                           "faces": {"up": {"uv": [0, 0, 1, 1], "texture": 0}}}],
+             "groups": [{"name": "lamps", "uuid": "g"}, {"name": "lenses", "uuid": "h"}],
+             "outliner": [{"uuid": "g", "children": [{"uuid": "h", "children": ["a"]}]}],
+             "textures": [{"name": "t.png", "width": 16, "height": 16}]}
+            """;
+        Mesh m = BbModel.parse(project).mesh();
+        assertEquals("lamps/lenses/lens", m.faces().get(0).group(), "the folder path comes from the groups list");
     }
 
     @Test

@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * The Mechanic Lift's shape: a deck five cells wide and seven long, one
- * cell high, with a two-cell post on each corner of the deck. The
+ * The Mechanic Lift's shape: a deck five cells wide and six long, one
+ * cell high, with a one-cell post on each corner of the deck. The
  * controller is the deck's front-centre cell; every other cell is a part
  * with an index, and the index alone finds the controller again.
  *
@@ -41,9 +41,9 @@ public final class Footprint {
     private Footprint() {}
 
     public static final int WIDTH = 5;
-    public static final int LENGTH = 7;
+    public static final int LENGTH = 6;
     /** Blocks in each corner post, above the deck. */
-    public static final int POST = 2;
+    public static final int POST = 1;
     /** Cells besides the controller. */
     public static final int PARTS = WIDTH * LENGTH - 1 + 4 * POST;
 

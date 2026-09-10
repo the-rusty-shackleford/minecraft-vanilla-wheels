@@ -114,6 +114,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The entity id of the trailer this one tows, -1 for none. */
     private static final EntityDataAccessor<Integer> DATA_TRAILER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_DOORS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
+    /** How many players have the storage open: the chest's lid is up while it is above zero. */
+    private static final EntityDataAccessor<Integer> DATA_OPENERS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     /** How close a tongue must come to a hitch to catch, blocks; how far it may stretch before it lets go. */
     public static final double CATCH = 0.5;
     public static final double STRETCH = 1.0;
@@ -153,6 +155,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The doors' swing on the client, 0 shut to 1 open, eased toward the synced state. */
     private float doorSwing;
     private float doorSwingO;
+    /** The ground under the axles and the sides as last probed, relative to the body. */
+    private double[] ground = new double[4];
+    /** The chest lid on the client, 0 shut to 1 open, eased toward whether anyone has the storage open. */
+    private float lid;
+    private float lidO;
     private long lootTableSeed;
     /** The most hit boxes a profile may add beyond the body's own square. */
     public static final int MAX_PARTS = 4;
@@ -271,6 +278,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_TOWER, -1);
         builder.define(DATA_TRAILER, -1);
         builder.define(DATA_DOORS, false);
+        builder.define(DATA_OPENERS, 0);
     }
 
     @Override
@@ -464,6 +472,37 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** effects: returns the doors' swing, 0 shut to 1 open, for drawing */
     public float doorSwing(float partialTick) {
         return Mth.lerp(partialTick, doorSwingO, doorSwing);
+    }
+
+    /**
+     * effects: returns how far the chest's lid is up for drawing, 0 shut to
+     * 1 open, eased the way the game eases a chest's
+     */
+    public float lidOpenness(float partialTick) {
+        float o = 1.0f - Mth.lerp(partialTick, lidO, lid);
+        return 1.0f - o * o * o;
+    }
+
+    @Override
+    public void startOpen(Player player) {
+        if (!level().isClientSide()) {
+            int n = entityData.get(DATA_OPENERS);
+            entityData.set(DATA_OPENERS, n + 1);
+            if (n == 0) {
+                level().playSound(null, getX(), getY(), getZ(), SoundEvents.CHEST_OPEN, SoundSource.BLOCKS, 0.5f, level().random.nextFloat() * 0.1f + 0.9f);
+            }
+        }
+    }
+
+    @Override
+    public void stopOpen(Player player) {
+        if (!level().isClientSide()) {
+            int n = Math.max(0, entityData.get(DATA_OPENERS) - 1);
+            entityData.set(DATA_OPENERS, n);
+            if (n == 0) {
+                level().playSound(null, getX(), getY(), getZ(), SoundEvents.CHEST_CLOSE, SoundSource.BLOCKS, 0.5f, level().random.nextFloat() * 0.1f + 0.9f);
+            }
+        }
     }
 
     /** effects: opens the doors if shut, shuts them if open */
@@ -683,7 +722,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
         }
         setYRot((float) Math.toDegrees(f.heading()));
-        drive = new Drive(f.travelled(), f.heading(), f.heading(), 0.0, 0.0, false);
+        drive = new Drive(f.travelled(), f.heading(), f.heading(), 0.0, 0.0, false, 0);
         wheelTravel += f.travelled();
         entityData.set(DATA_SPEED, (float) f.travelled());
         entityData.set(DATA_STEER, 0.0f);
@@ -745,11 +784,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         suspensionO = suspension;
         wheelTravelO = wheelTravel;
         doorSwingO = doorSwing;
+        lidO = lid;
         if (p == null) {
             return;
         }
         if (level().isClientSide()) {
             doorSwing = Mth.clamp(doorSwing + (doorsOpen() ? 0.15f : -0.15f), 0.0f, 1.0f);
+            lid = Mth.clamp(lid + (entityData.get(DATA_OPENERS) > 0 ? 0.1f : -0.1f), 0.0f, 1.0f);
         }
         double yBefore = getY();
         Vehicle tower = tower();
@@ -790,7 +831,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (Math.abs(dy) > 0.3 && Math.abs(dy) <= Suspension.MAX_LIFT) {
             suspension = suspension.jumped(dy);
         }
-        suspension = suspension.step(0.0, 0.0, 0.0, 0.0, tuning.wheelBase(), p.track());
+        rideTheGround(p);
         // The trailer goes where this went, this very tick, wherever this is moved: the driver's client or the server.
         Vehicle trailer = trailer();
         if (trailer != null && tower == null && (!level().isClientSide() || isControlledByLocalInstance())) {
@@ -800,6 +841,77 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (!level().isClientSide()) {
             serverTick(p);
         }
+    }
+
+    /**
+     * effects: steps the suspension toward what the ground under the wheels
+     * says: the front and rear axles' ground heights give the pitch, the
+     * two sides' the roll, their mean the lift -- so a body whose box has
+     * stepped onto a ledge pitches nose-up while its rear wheels are still
+     * below, and levels as they follow
+     */
+    private void rideTheGround(VehicleProfile p) {
+        List<VehicleProfile.WheelPosition> wheels = p.wheels().positions();
+        double meanForward = 0.0;
+        for (VehicleProfile.WheelPosition w : wheels) {
+            meanForward += w.forward();
+        }
+        meanForward /= wheels.size();
+        double front = 0.0, rear = 0.0, left = 0.0, right = 0.0;
+        int nf = 0, nr = 0, nl = 0, nrt = 0;
+        for (VehicleProfile.WheelPosition w : wheels) {
+            Vec3 at = position().add(rotate(new Vec(-p.blocks(w.right()), 0.0, p.blocks(w.forward()))));
+            double h = groundUnder(at.x, at.z);
+            if (w.forward() >= meanForward) {
+                front += h;
+                nf++;
+            } else {
+                rear += h;
+                nr++;
+            }
+            if (w.right() <= 0) {
+                left += h;
+                nl++;
+            } else {
+                right += h;
+                nrt++;
+            }
+        }
+        front = nf > 0 ? front / nf : 0.0;
+        rear = nr > 0 ? rear / nr : front;
+        left = nl > 0 ? left / nl : 0.0;
+        right = nrt > 0 ? right / nrt : left;
+        ground = new double[] {front, rear, left, right};
+        suspension = suspension.step(front, rear, left, right, tuning.wheelBase(), p.track());
+    }
+
+    /** effects: returns the ground heights the suspension last chased: front, rear, left, right, blocks relative to the body */
+    public double[] ground() {
+        return ground.clone();
+    }
+
+    /**
+     * effects: returns the height of the ground in the column at (x, z)
+     * relative to the body's own height: the top of the highest block
+     * collision within {@link Suspension#MAX_LIFT} above or below it; the
+     * bottom of that range when there is nothing (a wheel over a drop)
+     */
+    private double groundUnder(double x, double z) {
+        double top = getY() + Suspension.MAX_LIFT;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int bx = Mth.floor(x);
+        int bz = Mth.floor(z);
+        for (int by = Mth.floor(top); by >= Mth.floor(getY() - Suspension.MAX_LIFT); by--) {
+            pos.set(bx, by, bz);
+            net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos).getCollisionShape(level(), pos);
+            if (!shape.isEmpty()) {
+                double h = by + shape.max(net.minecraft.core.Direction.Axis.Y);
+                if (h <= top + 1e-6) {
+                    return h - getY();
+                }
+            }
+        }
+        return -Suspension.MAX_LIFT;
     }
 
     private void tickLerp() {
@@ -906,7 +1018,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         if (slowest != speed) {
             entityData.set(DATA_SPEED, (float) slowest);
-            drive = new Drive(slowest, drive.heading(), drive.motion(), drive.steer(), drive.driftCharge(), drive.drifting());
+            drive = new Drive(slowest, drive.heading(), drive.motion(), drive.steer(), drive.driftCharge(), drive.drifting(), drive.driftSide());
         }
     }
 
@@ -925,7 +1037,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         entityData.set(DATA_SPEED, speed);
         entityData.set(DATA_STEER, steer);
         entityData.set(DATA_DRIFTING, drifting);
-        drive = new Drive(speed, Math.toRadians(getYRot()), drive.motion(), steer, drive.driftCharge(), drifting);
+        drive = new Drive(speed, Math.toRadians(getYRot()), drive.motion(), steer, drive.driftCharge(), drifting, drifting ? (drive.driftSide() == 0 ? (steer < 0 ? -1 : 1) : drive.driftSide()) : 0);
     }
 
     @Override

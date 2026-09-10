@@ -32,12 +32,15 @@ import org.junit.jupiter.api.Test;
  * without ever reversing, within the ticks rolling resistance alone allows;
  * rolling bites only off the throttle and only on the ground. Steering: none at rest, a turn at low speed, a smaller turn
  * per block at top speed; left and right symmetric; the wheels ease to the
- * lock and back. Drift: refused below the floor, refused without steer,
- * held: grip drops and the charge fills to one and stops, a skid is
- * reported while the tail is out; released: a boost proportional to the
- * charge, capped, decaying back to the top speed; released with no charge:
- * nothing; a drift needs fuel to boost. Tuning: each bound refused. Angles
- * wrap.
+ * lock and back. Drift: refused below the floor, refused without steer;
+ * held: the nose swings out over several ticks to the base slip, tighter
+ * with the stick into the turn and wider against it, never past the tight
+ * angle and never flipping side; the path's curvature follows the slip,
+ * harder than full lock when tight and softer when wide; the charge fills
+ * to one and stops, a skid is reported while the tail is out, speed bleeds
+ * a little; released: a boost proportional to the charge, capped, decaying
+ * back to the top speed; released early or without fuel: nothing. Tuning:
+ * each bound refused. Angles wrap.
  */
 final class DriveTest {
     private static final Tuning T = Tuning.pickup();
@@ -144,7 +147,7 @@ final class DriveTest {
     }
 
     @Test
-    void aDriftNeedsSpeedAndSteerThenSlidesChargesAndBoosts() {
+    void aDriftNeedsSpeedAndSteerThenSlidesRoundAnArcChargesAndBoosts() {
         Input driftRight = new Input(1, 1, true, true, true);
         Drive slow = run(Drive.atRest(0.0), GAS, 5);
         assertFalse(slow.step(driftRight, T).next().drifting(), "too slow to drift");
@@ -152,25 +155,61 @@ final class DriveTest {
         assertFalse(fast.step(new Input(1, 0, true, true, true), T).next().drifting(), "no steer, no drift");
         Drive.Step first = fast.step(driftRight, T);
         assertTrue(first.next().drifting());
+        assertEquals(1, first.next().driftSide(), "begun to the right");
         Drive d = first.next();
         boolean skidded = false;
+        double lastSlip = 0;
         for (int i = 0; i < 60; i++) {
             Drive.Step s = d.step(driftRight, T);
             skidded |= s.effects().contains(Drive.Effect.SKID);
             d = s.next();
+            assertTrue(Math.abs(d.slip()) <= Drive.BASE_SLIP + Drive.SLIP_RANGE + 1e-9, "the nose never swings past the tight slip: " + d.slip());
+            lastSlip = d.slip();
         }
         assertEquals(1.0, d.driftCharge(), 1e-9, "a full charge after the charge ticks");
         assertTrue(skidded, "the tail was out");
-        assertTrue(Math.abs(d.slip()) > 0.05, "pointing one way, going another: " + d.slip());
+        assertEquals(Drive.BASE_SLIP + Drive.SLIP_RANGE, lastSlip, 1e-3, "with the stick into the turn the slip settles at the tight angle");
+        assertTrue(d.speed() > fast.speed() * 0.8, "a drift bleeds only a little speed: " + d.speed() + " of " + fast.speed());
         Drive.Step release = d.step(new Input(1, 1, false, true, true), T);
         assertTrue(release.effects().contains(Drive.Effect.BOOST));
         assertTrue(release.next().speed() > T.maxSpeed(), "boosted past the top: " + release.next().speed());
         assertTrue(release.next().speed() <= T.maxSpeed() * Drive.BOOST_CAP, "capped");
         assertEquals(0.0, release.next().driftCharge());
         assertFalse(release.next().drifting());
+        assertEquals(0, release.next().driftSide());
         Drive settled = run(release.next(), GAS, 100);
         assertTrue(settled.speed() <= T.maxSpeed() + 1e-9, "the boost decays back to the top");
         assertTrue(Math.abs(settled.slip()) < 0.02, "grip pulls the motion back to the heading");
+    }
+
+    @Test
+    void theStickTightensOrWidensADriftAndCannotSwitchItsSide() {
+        Drive fast = run(Drive.atRest(0.0), GAS, 400);
+        Input into = new Input(1, 1, true, true, true);
+        Input centred = new Input(1, 0, true, true, true);
+        Input against = new Input(1, -1, true, true, true);
+        Drive tight = run(fast, into, 60);
+        Drive wide = run(run(fast, into, 1), against, 60);
+        Drive middle = run(run(fast, into, 1), centred, 60);
+        assertEquals(1, wide.driftSide(), "steering against the drift widens it, it does not flip it");
+        assertTrue(wide.drifting(), "still drifting");
+        assertEquals(Drive.BASE_SLIP - Drive.SLIP_RANGE, wide.slip(), 1e-3, "the wide slip");
+        assertEquals(Drive.BASE_SLIP, middle.slip(), 1e-3, "the stick centred, the base slip");
+        assertEquals(Drive.BASE_SLIP + Drive.SLIP_RANGE, tight.slip(), 1e-3, "the tight slip");
+        // The path's curvature follows the slip: the motion direction turns fastest in a tight drift, slowest in a wide one.
+        double turnTight = Drive.wrap(tight.step(into, T).next().motion() - tight.motion());
+        double turnMiddle = Drive.wrap(middle.step(centred, T).next().motion() - middle.motion());
+        double turnWide = Drive.wrap(wide.step(against, T).next().motion() - wide.motion());
+        assertTrue(turnTight > turnMiddle && turnMiddle > turnWide && turnWide > 0, "tight " + turnTight + " > middle " + turnMiddle + " > wide " + turnWide);
+        // A tight drift corners harder than the wheels alone will at that speed; a wide one, softer.
+        Drive steered = fast.step(new Input(1, 1, false, true, true), T).next();
+        Drive locked = run(steered, new Input(1, 1, false, true, true), 20);
+        double turnGrip = Drive.wrap(locked.step(new Input(1, 1, false, true, true), T).next().motion() - locked.motion());
+        assertTrue(turnTight > turnGrip, "a tight drift turns harder than full lock at speed: " + turnTight + " vs " + turnGrip);
+        assertTrue(turnWide < turnGrip, "a wide drift turns softer: " + turnWide + " vs " + turnGrip);
+        // The nose swings out over several ticks, not in one.
+        Drive one = fast.step(into, T).next();
+        assertTrue(Math.abs(one.slip()) < Drive.BASE_SLIP * 0.5, "the first tick swings only part of the way: " + one.slip());
     }
 
     @Test
@@ -178,8 +217,13 @@ final class DriveTest {
         Drive fast = run(Drive.atRest(0.0), GAS, 400);
         Drive.Step plain = fast.step(new Input(1, 0, false, true, true), T);
         assertFalse(plain.effects().contains(Drive.Effect.BOOST));
-        Drive drifting = run(fast, new Input(1, 1, true, true, true), 10);
-        assertTrue(drifting.driftCharge() > 0);
+        Drive brief = run(fast, new Input(1, 1, true, true, true), 5);
+        assertTrue(brief.driftCharge() > 0 && brief.driftCharge() < Drive.MIN_CHARGE);
+        Drive.Step early = brief.step(new Input(1, 1, false, true, true), T);
+        assertFalse(early.effects().contains(Drive.Effect.BOOST), "too short a drift pays nothing");
+        assertEquals(0.0, early.next().driftCharge(), "and the charge is gone");
+        Drive drifting = run(fast, new Input(1, 1, true, true, true), 30);
+        assertTrue(drifting.driftCharge() >= Drive.MIN_CHARGE);
         Drive.Step dry = drifting.step(new Input(1, 1, false, true, false), T);
         assertFalse(dry.effects().contains(Drive.Effect.BOOST), "no fuel, no boost");
         assertEquals(0.0, dry.next().driftCharge(), "the charge is spent anyway");
@@ -195,7 +239,9 @@ final class DriveTest {
         assertThrows(IllegalArgumentException.class, () -> new Tuning(t.maxSpeed(), t.reverseSpeed(), t.acceleration(), t.brake(), t.drag(), t.grip(), t.driftGrip(), Math.PI / 2, t.driftBoost(), t.driftChargeTicks(), t.wheelBase(), t.climb(), t.mass()));
         assertThrows(IllegalArgumentException.class, () -> new Tuning(t.maxSpeed(), t.reverseSpeed(), t.acceleration(), t.brake(), t.drag(), t.grip(), t.driftGrip(), t.steer(), t.driftBoost(), 0, t.wheelBase(), t.climb(), t.mass()));
         assertThrows(IllegalArgumentException.class, () -> new Input(2, 0, false, true, true));
-        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 1.5, false));
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 1.5, false, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.5, true, 0), "a drift has a side");
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.0, false, 1), "no side without a drift");
     }
 
     @Test

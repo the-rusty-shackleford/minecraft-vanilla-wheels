@@ -15,16 +15,21 @@ Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-lumi
 ## Driving
 
 Right-click a vehicle to board the nearest free seat, the driver's first. Movement keys
-drive and steer; **jump** held while turning above a third of top speed drifts -- the
-tail comes out, the wheels get more lock, a charge builds, and releasing pays a boost
+drive and steer; **jump** held while turning above a third of top speed drifts the kart
+way: the nose swings out to a slip angle on the side you turned, steering leans the
+slide tighter or wider, the car keeps sliding the way it was going and comes round only
+as fast as `drift_grip` lets it, a charge builds, and releasing pays a boost
 proportional to it. **Left Control** is the horn while held; **H** cycles the headlights
-off, on, auto (auto lights below a configurable darkness). Both keys are live only while
-riding one of these vehicles, so Left Control stays sprint everywhere else. Crouch to
-dismount, as from a boat.
+off, on, auto (auto lights below a configurable darkness); the mode sits at the lower
+left of the screen beside the hotbar, a lamp icon and its word, whenever you ride. Both
+keys are live only while riding one of these vehicles, so Left Control stays sprint
+everywhere else. Crouch to dismount, as from a boat.
 
 A vehicle climbs any ledge up to its profile's `climb` (two blocks for a pickup) without
 a jump: the collision box steps up the way the game steps a player up a slab, and the
-suspension eases the body and the riders up over a few ticks so nothing snaps. Off the
+suspension eases the body and the riders up over a few ticks so nothing snaps. The body
+also cants: each tick the ground under every wheel is probed, and the body pitches nose
+up on a climb and rolls across a slope, the riders and the camera with it. Off the
 throttle, drag and rolling resistance bring it to rest within a few seconds; it never
 rolls backward on its own.
 
@@ -40,7 +45,9 @@ speed, steer and drift for its wheels and engine sound.
   refuses the throttle. `fuelRequired = false` in the config turns all of this off.
 - **Chest**: crouch and right-click the chest region (a pickup's bed) for the vehicle's
   chest; a rider presses the inventory key instead, since crouching dismounts. Contents
-  ride with the vehicle and spill when it is wrenched or destroyed.
+  ride with the vehicle and spill when it is wrenched or destroyed. A profile that
+  places `storage.chest` gets the game's own double chest drawn there, lid and all: it
+  opens with the chest sounds while anyone has the inventory up, as a chest block does.
 - **Records**: crouch and right-click a vehicle that has a radio while holding a music
   disc, and it plays for everyone in range the way a jukebox does, with the now-playing
   toast; crouch and right-click the radio empty-handed to eject it. The disc stays until
@@ -63,7 +70,10 @@ The lamp faces draw fullbright when lit. With Luminance present (it is nested, s
 for the pack; a server-only install and a client without it both work) each lamp casts a
 beam ten blocks down the road, a line light the terrain and entities take. The dash is
 part of the mesh: a speed needle and a fuel needle rotate about their pivots by the
-speed fraction and the tank fraction, seen from the driver's seat in first person.
+speed fraction and the tank fraction, seen from the driver's seat in first person. The
+`glass` part is drawn last through the translucent type, and at a third of its alpha for
+whoever is aboard, so a windshield that reads as glass from outside is clear from the
+driver's seat.
 
 ## The contract
 
@@ -71,23 +81,24 @@ speed fraction and the tank fraction, seen from the driver's seat in first perso
 `vanillawheels:vehicle`; every bound is checked at load and a bad file is refused naming
 its field. Vectors are in mesh units (`scale` turns them into blocks; a pixel mesh uses
 `0.0625`). `handedness: left` says the mesh has +X to the vehicle's right with +Z forward,
-and it is mirrored once at load, vectors and angles with it.
+and it is mirrored once at load, vectors and angles with it; a Blockbench model is
+`right`, since Blockbench's frame is the game's.
 
 ```jsonc
 {
-  "mesh": "trailblazer:trailblazer",                  // assets/<ns>/vanillawheels/mesh/<name>.obj
+  "mesh": "trailblazer:trailblazer",                  // assets/<ns>/vanillawheels/mesh/<name>.bbmodel, or .obj
   "wheel_mesh": "trailblazer:trailblazer_wheel",
-  "texture": "trailblazer:textures/entity/trailblazer.png",
-  "scale": 0.0625, "handedness": "left",
+  "texture": "trailblazer:textures/entity/trailblazer.png",   // optional: a .bbmodel carries its own
+  "scale": 0.0625, "handedness": "right",
   "body": {"width": 2.75, "length": 5.4, "height": 1.9,
            "parts": [{"at": [0, 3, 21], "width": 2.75, "height": 1.55}]},   // hit boxes
   "seats": [{"at": [-8, 10, 10], "driver": true}, {"at": [8, 10, 10]}],
   "wheels": {"radius": 12, "positions": [{"forward": 24, "right": -16, "steers": true}, {"forward": -23, "right": 16}]},   // "up" defaults to the radius: a wheel on the ground
   "engine": {"max_speed": 0.9, "acceleration": 0.02, "reverse_speed": 0.3, "brake": 0.05, "drag": 0.01},
-  "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.4, "drift_boost": 0.3, "drift_charge_ticks": 40},
+  "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
   "climb": 2.0, "mass": 1.45,
   "fuel": {"capacity": 24000},                        // burn ticks, as the furnace counts them
-  "storage": {"rows": 6, "region": {"z_max": -12.5}}, // the chest and where to click for it
+  "storage": {"rows": 6, "region": {"z_max": -12.5}, "chest": {"at": [0, 16, -35], "yaw": 180}},   // the chest, where to click for it, and where the game's double chest is drawn (optional)
   "gauges": [{"kind": "speed", "part": {"material": "needle", "x_max": -5}, "pivot": [-8, 17, 21.9], "axis": [0, 0, 1], "zero": 0.3, "sweep": 4.7}],
   "headlights": {"at": [[-13, 15.5, 40.5], [13, 15.5, 40.5]], "part": {"material": "gauge"}, "range": 10},
   "horn": "vanillawheels:horn.truck",
@@ -95,23 +106,29 @@ and it is mirrored once at load, vectors and angles with it.
   "hitch": {"rear": [0, 4, -34]},                     // a trailer: {"front": [0, 6, 42]}
   "cargo": {"adults": 4, "young": 8, "slots": [[-8, 3, 5], [8, 3, 5], [-8, 3, -12], [8, 3, -12]]},   // a trailer
   "doors": [{"part": {"group": "left_door"}, "hinge": [-15, 20, -40], "axis": [0, 1, 0], "open": -1.9}],   // radians
-  "paint": {"part": {"material": ["body_blue", "body_blue_dark"]}, "default": "light_blue"},
-  "glass": {"material": "glass"},
+  "paint": {"part": {"group": "body"}, "default": "light_blue"},
+  "glass": {"group": "windshield"},
   "sounds": {"engine": "vanillawheels:engine.petrol"}
 }
 ```
 
 A trailer is a profile with no `engine`, no `seats`, and a `hitch.front`. Parts are
-selected by material name, group name, or both, narrowed by an axis range, because one
-generator's OBJ has no groups and another's has them. The mesh is Wavefront OBJ with
-texture coordinates (normals are computed, n-gons fanned); face winding may be
-inconsistent, since normals are oriented away from each convex piece's centre. Paint
-parts are drawn with the dye as the vertex colour, so grey swatches take the colour.
-`assets/<ns>/lang/en_us.json` names the vehicle under `vehicle.<ns>.<name>`. Keep every
-texture coordinate inside its swatch: the body is drawn through the cutout shader, and a
-coordinate on a swatch's edge samples the neighbour or the atlas's empty padding, whose
-alpha is zero, which drops the whole face -- a generator's polygon caps, which carry one
-coordinate on a corner for every vertex, vanish that way.
+selected by material name, group name, or both, narrowed by an axis range. The mesh is
+either a **Blockbench project** (`.bbmodel`, the free or Java Block format: cubes with
+their rotations, mesh elements, folders in the outliner, the texture embedded) or a
+Wavefront OBJ with texture coordinates (normals are computed, n-gons fanned; face winding
+may be inconsistent, since normals are oriented away from each convex piece's centre).
+In a Blockbench model a face's group is its folder path and element name joined by
+slashes, so `{"group": "lenses"}` matches every element in a `lenses` folder however
+deep, and its material is its texture's name, so a one-texture project has one
+material; `texture` may then be left out and the embedded texture is used. Paint parts
+are drawn with the dye as the vertex colour, lifted a quarter of the way toward white
+so a grey swatch reads as paint and not wool. `assets/<ns>/lang/en_us.json` names the
+vehicle under `vehicle.<ns>.<name>`. Keep every texture coordinate inside its swatch:
+the body is drawn through the cutout shader, and a coordinate on a swatch's edge samples
+the neighbour or the atlas's empty padding, whose alpha is zero, which drops the whole
+face -- a generator's polygon caps, which carry one coordinate on a corner for every
+vertex, vanish that way.
 
 ## Towing and animals
 
@@ -144,7 +161,7 @@ pistons, three iron blocks, a redstone block and three smooth stone. Steel is Me
 Materials' (nested, so always present).
 
 The **Mechanic Lift** is one item that places a whole lift: a deck five blocks wide and
-seven long with a two-block post on each corner, forty-three blocks laid at once facing
+six long with a one-block post on each corner, thirty-four blocks laid at once facing
 you, refused with a message unless every cell is clear and every deck cell has solid
 ground under it. Break any block of it and the whole lift goes, dropping one lift item
 (none in creative); replace a block with a command and the rest goes without a drop; a
@@ -172,13 +189,14 @@ registered profile appears in the Tools tab, the lift in Functional Blocks.
 `src/domain` (JDK-only, plain JUnit): `Drive` (the step: throttle, drag, rolling,
 steering by the bicycle rule, grip, drift), `Suspension`, `Impact`, `Tank`, `Tow` (the
 trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
-`LiftMotion`, `LiftStatus` and `Assembly`, and the mesh library (`Obj`,
-`Mesh`, `Transform`, `Rotation`, `Dial`, `WheelSpin`, `BodyPose`, `BakedMesh`).
+`LiftMotion`, `LiftStatus` and `Assembly`, `Paint`, and the mesh library (`Obj`,
+`BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
+`WheelSpin`, `BodyPose`, `BakedMesh`).
 `src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`), the `Vehicle` entity
 and its parts, the items, `net/Payloads`, `WheelsConfig`, `lift` (the two blocks, the
 block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary`,
-`Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, the item renderer,
-`lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,
+`Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
+the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,
 texture and profile generated by `devtools/art/build.py`) and a box trailer, nineteen
 gametests and the photo booth -- a mod of its own, never shipped.
 

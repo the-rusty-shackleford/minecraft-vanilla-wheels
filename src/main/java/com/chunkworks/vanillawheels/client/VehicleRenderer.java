@@ -19,6 +19,7 @@ package com.chunkworks.vanillawheels.client;
 
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
+import com.chunkworks.vanillawheels.domain.Paint;
 import com.chunkworks.vanillawheels.domain.BodyPose;
 import com.chunkworks.vanillawheels.domain.Rotation;
 import com.chunkworks.vanillawheels.domain.Suspension;
@@ -27,14 +28,19 @@ import com.chunkworks.vanillawheels.domain.WheelSpin;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.DyeColor;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -45,20 +51,72 @@ import org.joml.Vector3f;
  * each needle turned by what its gauge shows, each wheel at its slot
  * spinning with the distance rolled and turned with the steer on the
  * steering pair, the doors swung when open, and the glass last, through
- * the translucent type. Two draw calls a vehicle.
+ * the translucent type -- faded to a third of its alpha while the camera
+ * rides this vehicle, so a driver sees the road and not the pane. Two
+ * draw calls a vehicle.
  */
 public final class VehicleRenderer extends EntityRenderer<Vehicle> {
     private static final ResourceLocation MISSING = ResourceLocation.withDefaultNamespace("textures/misc/unknown_server.png");
+    /** White at a third of the alpha: what the glass is multiplied by for whoever is aboard. */
+    static final int GLASS_FROM_INSIDE = 0x55FFFFFF;
+
+    private final ModelPart leftLid;
+    private final ModelPart leftLock;
+    private final ModelPart leftBottom;
+    private final ModelPart rightLid;
+    private final ModelPart rightLock;
+    private final ModelPart rightBottom;
 
     public VehicleRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.shadowRadius = 1.2f;
+        ModelPart left = context.bakeLayer(ModelLayers.DOUBLE_CHEST_LEFT);
+        leftLid = left.getChild("lid");
+        leftLock = left.getChild("lock");
+        leftBottom = left.getChild("bottom");
+        ModelPart right = context.bakeLayer(ModelLayers.DOUBLE_CHEST_RIGHT);
+        rightLid = right.getChild("lid");
+        rightLock = right.getChild("lock");
+        rightBottom = right.getChild("bottom");
+    }
+
+    /**
+     * effects: draws the game's own double chest where the profile puts it,
+     * its front turned as the profile says, the lid up by the vehicle's
+     * openness -- the left half on the chest's own left, as the game lays
+     * a double chest
+     */
+    private void drawChest(Vehicle vehicle, VehicleProfile p, VehicleProfile.Chest chest, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight, int overlay) {
+        Vec at = p.localBlocks(chest.at());
+        float lid = vehicle.lidOpenness(partialTick);
+        poseStack.pushPose();
+        poseStack.translate(at.x(), at.y(), at.z());
+        poseStack.mulPose(Axis.YP.rotationDegrees((float) -chest.yaw()));
+        VertexConsumer left = Sheets.CHEST_LOCATION_LEFT.buffer(buffers, RenderType::entityCutout);
+        poseStack.pushPose();
+        poseStack.translate(0.0, 0.0, -0.5);
+        chestHalf(poseStack, left, leftLid, leftLock, leftBottom, lid, packedLight, overlay);
+        poseStack.popPose();
+        VertexConsumer right = Sheets.CHEST_LOCATION_RIGHT.buffer(buffers, RenderType::entityCutout);
+        poseStack.pushPose();
+        poseStack.translate(-1.0, 0.0, -0.5);
+        chestHalf(poseStack, right, rightLid, rightLock, rightBottom, lid, packedLight, overlay);
+        poseStack.popPose();
+        poseStack.popPose();
+    }
+
+    private static void chestHalf(PoseStack poseStack, VertexConsumer out, ModelPart lid, ModelPart lock, ModelPart bottom, float openness, int light, int overlay) {
+        lid.xRot = -(openness * (float) (Math.PI / 2));
+        lock.xRot = lid.xRot;
+        lid.render(poseStack, out, light, overlay);
+        lock.render(poseStack, out, light, overlay);
+        bottom.render(poseStack, out, light, overlay);
     }
 
     @Override
     public ResourceLocation getTextureLocation(Vehicle vehicle) {
         VehicleProfile p = vehicle.profile();
-        return p == null ? MISSING : p.texture();
+        return p == null ? MISSING : Appearance.of(p).texture;
     }
 
     @Override
@@ -107,6 +165,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
 
         double spin = WheelSpin.radians(vehicle.wheelTravel(partialTick), a.wheelRadius);
         float steer = vehicle.steer();
+        VertexConsumer wheelOut = a.wheelTexture.equals(a.texture) ? solid : buffers.getBuffer(RenderType.entityCutoutNoCull(a.wheelTexture));
         for (Appearance.WheelSlot slot : a.wheels) {
             poseStack.pushPose();
             poseStack.translate(slot.at().x(), slot.at().y(), slot.at().z());
@@ -119,13 +178,17 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
             } else {
                 poseStack.mulPose(Axis.XP.rotation((float) spin));
             }
-            MeshDrawer.draw(a.wheel, poseStack.last(), solid, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
+            MeshDrawer.draw(a.wheel, poseStack.last(), wheelOut, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
             poseStack.popPose();
         }
 
+        p.storage().flatMap(VehicleProfile.Storage::chest).ifPresent(chest -> drawChest(vehicle, p, chest, partialTick, poseStack, buffers, packedLight, overlay));
+
         if (a.glass.quadCount() > 0) {
             VertexConsumer glass = buffers.getBuffer(RenderType.entityTranslucent(a.texture));
-            MeshDrawer.draw(a.glass, poseStack.last(), glass, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
+            Entity camera = Minecraft.getInstance().getCameraEntity();
+            int tint = camera != null && camera.getVehicle() == vehicle ? GLASS_FROM_INSIDE : MeshDrawer.WHITE;
+            MeshDrawer.draw(a.glass, poseStack.last(), glass, tint, packedLight, overlay, MeshDrawer.Shading.LIT);
         }
         poseStack.popPose();
         super.render(vehicle, entityYaw, partialTick, poseStack, buffers, packedLight);
@@ -137,7 +200,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         if (paint == null) {
             paint = p.paint().map(VehicleProfile.Paint::defaultColor).orElse(null);
         }
-        return paint == null ? MeshDrawer.WHITE : 0xFF000000 | paint.getTextureDiffuseColor();
+        return paint == null ? MeshDrawer.WHITE : 0xFF000000 | Paint.lift(paint.getTextureDiffuseColor());
     }
 
     /** effects: applies {@code r} to the pose stack: a turn about its axis through its pivot */

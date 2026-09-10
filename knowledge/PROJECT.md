@@ -10,8 +10,8 @@ tags: [overview]
 ## What this is
 
 A NeoForge 1.21.1 vehicle protocol, built the way the ranged-weapons protocol was: one
-mod owns the mechanics, and a vehicle mod contributes a datapack entry, an OBJ mesh and a
-texture. The first vehicles, the Trailblazer pickup and the Trailer, live in their own
+mod owns the mechanics, and a vehicle mod contributes a datapack entry and a Blockbench
+project (or an OBJ mesh and a texture). The first vehicles, the Trailblazer pickup and the Trailer, live in their own
 data-only repos. Nothing here depends on Automobility, which the pack may drop.
 
 ## Shape
@@ -20,21 +20,24 @@ data-only repos. Nothing here depends on Automobility, which the pack may drop.
 `Input` and a `Tuning`, returning the next state and the effects to emit (skid, boost,
 stalled); `Suspension` -- the body's smoothed lift, pitch and roll that hide the step-up
 snap; `Impact`, `Tank`; `Tow` -- a trailer's axle dragged along the line to the hitch;
-`Cargo` -- adults and young against a trailer's room; and the mesh library (`Obj.parse`, `Mesh` with Newell normals
-oriented outward per convex piece and parts by `Selector`, `Transform`/`Rotation`/`Dial`/
-`WheelSpin`/`BodyPose`, `BakedMesh`). `main`: `api/VehicleProfile` (the contract, a flat
+`Cargo` -- adults and young against a trailer's room; `Paint` -- the dye lifted toward
+white; and the mesh library (`Obj.parse`, `BbModel.parse` over its own `Json` reader,
+`Mesh` with Newell normals oriented outward per convex piece and parts by `Selector`,
+`Transform`/`Rotation`/`Dial`/`WheelSpin`/`BodyPose`, `BakedMesh`). `main`: `api/VehicleProfile` (the contract, a flat
 JSON split into `Look`/`Kit` map codecs to stay under the sixteen-field limit, its RI in
 the compact constructor), the single `Vehicle` entity (vanilla's `VehicleEntity`, NeoForge
 `PartEntity` hit boxes, `ContainerEntity` chest, `HasCustomInventoryScreen`), the items,
 payloads, config, the `lift` package (controller and part blocks with the index in the
 state, one block entity, a menu whose verdicts ride data slots, the placing item), and
-the client (renderer, mesh library with placeholder on a bad OBJ, keys with a riding-only
-conflict context, engine loop, radio, Luminance headlamps, the lift renderer and screen).
+the client (renderer with the game's double chest and the rider's glass fade, mesh
+library with placeholder on a bad file, keys with a riding-only conflict context, the
+lights indicator by the hotbar, engine loop, radio, Luminance headlamps, the lift
+renderer and screen).
 `gametest`: the box car and box trailer, nineteen gametests, the photo booth.
 
 ## How it is verified
 
-`./gradlew check`: 53 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+`./gradlew check`: 62 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
 fixtures); nineteen gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
@@ -48,13 +51,20 @@ load. D-0002 authority and climbing: the driver's client drives, the server re-r
 same step, `maxUpStep` climbs and the suspension hides it; rolling resistance stops a
 coasting car. D-0003 the renderer: OBJ through our own parser, normals from geometry not
 winding, paint as vertex colour. D-0004 the lift: the assembly is the profile's own part
-list, not a recipe type; a 5 x 7 deck; the index in the part's state finds the controller.
+list, not a recipe type; a 5 x 7 deck (5 x 6 since 1.3.0); the index in the part's state finds the controller.
 D-0005 towing: the server tows its own copy from its own tower, no client payload; the
-trailer's axle follows the hitch line; animals are passengers on cargo slots.
+trailer's axle follows the hitch line; animals are passengers on cargo slots. D-0006
+Blockbench: the `.bbmodel` is read as saved, the dye is lifted a quarter toward white,
+the glass clears for the rider.
 
 ## Next
 
 1.0.0 (2026-09-09): the core. 1.1.0 (2026-09-09): the Mechanic Lift and the recipes.
 1.2.0 (2026-09-09): towing, doors, animals. 1.2.1: a trailer is caught every tick, not
 every fifth, so a hitch that starts within reach of a tongue cannot slip past the check.
-The Trailblazer and Trailer repos exist and tow; a tuning session with Rusty is next.
+1.3.0 (2026-09-09), from Rusty's look at the shipped Trailblazer: the body cants on a
+climb (ground probed under each wheel), the drift slides the kart way instead of
+snapping, the chest is the game's double chest, a lights indicator by the hotbar, the
+`.bbmodel` reader, the lifted paint, the rider's glass fade, and the lift cut to five by
+six with one-block posts. The Trailblazer is being rebuilt in Blockbench to Rusty's
+reference; a tuning session on speed, drift and damage is still to come.

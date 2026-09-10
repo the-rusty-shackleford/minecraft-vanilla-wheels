@@ -51,6 +51,9 @@ public final class Appearance {
     public record WheelSlot(Vec at, boolean steers, boolean right) {}
 
     public final ResourceLocation texture;
+    /** The wheel's texture: its own Blockbench project's if it has one, else the body's. */
+    public final ResourceLocation wheelTexture;
+    private static final ResourceLocation MISSING = ResourceLocation.withDefaultNamespace("textures/misc/unknown_server.png");
     public final BakedMesh rest;
     public final BakedMesh body;
     public final BakedMesh lamps;
@@ -90,7 +93,8 @@ public final class Appearance {
         remaining = remaining.without(glassMesh);
         Mesh bodyMesh = p.paint().map(paint -> local.part(paint.part().transformed(t).selector())).orElse(local.part(f -> false));
         remaining = remaining.without(bodyMesh);
-        this.texture = p.texture();
+        this.texture = p.texture().or(() -> MeshLibrary.INSTANCE.embeddedTexture(p.mesh())).orElse(MISSING);
+        this.wheelTexture = p.wheelMesh().flatMap(MeshLibrary.INSTANCE::embeddedTexture).orElse(this.texture);
         this.rest = BakedMesh.of(remaining, scale);
         this.body = BakedMesh.of(bodyMesh, scale);
         this.lamps = BakedMesh.of(lampMesh, scale);

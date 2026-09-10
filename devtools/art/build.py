@@ -143,7 +143,26 @@ def lift_icon():
     return px
 
 
+def lamp_icon(lit):
+    """A headlamp seen from the front-left: a round lens in a housing, with beam strokes when lit."""
+    px, put = _canvas()
+    lens = (250, 236, 150) if lit else (120, 124, 132)
+    lens_hi = (255, 255, 220) if lit else (160, 164, 172)
+    for y in range(3, 13):
+        for x in range(1, 8):
+            d = ((x - 4) ** 2 + (y - 8) ** 2) ** 0.5
+            if d <= 4.3:
+                put(x, y, lens_hi if d < 2 else lens)
+            elif d <= 5.2:
+                put(x, y, STEEL_DARK)
+    if lit:
+        for (x, y) in ((9, 5), (10, 4), (11, 3), (9, 8), (10, 8), (11, 8), (12, 8), (9, 11), (10, 12), (11, 13), (13, 8), (12, 2), (12, 14)):
+            put(x, y, (255, 230, 120))
+    return px
+
+
 ICONS = {"wheel": wheel_icon, "engine": engine_icon, "wrench": wrench_icon, "mechanic_lift": lift_icon}
+GUI_ICONS = {"lamp_off": lambda: lamp_icon(False), "lamp_on": lambda: lamp_icon(True)}
 
 
 # ---------------------------------------------------------------- the lift's textures
@@ -336,7 +355,7 @@ BOX_CAR_PROFILE = {
     "wheels": {"radius": 6, "positions": [{"forward": 16, "right": -12, "steers": True}, {"forward": 16, "right": 12, "steers": True},
                                          {"forward": -16, "right": -12}, {"forward": -16, "right": 12}]},
     "engine": {"max_speed": 0.9, "acceleration": 0.02, "reverse_speed": 0.3, "brake": 0.05, "drag": 0.01},
-    "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.4, "drift_boost": 0.3, "drift_charge_ticks": 40},
+    "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
     "climb": 2.0,
     "mass": 1.0,
     "fuel": {"capacity": 24000},
@@ -488,6 +507,8 @@ def main(argv) -> None:
     if "icons" in want:
         for name, draw in ICONS.items():
             write_png(ASSETS / f"textures/item/{name}.png", 16, 16, draw())
+        for name, draw in GUI_ICONS.items():
+            write_png(ASSETS / f"textures/gui/{name}.png", 16, 16, draw())
         write_png(ASSETS / "textures/block/mechanic_lift.png", 16, 16, lift_plate())
         write_png(ASSETS / "textures/block/mechanic_lift_deck.png", 16, 16, lift_deck())
         write_png(ASSETS / "textures/block/mechanic_lift_stripe.png", 16, 16, lift_stripe())

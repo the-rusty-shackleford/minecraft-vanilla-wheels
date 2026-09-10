@@ -17,6 +17,7 @@
  */
 package com.chunkworks.vanillawheels.client;
 
+import com.chunkworks.vanillawheels.domain.BbModel;
 import com.chunkworks.vanillawheels.domain.Mesh;
 import com.chunkworks.vanillawheels.domain.Obj;
 import com.chunkworks.vanillawheels.domain.ObjFormatException;
@@ -34,23 +35,37 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Every mesh in every resource pack, parsed once per reload (F3+T
- * included): {@code assets/<ns>/vanillawheels/mesh/<name>.obj} is the
- * mesh {@code <ns>:<name>}. A file that is not a mesh is logged with its
- * pack and line and stands in as a placeholder box, so a broken vehicle
- * mod shows a box where the vehicle is, not nothing. Parsing is pure and
- * runs on the reload's worker; the appearances built from meshes are
- * cached per profile in {@link Appearance}.
+ * included): {@code assets/<ns>/vanillawheels/mesh/<name>.obj} or
+ * {@code <name>.bbmodel} (a Blockbench project, saved as it is) is the
+ * mesh {@code <ns>:<name>}. A project's embedded texture is registered
+ * as the texture {@code vanillawheels:bbmodel/<ns>/<name>}, which a
+ * profile without a texture of its own draws with. A file that is not a
+ * mesh is logged with its pack and the reason and stands in as a
+ * placeholder box, so a broken vehicle mod shows a box where the vehicle
+ * is, not nothing. Parsing is pure and runs on the reload's worker; the
+ * appearances built from meshes are cached per profile in
+ * {@link Appearance}.
  */
-public final class MeshLibrary extends SimplePreparableReloadListener<Map<ResourceLocation, Mesh>> {
+public final class MeshLibrary extends SimplePreparableReloadListener<MeshLibrary.Loaded> {
     private static final Logger LOG = LoggerFactory.getLogger("Vanilla Wheels");
     public static final MeshLibrary INSTANCE = new MeshLibrary();
     private static final String PREFIX = "vanillawheels/mesh/";
-    private static final String SUFFIX = ".obj";
+    private static final String OBJ = ".obj";
+    private static final String BBMODEL = ".bbmodel";
+
+    /** What a reload found: the meshes, and the PNG bytes of every embedded texture by mesh id. */
+    public record Loaded(Map<ResourceLocation, Mesh> meshes, Map<ResourceLocation, byte[]> textures) {}
 
     private volatile Map<ResourceLocation, Mesh> meshes = Map.of();
+    private volatile Map<ResourceLocation, ResourceLocation> embedded = Map.of();
     private final Mesh placeholder = Mesh.placeholder(1.0);
 
     private MeshLibrary() {}
+
+    /** effects: returns the texture a Blockbench mesh {@code id} embeds, if it embeds one */
+    public java.util.Optional<ResourceLocation> embeddedTexture(ResourceLocation id) {
+        return java.util.Optional.ofNullable(embedded.get(id));
+    }
 
     /** effects: returns the mesh {@code id} names, or the placeholder box (logged once) */
     public Mesh get(ResourceLocation id) {
@@ -68,21 +83,33 @@ public final class MeshLibrary extends SimplePreparableReloadListener<Map<Resour
     }
 
     @Override
-    protected Map<ResourceLocation, Mesh> prepare(ResourceManager manager, ProfilerFiller profiler) {
+    protected Loaded prepare(ResourceManager manager, ProfilerFiller profiler) {
         Map<ResourceLocation, Mesh> out = new HashMap<>();
-        for (Map.Entry<ResourceLocation, Resource> e : manager.listResources(PREFIX.substring(0, PREFIX.length() - 1), id -> id.getPath().endsWith(SUFFIX)).entrySet()) {
+        Map<ResourceLocation, byte[]> textures = new HashMap<>();
+        for (Map.Entry<ResourceLocation, Resource> e : manager.listResources(PREFIX.substring(0, PREFIX.length() - 1),
+                id -> id.getPath().endsWith(OBJ) || id.getPath().endsWith(BBMODEL)).entrySet()) {
             ResourceLocation file = e.getKey();
             String path = file.getPath();
-            String name = path.substring(PREFIX.length(), path.length() - SUFFIX.length());
+            boolean project = path.endsWith(BBMODEL);
+            String name = path.substring(PREFIX.length(), path.length() - (project ? BBMODEL : OBJ).length());
             ResourceLocation id = ResourceLocation.fromNamespaceAndPath(file.getNamespace(), name);
             try (Reader reader = e.getValue().openAsReader()) {
                 String text = readAll(reader);
-                Obj.Parsed parsed = Obj.parse(text);
-                for (String warning : parsed.warnings()) {
-                    LOG.warn("vanillawheels: mesh {} ({}): {}", id, e.getValue().sourcePackId(), warning);
+                if (project) {
+                    BbModel.Parsed parsed = BbModel.parse(text);
+                    for (String warning : parsed.warnings()) {
+                        LOG.warn("vanillawheels: mesh {} ({}): {}", id, e.getValue().sourcePackId(), warning);
+                    }
+                    out.put(id, parsed.mesh());
+                    parsed.texture().ifPresent(png -> textures.put(id, png));
+                } else {
+                    Obj.Parsed parsed = Obj.parse(text);
+                    for (String warning : parsed.warnings()) {
+                        LOG.warn("vanillawheels: mesh {} ({}): {}", id, e.getValue().sourcePackId(), warning);
+                    }
+                    out.put(id, parsed.mesh());
                 }
-                out.put(id, parsed.mesh());
-            } catch (ObjFormatException ex) {
+            } catch (ObjFormatException | IllegalArgumentException ex) {
                 LOG.error("vanillawheels: mesh {} ({}) is not a mesh: {}; drawing a box", id, e.getValue().sourcePackId(), ex.getMessage());
                 out.put(id, placeholder);
             } catch (IOException | RuntimeException ex) {
@@ -90,7 +117,12 @@ public final class MeshLibrary extends SimplePreparableReloadListener<Map<Resour
                 out.put(id, placeholder);
             }
         }
-        return Map.copyOf(out);
+        return new Loaded(Map.copyOf(out), Map.copyOf(textures));
+    }
+
+    /** effects: returns the id the embedded texture of mesh {@code id} is registered under */
+    static ResourceLocation textureId(ResourceLocation mesh) {
+        return ResourceLocation.fromNamespaceAndPath(com.chunkworks.vanillawheels.api.VanillaWheels.NAMESPACE, "bbmodel/" + mesh.getNamespace() + "/" + mesh.getPath());
     }
 
     private static String readAll(Reader reader) throws IOException {
@@ -104,9 +136,22 @@ public final class MeshLibrary extends SimplePreparableReloadListener<Map<Resour
     }
 
     @Override
-    protected void apply(Map<ResourceLocation, Mesh> prepared, ResourceManager manager, ProfilerFiller profiler) {
-        meshes = prepared;
+    protected void apply(Loaded prepared, ResourceManager manager, ProfilerFiller profiler) {
+        meshes = prepared.meshes();
+        Map<ResourceLocation, ResourceLocation> registered = new HashMap<>();
+        net.minecraft.client.renderer.texture.TextureManager textureManager = net.minecraft.client.Minecraft.getInstance().getTextureManager();
+        for (Map.Entry<ResourceLocation, byte[]> e : prepared.textures().entrySet()) {
+            try {
+                com.mojang.blaze3d.platform.NativeImage image = com.mojang.blaze3d.platform.NativeImage.read(new java.io.ByteArrayInputStream(e.getValue()));
+                ResourceLocation id = textureId(e.getKey());
+                textureManager.register(id, new net.minecraft.client.renderer.texture.DynamicTexture(image));
+                registered.put(e.getKey(), id);
+            } catch (IOException | RuntimeException ex) {
+                LOG.error("vanillawheels: mesh {} embeds a texture that is not a PNG: {}", e.getKey(), ex.toString());
+            }
+        }
+        embedded = Map.copyOf(registered);
         Appearance.invalidate();
-        LOG.info("vanillawheels: {} meshes loaded", prepared.size());
+        LOG.info("vanillawheels: {} meshes loaded, {} with their own texture", meshes.size(), embedded.size());
     }
 }

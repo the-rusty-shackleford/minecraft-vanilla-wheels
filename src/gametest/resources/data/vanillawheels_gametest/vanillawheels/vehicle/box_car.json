@@ -79,7 +79,7 @@
   "handling": {
     "grip": 0.85,
     "steer_degrees": 32,
-    "drift_grip": 0.4,
+    "drift_grip": 0.12,
     "drift_boost": 0.3,
     "drift_charge_ticks": 40
   },

@@ -32,7 +32,8 @@ import java.util.Set;
  *
  * <p>RI: |speed| <= maxSpeed * BOOST_CAP (any tuning it was stepped with);
  *     heading and motion are angles; 0 <= driftCharge <= 1; steer is within
- *     the lock; drifting implies the state was stepped with drift held.
+ *     the lock; drifting implies the state was stepped with drift held and
+ *     driftSide is the side (-1 left, 1 right) it began on, else 0.
  * AF: AF(speed, heading, motion, steer, driftCharge, drifting) = "moving
  *     at {@code speed} blocks a tick (negative in reverse) along
  *     {@code motion}, pointing along {@code heading}, front wheels at
@@ -46,8 +47,9 @@ import java.util.Set;
  * @param steer       the front wheels' angle, radians, positive right
  * @param driftCharge 0..1, the boost banked by drifting
  * @param drifting    whether the tail is out this tick
+ * @param driftSide   which way the drift began, -1 left or 1 right; 0 when not drifting
  */
-public record Drive(double speed, double heading, double motion, double steer, double driftCharge, boolean drifting) {
+public record Drive(double speed, double heading, double motion, double steer, double driftCharge, boolean drifting, int driftSide) {
 
     /** What a step wants the world to do beside moving. */
     public enum Effect { SKID, BOOST, STALLED }
@@ -60,11 +62,21 @@ public record Drive(double speed, double heading, double motion, double steer, d
     /** The fraction of top speed under which a drift cannot begin. */
     public static final double DRIFT_FLOOR = 0.35;
     /** How much of the lock the wheels keep at top speed. */
-    public static final double LOCK_AT_SPEED = 0.4;
+    public static final double LOCK_AT_SPEED = 0.3;
     /** How fast the wheels reach the lock, per tick. */
     public static final double STEER_RATE = 0.25;
-    /** A drift widens the lock by this factor. */
-    public static final double DRIFT_LOCK = 1.5;
+    /** The slip angle a drift settles at with the stick centred, radians. */
+    public static final double BASE_SLIP = Math.toRadians(26);
+    /** How much the stick into or against the turn tightens or widens the slip, radians. */
+    public static final double SLIP_RANGE = Math.toRadians(14);
+    /** The fraction of the way to the slip angle the nose swings each tick. */
+    public static final double DRIFT_TURN = 0.15;
+    /** The fraction of speed a drifting tick costs. */
+    public static final double DRIFT_BLEED = 0.003;
+    /** A drift shorter than this fraction of a full charge pays no boost. */
+    public static final double MIN_CHARGE = 0.35;
+    /** The slip past which the tyres are heard. */
+    public static final double SKID_SLIP = Math.toRadians(10);
     /** Speed may exceed the maximum by this factor for a moment after a boost. */
     public static final double BOOST_CAP = 1.3;
     /** Below this speed with no throttle the vehicle is stopped. */
@@ -81,6 +93,9 @@ public record Drive(double speed, double heading, double motion, double steer, d
         if (driftCharge < 0 || driftCharge > 1) {
             throw new IllegalArgumentException("driftCharge is 0..1: " + driftCharge);
         }
+        if (driftSide < -1 || driftSide > 1 || (drifting && driftSide == 0) || (!drifting && driftSide != 0)) {
+            throw new IllegalArgumentException("a drift has a side, -1 or 1, and nothing else does: " + drifting + " " + driftSide);
+        }
         if (!Double.isFinite(speed) || !Double.isFinite(heading) || !Double.isFinite(motion) || !Double.isFinite(steer)) {
             throw new IllegalArgumentException("a drive must be finite");
         }
@@ -88,7 +103,7 @@ public record Drive(double speed, double heading, double motion, double steer, d
 
     /** effects: returns a vehicle at rest pointing along {@code heading} */
     public static Drive atRest(double heading) {
-        return new Drive(0.0, heading, heading, 0.0, 0.0, false);
+        return new Drive(0.0, heading, heading, 0.0, 0.0, false, 0);
     }
 
     /** effects: returns the speed as a fraction of the top speed, 0..BOOST_CAP, sign dropped */
@@ -119,11 +134,14 @@ public record Drive(double speed, double heading, double motion, double steer, d
      * resistance a fixed amount whenever the throttle is off; the wheels
      * ease toward the lock the steer asks for, scaled down with speed; the
      * heading turns by the bicycle rule; the motion follows the heading at
-     * the grip's rate, or the drift grip's while drifting; a drift begins
-     * when the key is held above the floor speed with the wheels turned,
-     * charges while held, and pays its boost when the key is released.
-     * Effects: SKID while drifting with the tail out, BOOST on the release,
-     * STALLED when the throttle is pressed with no fuel.
+     * the grip's rate. A drift begins when the key is held above the floor
+     * speed with the wheels turned, and from then on the nose swings to a
+     * slip angle on that side (tighter with the stick into the turn, wider
+     * against it) while the body slides round an arc whose curvature is the
+     * slip times the drift grip; it charges while held, bleeds a little
+     * speed, and pays its boost when the key is released after enough of a
+     * charge. Effects: SKID while drifting with the tail out, BOOST on the
+     * release, STALLED when the throttle is pressed with no fuel.
      */
     public Step step(Input in, Tuning t) {
         EnumSet<Effect> effects = EnumSet.noneOf(Effect.class);
@@ -157,37 +175,47 @@ public record Drive(double speed, double heading, double motion, double steer, d
 
         // Steering: the wheels ease to the lock, the lock shrinks with speed.
         double fraction = Math.min(1.0, Math.abs(v) / t.maxSpeed());
-        boolean canDrift = in.drift() && driving && fraction >= DRIFT_FLOOR && in.steer() != 0;
-        boolean nowDrifting = canDrift || (drifting && in.drift() && driving && fraction >= DRIFT_FLOOR * 0.6);
+        boolean canStart = in.drift() && driving && fraction >= DRIFT_FLOOR && in.steer() != 0;
+        boolean holding = drifting && in.drift() && driving && fraction >= DRIFT_FLOOR * 0.6;
+        boolean nowDrifting = holding || canStart;
+        int side = holding ? driftSide : canStart ? in.steer() : 0;
         double lockScale = 1.0 - (1.0 - LOCK_AT_SPEED) * fraction;
-        double lock = t.steer() * lockScale * (nowDrifting ? DRIFT_LOCK : 1.0);
-        double wantSteer = in.steer() * lock;
+        double lock = t.steer() * lockScale;
+        double wantSteer = nowDrifting ? side * t.steer() : in.steer() * lock;
         double s = steer + (wantSteer - steer) * STEER_RATE;
-        if (Math.abs(s) > t.steer() * DRIFT_LOCK) {
-            s = Math.signum(s) * t.steer() * DRIFT_LOCK;
-        }
 
-        // The heading turns by the bicycle rule; nothing turns at a creep.
         double h = heading;
-        if (driving && Math.abs(v) > t.maxSpeed() * CREEP) {
-            h = wrap(h + Math.tan(s) * v / t.wheelBase());
-        }
-
-        // The motion follows the heading at the grip's rate.
-        double gripNow = nowDrifting ? t.driftGrip() : t.grip();
-        double m = wrap(motion + wrap(h - motion) * gripNow);
-        if (!driving) {
-            m = motion;
+        double m = motion;
+        if (nowDrifting) {
+            // A drift, the kart way: the nose swings out to a slip angle on the
+            // side the drift began, tighter with the stick into the turn and
+            // wider against it, and the body slides round an arc whose
+            // curvature is the slip times the drift grip. Speed bleeds a little.
+            double targetSlip = side * (BASE_SLIP + side * in.steer() * SLIP_RANGE);
+            double slipNow = wrap(h - m);
+            double slipNext = slipNow + (targetSlip - slipNow) * DRIFT_TURN;
+            m = wrap(m + slipNext * t.driftGrip());
+            h = wrap(m + slipNext);
+            v *= 1.0 - DRIFT_BLEED;
+        } else {
+            // The heading turns by the bicycle rule; nothing turns at a creep.
+            if (driving && Math.abs(v) > t.maxSpeed() * CREEP) {
+                h = wrap(h + Math.tan(s) * v / t.wheelBase());
+            }
+            // The motion follows the heading at the grip's rate.
+            if (driving) {
+                m = wrap(motion + wrap(h - motion) * t.grip());
+            }
         }
 
         // The drift charge, and its boost on release.
         double charge = driftCharge;
         if (nowDrifting) {
             charge = Math.min(1.0, charge + 1.0 / t.driftChargeTicks());
-            if (Math.abs(wrap(h - m)) > 0.05) {
+            if (Math.abs(wrap(h - m)) > SKID_SLIP) {
                 effects.add(Effect.SKID);
             }
-        } else if (drifting && !in.drift() && charge > 0.0) {
+        } else if (drifting && !in.drift() && charge >= MIN_CHARGE) {
             if (in.fuel() && driving && v > 0) {
                 v = Math.min(t.maxSpeed() * BOOST_CAP, v + t.driftBoost() * charge);
                 effects.add(Effect.BOOST);
@@ -197,7 +225,7 @@ public record Drive(double speed, double heading, double motion, double steer, d
             charge = 0.0;
         }
 
-        return new Step(new Drive(v, h, m, s, charge, nowDrifting), Set.copyOf(effects));
+        return new Step(new Drive(v, h, m, s, charge, nowDrifting, nowDrifting ? side : 0), Set.copyOf(effects));
     }
 
     /** effects: returns {@code a} wrapped into (-pi, pi] */

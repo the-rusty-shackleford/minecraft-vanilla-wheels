@@ -43,18 +43,18 @@ import org.junit.jupiter.api.Test;
 final class FootprintTest {
 
     @Test
-    void theLiftIsThirtyFiveDeckCellsAndEightPostCells() {
-        assertEquals(35 + 8, Footprint.cells().size());
-        assertEquals(42, Footprint.PARTS);
+    void theLiftIsThirtyDeckCellsAndFourPostCells() {
+        assertEquals(30 + 4, Footprint.cells().size());
+        assertEquals(33, Footprint.PARTS);
         assertEquals(new Cell(0, 0, 0), Footprint.cells().get(0), "the controller first");
         Set<Cell> distinct = new HashSet<>(Footprint.cells());
         assertEquals(Footprint.cells().size(), distinct.size(), "no cell twice");
         long deck = Footprint.cells().stream().filter(Cell::isDeck).count();
-        assertEquals(35, deck);
+        assertEquals(30, deck);
         for (Cell c : Footprint.cells()) {
-            assertTrue(c.right() >= -2 && c.right() <= 2 && c.back() >= 0 && c.back() <= 6 && c.up() >= 0 && c.up() <= 2, "within the shape: " + c);
+            assertTrue(c.right() >= -2 && c.right() <= 2 && c.back() >= 0 && c.back() <= 5 && c.up() >= 0 && c.up() <= 1, "within the shape: " + c);
             if (!c.isDeck()) {
-                assertTrue(Math.abs(c.right()) == 2 && (c.back() == 0 || c.back() == 6), "posts stand on the corners: " + c);
+                assertTrue(Math.abs(c.right()) == 2 && (c.back() == 0 || c.back() == 5), "posts stand on the corners: " + c);
             }
         }
     }
@@ -72,17 +72,17 @@ final class FootprintTest {
 
     @Test
     void eachHeadingTurnsTheDeckBehindTheFrontAndRightToTheRight() {
-        Cell backRight = new Cell(2, 0, 6);
+        Cell backRight = new Cell(2, 0, 5);
         // Looking north (-Z): the deck runs south (+Z), right is east (+X).
-        assertArrayEquals(new int[] {2, 0, 6}, Heading.NORTH.offset(backRight));
+        assertArrayEquals(new int[] {2, 0, 5}, Heading.NORTH.offset(backRight));
         // Looking south (+Z): the deck runs north, right is west.
-        assertArrayEquals(new int[] {-2, 0, -6}, Heading.SOUTH.offset(backRight));
+        assertArrayEquals(new int[] {-2, 0, -5}, Heading.SOUTH.offset(backRight));
         // Looking east (+X): the deck runs west, right is south (+Z).
-        assertArrayEquals(new int[] {-6, 0, 2}, Heading.EAST.offset(backRight));
+        assertArrayEquals(new int[] {-5, 0, 2}, Heading.EAST.offset(backRight));
         // Looking west (-X): the deck runs east, right is north.
-        assertArrayEquals(new int[] {6, 0, -2}, Heading.WEST.offset(backRight));
-        Cell post = new Cell(-2, 2, 0);
-        assertArrayEquals(new int[] {-2, 2, 0}, Heading.NORTH.offset(post));
+        assertArrayEquals(new int[] {5, 0, -2}, Heading.WEST.offset(backRight));
+        Cell post = new Cell(-2, 1, 0);
+        assertArrayEquals(new int[] {-2, 1, 0}, Heading.NORTH.offset(post));
         for (Heading h : Heading.values()) {
             for (int i = 1; i <= Footprint.PARTS; i++) {
                 int[] o = h.offset(Footprint.cell(i));
@@ -96,13 +96,13 @@ final class FootprintTest {
     void boundsSpawnAndDeckBoxPerHeading() {
         int[][] north = Footprint.bounds(Heading.NORTH);
         assertArrayEquals(new int[] {-2, 0, 0}, north[0]);
-        assertArrayEquals(new int[] {2, 2, 6}, north[1]);
+        assertArrayEquals(new int[] {2, 1, 5}, north[1]);
         int[][] east = Footprint.bounds(Heading.EAST);
-        assertArrayEquals(new int[] {-6, 0, -2}, east[0]);
-        assertArrayEquals(new int[] {0, 2, 2}, east[1]);
+        assertArrayEquals(new int[] {-5, 0, -2}, east[0]);
+        assertArrayEquals(new int[] {0, 1, 2}, east[1]);
         double[] spawn = Footprint.spawn(Heading.NORTH);
-        assertArrayEquals(new double[] {0.5, 1.0, 3.5}, spawn, 1e-12, "the deck's centre, on top of it");
-        assertArrayEquals(new double[] {-2.5, 1.0, 0.5}, Footprint.spawn(Heading.EAST), 1e-12);
+        assertArrayEquals(new double[] {0.5, 1.0, 3.0}, spawn, 1e-12, "the deck's centre, on top of it");
+        assertArrayEquals(new double[] {-2.0, 1.0, 0.5}, Footprint.spawn(Heading.EAST), 1e-12);
         for (Heading h : Heading.values()) {
             double[][] box = Footprint.deckBox(h);
             double[] s = Footprint.spawn(h);
@@ -110,7 +110,7 @@ final class FootprintTest {
                 assertTrue(s[i] >= box[0][i] && s[i] <= box[1][i], "the spawn is inside the deck box facing " + h + " on axis " + i);
             }
             assertEquals(1.0, box[0][1], 1e-12, "from the deck's top");
-            assertEquals(3.0, box[1][1], 1e-12, "to the posts' top");
+            assertEquals(2.0, box[1][1], 1e-12, "to the posts' top");
         }
         assertEquals(0.0f, Heading.SOUTH.yaw());
         assertEquals(-90.0f, Heading.EAST.yaw());

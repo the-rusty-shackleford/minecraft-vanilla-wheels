@@ -58,12 +58,12 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
                              Handling handling, double climb, double mass, Kit kit) {
 
     /** What the vehicle looks like: its meshes, texture, units, hand, paint, glass and sounds. One flat object in the JSON. */
-    public record Look(ResourceLocation mesh, Optional<ResourceLocation> wheelMesh, ResourceLocation texture, double scale,
+    public record Look(ResourceLocation mesh, Optional<ResourceLocation> wheelMesh, Optional<ResourceLocation> texture, double scale,
                        Handedness handedness, Optional<Paint> paint, Optional<PartSelector> glass, Sounds sounds) {
         public static final MapCodec<Look> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 ResourceLocation.CODEC.fieldOf("mesh").forGetter(Look::mesh),
                 ResourceLocation.CODEC.optionalFieldOf("wheel_mesh").forGetter(Look::wheelMesh),
-                ResourceLocation.CODEC.fieldOf("texture").forGetter(Look::texture),
+                ResourceLocation.CODEC.optionalFieldOf("texture").forGetter(Look::texture),
                 Codec.doubleRange(0.0001, 100.0).optionalFieldOf("scale", 1.0).forGetter(Look::scale),
                 Handedness.CODEC.optionalFieldOf("handedness", Handedness.RIGHT).forGetter(Look::handedness),
                 Paint.CODEC.optionalFieldOf("paint").forGetter(Look::paint),
@@ -96,7 +96,8 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     // The look's and the kit's fields, as if they were the profile's own.
     public ResourceLocation mesh() { return look.mesh(); }
     public Optional<ResourceLocation> wheelMesh() { return look.wheelMesh(); }
-    public ResourceLocation texture() { return look.texture(); }
+    /** The texture to draw with; absent, the mesh's own embedded one (a Blockbench project carries it). */
+    public Optional<ResourceLocation> texture() { return look.texture(); }
     public double scale() { return look.scale(); }
     public Handedness handedness() { return look.handedness(); }
     public Optional<Paint> paint() { return look.paint(); }
@@ -258,12 +259,12 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         public static final Codec<Handling> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.doubleRange(0.01, 1.0).optionalFieldOf("grip", 0.85).forGetter(Handling::grip),
                 Codec.doubleRange(1.0, 89.0).optionalFieldOf("steer_degrees", 32.0).forGetter(Handling::steerDegrees),
-                Codec.doubleRange(0.01, 1.0).optionalFieldOf("drift_grip", 0.4).forGetter(Handling::driftGrip),
+                Codec.doubleRange(0.01, 1.0).optionalFieldOf("drift_grip", 0.12).forGetter(Handling::driftGrip),
                 Codec.doubleRange(0.0, 3.0).optionalFieldOf("drift_boost", 0.3).forGetter(Handling::driftBoost),
                 Codec.intRange(1, 400).optionalFieldOf("drift_charge_ticks", 40).forGetter(Handling::driftChargeTicks)
         ).apply(i, Handling::new));
 
-        public static final Handling DEFAULT = new Handling(0.85, 32.0, 0.4, 0.3, 40);
+        public static final Handling DEFAULT = new Handling(0.85, 32.0, 0.12, 0.3, 40);
     }
 
     /** A tank, in burn ticks. */
@@ -274,11 +275,25 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     }
 
     /** A chest of {@code rows} rows of nine, opened by clicking inside {@code region} (mesh units). */
-    public record Storage(int rows, Optional<PartSelector> region) {
+    public record Storage(int rows, Optional<PartSelector> region, Optional<Chest> chest) {
         public static final Codec<Storage> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.intRange(1, 6).fieldOf("rows").forGetter(Storage::rows),
-                PartSelector.CODEC.optionalFieldOf("region").forGetter(Storage::region)
+                PartSelector.CODEC.optionalFieldOf("region").forGetter(Storage::region),
+                Chest.CODEC.optionalFieldOf("chest").forGetter(Storage::chest)
         ).apply(i, Storage::new));
+    }
+
+    /**
+     * A real double chest, the game's own model and texture, drawn on the
+     * vehicle with its bottom centred at {@code at} (mesh units) and its
+     * front turned {@code yaw} degrees from forward (180: it faces the
+     * rear). Its lid opens while anyone has the storage open.
+     */
+    public record Chest(Vec at, double yaw) {
+        public static final Codec<Chest> CODEC = RecordCodecBuilder.create(i -> i.group(
+                VEC.fieldOf("at").forGetter(Chest::at),
+                Codec.DOUBLE.optionalFieldOf("yaw", 180.0).forGetter(Chest::yaw)
+        ).apply(i, Chest::new));
     }
 
     /** What a gauge shows. */

@@ -21,7 +21,8 @@ import java.util.Set;
 
 /**
  * Which faces of a mesh make a part: those whose material is one of
- * {@code materials} (any, if empty), whose group is one of {@code groups}
+ * {@code materials} (any, if empty), whose group -- or, for a group that is a path of
+ * names joined by slashes, any name on it -- is one of {@code groups}
  * (any, if empty), and whose centre lies in {@code region}. A profile names
  * a needle this way -- material {@code needle}, x at most -5 -- because the
  * bundle's meshes carry no groups and the trailer's carry many.
@@ -51,9 +52,25 @@ public record Selector(Set<String> materials, Set<String> groups, Region region)
     }
 
     /** effects: returns whether {@code face}, whose centre is {@code centre}, is selected */
+    /** effects: returns whether the face's group, a path of names joined by slashes, has one of the selector's groups as a component */
+    private boolean inGroup(String group) {
+        if (group == null) {
+            return false;
+        }
+        if (groups.contains(group)) {
+            return true;
+        }
+        for (String part : group.split("/")) {
+            if (groups.contains(part)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean matches(Face face, Vec centre) {
         return (materials.isEmpty() || materials.contains(face.material()))
-                && (groups.isEmpty() || groups.contains(face.group()))
+                && (groups.isEmpty() || inGroup(face.group()))
                 && region.contains(centre);
     }
 }

@@ -17,6 +17,7 @@
  */
 package com.chunkworks.vanillawheels.client;
 
+import com.chunkworks.vanillawheels.domain.Paint;
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
@@ -59,8 +60,8 @@ public final class VehicleItemRenderer extends BlockEntityWithoutLevelRenderer {
         boolean chassis = stack.is(ModContent.CHASSIS.get());
         DyeColor paint = stack.get(ModContent.PAINT.get());
         int colour = paint == null
-                ? p.paint().map(pp -> 0xFF000000 | pp.defaultColor().getTextureDiffuseColor()).orElse(MeshDrawer.WHITE)
-                : 0xFF000000 | paint.getTextureDiffuseColor();
+                ? p.paint().map(pp -> 0xFF000000 | Paint.lift(pp.defaultColor().getTextureDiffuseColor())).orElse(MeshDrawer.WHITE)
+                : 0xFF000000 | Paint.lift(paint.getTextureDiffuseColor());
         float scale = (float) (0.9 / a.extent);
         poseStack.pushPose();
         poseStack.translate(0.5, 0.5 - (p.body().height() * scale) / 2.0, 0.5);

@@ -147,11 +147,21 @@ public final class VehicleGameTests {
         }
         Vehicle v = car(helper, 4.5, 7.5, true);
         double floorY = helper.absoluteVec(new Vec3(0, FLOOR, 0)).y;
+        // The body should cant: nose up while the front wheels are on the shelf and the rear ones below.
+        double[] noseUp = {0.0};
+        helper.onEachTick(() -> noseUp[0] = Math.min(noseUp[0], v.suspension(1.0f).pitch()));
         v.setScriptedInput(GAS);
-        helper.runAtTickTime(120, () -> {
+        // Brake once it is up, so it comes to rest on the shelf rather than fifty blocks on.
+        helper.runAtTickTime(55, () -> {
+            helper.assertTrue(v.getX() > helper.absoluteVec(new Vec3(22, 0, 0)).x, "up the step by now: " + (v.getX() - helper.absoluteVec(new Vec3(0, 0, 0)).x));
+            v.setScriptedInput(new Input(-1, 0, false, true, true));
+        });
+        helper.runAtTickTime(80, () -> v.setScriptedInput(null));
+        helper.runAtTickTime(150, () -> {
             helper.assertTrue(v.getX() > helper.absoluteVec(new Vec3(24, 0, 0)).x, "past the step: " + (v.getX() - helper.absoluteVec(new Vec3(0, 0, 0)).x));
             helper.assertTrue(Math.abs(v.getY() - (floorY + 2.0)) < 0.1, "standing two blocks higher: " + (v.getY() - floorY));
-            helper.assertTrue(v.suspension(1.0f).isSettled(), "the body has settled onto the box: " + v.suspension(1.0f));
+            helper.assertTrue(v.suspension(1.0f).isSettled(), "the body has settled onto the box: " + v.suspension(1.0f) + " ground " + java.util.Arrays.toString(v.ground()) + " at " + v.position());
+            helper.assertTrue(noseUp[0] < -Math.toRadians(15), "the body pitched nose-up on the way: " + Math.toDegrees(noseUp[0]) + " degrees");
             helper.succeed();
         });
     }

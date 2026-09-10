@@ -35,7 +35,7 @@ package com.chunkworks.vanillawheels.domain;
  * @param brake            speed lost per tick when the throttle opposes the motion
  * @param drag             the fraction of speed lost per tick with no throttle
  * @param grip             how fast the motion follows the heading each tick, 0..1: 1 is on rails
- * @param driftGrip        the same while drifting; lower, so the tail hangs out
+ * @param driftGrip        the fraction of the slip angle the body's path turns by each drifting tick: the drift's curvature
  * @param steer            the front wheels' angle at full lock, radians
  * @param driftBoost       speed added on releasing a full drift charge
  * @param driftChargeTicks ticks of drifting to a full charge
@@ -69,6 +69,6 @@ public record Tuning(double maxSpeed, double reverseSpeed, double acceleration, 
 
     /** A small pickup: the Trailblazer's numbers, and the tests' */
     public static Tuning pickup() {
-        return new Tuning(0.9, 0.3, 0.02, 0.05, 0.01, 0.85, 0.4, Math.toRadians(32), 0.3, 40, 2.9, 2.0, 1.45);
+        return new Tuning(0.9, 0.3, 0.02, 0.05, 0.01, 0.85, 0.12, Math.toRadians(32), 0.3, 40, 2.9, 2.0, 1.45);
     }
 }

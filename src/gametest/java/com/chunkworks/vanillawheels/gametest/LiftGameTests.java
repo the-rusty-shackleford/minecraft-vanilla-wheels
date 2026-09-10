@@ -195,7 +195,7 @@ public final class LiftGameTests {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         // A block in the back-right corner post's cell.
-        BlockPos post = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 6));
+        BlockPos post = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 5));
         helper.setBlock(post, Blocks.STONE);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH) == InteractionResult.FAIL, "refused with a block in a post cell");
         helper.assertValueEqual(liftBlocks(helper), 0, "nothing placed");
@@ -227,7 +227,7 @@ public final class LiftGameTests {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
-        BlockPos farPost = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(-2, 2, 6));
+        BlockPos farPost = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(-2, 1, 5));
         helper.assertTrue(sp.gameMode.destroyBlock(helper.absolutePos(farPost)), "broke a post");
         helper.assertValueEqual(liftBlocks(helper), 0, "the lift is gone");
         helper.assertValueEqual(liftItemsDropped(helper), 1, "one lift dropped");
@@ -255,7 +255,7 @@ public final class LiftGameTests {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
-        LiftMenu menu = open(helper, sp, LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 2, 6)));
+        LiftMenu menu = open(helper, sp, LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 5)));
         helper.assertTrue(menu.stillValid(sp), "valid for the player who opened it");
         helper.assertValueEqual(menu.buildStatus(), LiftStatus.Build.NO_RECIPE, "empty: nothing to build");
         helper.assertValueEqual(menu.paintStatus(), LiftStatus.Paint.NO_VEHICLE, "empty: nothing to paint");

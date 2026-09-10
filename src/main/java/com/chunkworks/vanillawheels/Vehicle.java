@@ -225,7 +225,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (items.size() != slots) {
                 items = NonNullList.withSize(slots, ItemStack.EMPTY);
             }
-            if (p.paint().isPresent() && entityData.get(DATA_PAINT) < 0) {
+            // A profile with a factory colour leaves a new vehicle unpainted, wearing that colour until a dye replaces it.
+            if (p.paint().isPresent() && p.paint().get().factory().isEmpty() && entityData.get(DATA_PAINT) < 0) {
                 entityData.set(DATA_PAINT, p.paint().get().defaultColor().getId());
             }
             entityData.set(DATA_FUEL, Math.min(entityData.get(DATA_FUEL), p.fuel().map(VehicleProfile.Fuel::capacity).orElse(0)));

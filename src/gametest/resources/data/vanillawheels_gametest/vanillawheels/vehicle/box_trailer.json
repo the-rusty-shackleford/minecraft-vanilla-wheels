@@ -106,6 +106,7 @@
     "part": {
       "material": "body"
     },
-    "default": "white"
+    "default": "white",
+    "factory": "#c8a060"
   }
 }

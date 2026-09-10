@@ -106,7 +106,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "hitch": {"rear": [0, 4, -34]},                     // a trailer: {"front": [0, 6, 42]}
   "cargo": {"adults": 4, "young": 8, "slots": [[-8, 3, 5], [8, 3, 5], [-8, 3, -12], [8, 3, -12]]},   // a trailer
   "doors": [{"part": {"group": "left_door"}, "hinge": [-15, 20, -40], "axis": [0, 1, 0], "open": -1.9}],   // radians
-  "paint": {"part": {"group": "body"}, "default": "light_blue"},
+  "paint": {"part": {"group": "body"}, "default": "light_blue", "factory": "#58acff"},   // factory: the exact colour an undyed vehicle wears (optional)
   "glass": {"group": "windshield"},
   "sounds": {"engine": "vanillawheels:engine.petrol"}
 }
@@ -123,7 +123,9 @@ slashes, so `{"group": "lenses"}` matches every element in a `lenses` folder how
 deep, and its material is its texture's name, so a one-texture project has one
 material; `texture` may then be left out and the embedded texture is used. Paint parts
 are drawn with the dye as the vertex colour, lifted a quarter of the way toward white
-so a grey swatch reads as paint and not wool. `assets/<ns>/lang/en_us.json` names the
+so a grey swatch reads as paint and not wool; a profile may name a `factory` colour, an
+exact `#rrggbb` no dye is, which an undyed vehicle wears until a dye replaces it and
+which a wrench and a lift leave alone. `assets/<ns>/lang/en_us.json` names the
 vehicle under `vehicle.<ns>.<name>`. Keep every texture coordinate inside its swatch:
 the body is drawn through the cutout shader, and a coordinate on a swatch's edge samples
 the neighbour or the atlas's empty padding, whose alpha is zero, which drops the whole

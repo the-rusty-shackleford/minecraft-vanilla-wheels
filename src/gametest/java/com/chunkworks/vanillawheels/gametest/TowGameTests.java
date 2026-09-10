@@ -18,6 +18,7 @@
 package com.chunkworks.vanillawheels.gametest;
 
 import com.chunkworks.vanillawheels.VanillaWheelsMod;
+import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.Tow;
@@ -221,6 +222,22 @@ public final class TowGameTests {
             helper.assertTrue(!trailer.doorsOpen(), "shut again");
             helper.succeed();
         });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 20)
+    public void aFactoryColourLeavesATrailerUndyedUntilADyeAndAWrenchKeepsIt(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
+        helper.assertTrue(trailer.paint() == null, "a factory colour is no dye: the trailer is undyed");
+        helper.assertValueEqual(trailer.profile().paint().orElseThrow().factory().orElseThrow(), 0xc8a060, "the profile's factory colour");
+        net.minecraft.world.item.ItemStack item = trailer.toItem();
+        helper.assertTrue(item.get(ModContent.PAINT.get()) == null, "wrenched, it carries no dye");
+        Vehicle again = Vehicle.create(helper.getLevel(), BOX_TRAILER, trailer.position(), trailer.getYRot());
+        again.loadFromItem(item);
+        helper.assertTrue(again.paint() == null, "placed again, still undyed");
+        again.setPaint(net.minecraft.world.item.DyeColor.RED);
+        helper.assertValueEqual(again.paint(), net.minecraft.world.item.DyeColor.RED, "a dye replaces the factory colour");
+        helper.succeed();
     }
 
     @GameTest(template = "runway", timeoutTicks = 100)

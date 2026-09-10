@@ -42,6 +42,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.DyeColor;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -194,13 +195,20 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         super.render(vehicle, entityYaw, partialTick, poseStack, buffers, packedLight);
     }
 
-    /** effects: returns the body's colour as an ARGB int: the vehicle's paint, else the profile's default, else white */
+    /**
+     * effects: returns the body's colour as an ARGB int: the vehicle's dye, lifted; else the profile's factory
+     * colour, exactly; else the profile's default dye, lifted; else white
+     */
     static int paintOf(Vehicle vehicle, VehicleProfile p) {
-        DyeColor paint = vehicle.paint();
-        if (paint == null) {
-            paint = p.paint().map(VehicleProfile.Paint::defaultColor).orElse(null);
+        return colourOf(vehicle.paint(), p);
+    }
+
+    static int colourOf(@Nullable DyeColor dye, VehicleProfile p) {
+        if (dye != null) {
+            return 0xFF000000 | Paint.lift(dye.getTextureDiffuseColor());
         }
-        return paint == null ? MeshDrawer.WHITE : 0xFF000000 | Paint.lift(paint.getTextureDiffuseColor());
+        return p.paint().map(pp -> pp.factory().map(rgb -> 0xFF000000 | rgb)
+                .orElseGet(() -> 0xFF000000 | Paint.lift(pp.defaultColor().getTextureDiffuseColor()))).orElse(MeshDrawer.WHITE);
     }
 
     /** effects: applies {@code r} to the pose stack: a turn about its axis through its pivot */

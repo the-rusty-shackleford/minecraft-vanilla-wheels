@@ -24,6 +24,7 @@ import com.chunkworks.vanillawheels.domain.Transform;
 import com.chunkworks.vanillawheels.domain.Tuning;
 import com.chunkworks.vanillawheels.domain.Vec;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
@@ -389,11 +390,29 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         }
     }
 
-    /** The faces the dye colours, and the colour a new vehicle wears. */
-    public record Paint(PartSelector part, DyeColor defaultColor) {
+    /**
+     * The faces the dye colours, and the colour a new vehicle wears: the
+     * {@code factory} colour exactly, an RGB written {@code "#rrggbb"}, if
+     * the profile gives one -- a paint no dye is, kept until a dye replaces
+     * it -- else the {@code default} dye.
+     */
+    public record Paint(PartSelector part, DyeColor defaultColor, Optional<Integer> factory) {
+        private static final Codec<Integer> RGB = Codec.STRING.comapFlatMap(s -> {
+            String hex = s.startsWith("#") ? s.substring(1) : s;
+            if (hex.length() != 6) {
+                return DataResult.error(() -> "a colour is #rrggbb: " + s);
+            }
+            try {
+                return DataResult.success(Integer.parseInt(hex, 16));
+            } catch (NumberFormatException e) {
+                return DataResult.error(() -> "a colour is #rrggbb: " + s);
+            }
+        }, rgb -> String.format("#%06x", rgb & 0xFFFFFF));
+
         public static final Codec<Paint> CODEC = RecordCodecBuilder.create(i -> i.group(
                 PartSelector.CODEC.fieldOf("part").forGetter(Paint::part),
-                DyeColor.CODEC.optionalFieldOf("default", DyeColor.WHITE).forGetter(Paint::defaultColor)
+                DyeColor.CODEC.optionalFieldOf("default", DyeColor.WHITE).forGetter(Paint::defaultColor),
+                RGB.optionalFieldOf("factory").forGetter(Paint::factory)
         ).apply(i, Paint::new));
     }
 

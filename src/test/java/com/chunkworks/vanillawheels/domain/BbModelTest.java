@@ -30,7 +30,8 @@ import org.junit.jupiter.api.Test;
  * texture on one face and the first on the rest: six faces, the
  * material per face by texture name, the group as the folder path, UVs
  * as fractions of the resolution with rows counted from the bottom, the
- * north face's texture running to the viewer's right. A rotated cube: its corners turn about the origin.
+ * north face's texture running to the viewer's right, every normal out
+ * of the cube. A rotated cube: its corners turn about the origin.
  * An invisible cube: skipped. A mesh element: a face per polygon with a
  * UV per corner. The embedded texture: decoded bytes and size. Not JSON,
  * and JSON without elements: refused.
@@ -67,11 +68,16 @@ final class BbModelTest {
         assertEquals(1, shell.stream().filter(f -> f.material().equals("glass")).count(), "one on the second, by its name without the extension");
         Face north = shell.stream().filter(f -> m.positions().get(f.corners().get(0).position()).z() == 0.0 && f.material().equals("truck")
                 && f.corners().stream().allMatch(c -> m.positions().get(c.position()).z() == 0.0)).findFirst().orElseThrow();
-        // Seen from the north, the viewer's left is +X: the first (top-left) corner sits at x = 4, and its uv is the rect's left edge.
+        // Seen from the north, the viewer's left is +X: the first (top-left) corner sits at x = 4, and its uv is the rect's left edge;
+        // the corners then run down that edge and back along the bottom, counter-clockwise from outside.
         assertEquals(4.0, m.positions().get(north.corners().get(0).position()).x());
         assertEquals(0.0, m.uvs().get(north.corners().get(0).uv()).u());
-        assertEquals(4.0 / 64, m.uvs().get(north.corners().get(1).uv()).u(), 1e-9, "uv as a fraction of the resolution");
+        assertEquals(0.0, m.positions().get(north.corners().get(1).position()).y(), "second corner: the bottom of the left edge");
+        assertEquals(4.0 / 64, m.uvs().get(north.corners().get(2).uv()).u(), 1e-9, "uv as a fraction of the resolution");
         assertEquals(1.0 - 2.0 / 32, m.uvs().get(north.corners().get(2).uv()).v(), 1e-9, "rows from the bottom, as a mesh counts them");
+        assertEquals(new Vec(0, 0, -1), north.normal(), "the north face looks north");
+        Face up = shell.stream().filter(f -> f.corners().stream().allMatch(c -> m.positions().get(c.position()).y() == 2.0)).findFirst().orElseThrow();
+        assertEquals(new Vec(0, 1, 0), up.normal(), "the top looks up, whatever the winding Blockbench's texture order implies");
         assertTrue(m.faces().stream().noneMatch(f -> f.group().contains("ghost")), "an invisible cube is left out");
         Selector cage = new Selector(java.util.Set.of(), java.util.Set.of("cage"), Region.ALL);
         assertEquals(1, m.faces().stream().filter(f -> cage.matches(f, Vec.ZERO)).count(), "a folder on the path selects what is in it");
@@ -87,6 +93,8 @@ final class BbModelTest {
             assertEquals(-10.0, v.x(), 1e-9, "x after the turn: " + v);
             assertTrue(v.y() >= -1e-9 && v.y() <= 1.0 + 1e-9, "within the post's width: " + v);
         }
+        assertEquals(-1.0, top.normal().x(), 1e-9, "its normal turned with it, and still points out of the post");
+        assertEquals(0.0, top.normal().y(), 1e-9);
     }
 
     @Test

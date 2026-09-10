@@ -171,8 +171,11 @@ public final class BbModel {
             };
             // Blockbench counts texture rows from the top; a mesh's v runs from the bottom.
             Uv[] t = {new Uv(uv[0] / resW, 1.0 - uv[1] / resH), new Uv(uv[2] / resW, 1.0 - uv[1] / resH), new Uv(uv[2] / resW, 1.0 - uv[3] / resH), new Uv(uv[0] / resW, 1.0 - uv[3] / resH)};
+            // Wound the other way round -- top-left, bottom-left, bottom-right, top-right -- so that, seen from outside,
+            // the corners run counter-clockwise and the normal Mesh.of takes from them points out of the cube, whatever
+            // its turn. Each corner keeps its own texture coordinate.
             List<Corner> corners = new ArrayList<>(4);
-            for (int k = 0; k < 4; k++) {
+            for (int k : new int[] {0, 3, 2, 1}) {
                 Vec p = rotate(c[k], origin, rotation);
                 positions.add(p);
                 uvs.add(t[(k + turn) & 3]);

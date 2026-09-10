@@ -66,5 +66,7 @@ every fifth, so a hitch that starts within reach of a tongue cannot slip past th
 climb (ground probed under each wheel), the drift slides the kart way instead of
 snapping, the chest is the game's double chest, a lights indicator by the hotbar, the
 `.bbmodel` reader, the lifted paint, the rider's glass fade, and the lift cut to five by
-six with one-block posts. The Trailblazer is being rebuilt in Blockbench to Rusty's
-reference; a tuning session on speed, drift and damage is still to come.
+six with one-block posts. 1.3.1 (2026-09-09): Blockbench cube faces wound so their
+normals point out -- the truck had been lit inside out. The Trailblazer is being matched
+to Rusty's reference exactly; a tuning session on speed, drift and damage is still to
+come.

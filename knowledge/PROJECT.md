@@ -67,8 +67,8 @@ climb (ground probed under each wheel), the drift slides the kart way instead of
 snapping, the chest is the game's double chest, a lights indicator by the hotbar, the
 `.bbmodel` reader, the lifted paint, the rider's glass fade, and the lift cut to five by
 six with one-block posts. 1.3.1 (2026-09-09): Blockbench cube faces wound so their
-normals point out -- the truck had been lit inside out. 1.4.0 (2026-09-10, unreleased,
-awaiting Rusty's look): a profile's `factory` paint colour, an exact RGB an undyed
-vehicle wears, because the lifted light-blue dye cannot reach the reference's blue. The Trailblazer is being matched
-to Rusty's reference exactly; a tuning session on speed, drift and damage is still to
-come.
+normals point out -- the truck had been lit inside out. 1.4.0 (2026-09-10, pack 1.30.0): a
+profile's `factory` paint colour, an exact RGB an undyed vehicle wears, because the lifted
+light-blue dye cannot reach the reference's blue; the `.bbmodel` reader takes a Blockbench 5
+project's folder names from its `groups` list. The Trailblazer is now a hand-built Blockbench
+project (its D-0003); the protocol's job is to read it as saved. Next: the tuning session on speed, drift and damage, watched in the booth.

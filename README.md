@@ -44,7 +44,16 @@ resistance bring it to rest within a few seconds; it never rolls backward on its
 
 The collision box is the profile's `body`: as wide and long as the hull and as tall as
 the hull, not the cage or windshield over it, which pass through a low canopy the way a
-cage pushes through leaves. Nobody aboard takes the wall's damage for it. The only
+cage pushes through leaves. Nobody aboard takes the wall's damage for it.
+
+A vehicle built to the world's scale is too small for a person, so a profile may set
+`rider_scale`: everyone aboard is sized to it through the game's own scale attribute
+(model, box and eye together, synced to every client) for as long as they are aboard, and
+sized back as they leave. A seat may name an `eye`: the rider's entity is placed so its
+eye is there -- on the centreline in the glass, ahead of the pillars, where the driver's
+camera then is -- while the body is drawn sitting at the seat. And `cockpit` names the
+parts (a cage, a frame, mirrors) never drawn from a rider's own eyes in first person,
+so nothing bars the view; everyone else sees them. The only
 walls a vehicle's move meets are blocks and other vehicles (never its own trailer or
 tower): a boat stops dead at anything pushable, and a car that did would stall at every
 cow and bystander. The living are run over instead (below).
@@ -115,7 +124,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "scale": 0.0625, "handedness": "right",
   "body": {"width": 2.75, "length": 5.4, "height": 1.9,
            "parts": [{"at": [0, 3, 21], "width": 2.75, "height": 1.55}]},   // hit boxes
-  "seats": [{"at": [-8, 10, 10], "driver": true}, {"at": [8, 10, 10]}],
+  "seats": [{"at": [-8, 10, 10], "driver": true, "eye": [0, 22, 14]}, {"at": [8, 10, 10]}],   // eye: where the rider's eye goes, the body still drawn at "at" (optional)
   "wheels": {"radius": 12, "positions": [{"forward": 24, "right": -16, "steers": true}, {"forward": -23, "right": 16}]},   // "up" defaults to the radius: a wheel on the ground
   "engine": {"max_speed": 0.9, "acceleration": 0.02, "reverse_speed": 0.3, "brake": 0.05, "drag": 0.01},
   "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
@@ -131,6 +140,8 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "doors": [{"part": {"group": "left_door"}, "hinge": [-15, 20, -40], "axis": [0, 1, 0], "open": -1.9}],   // radians
   "paint": {"part": {"group": "body"}, "default": "light_blue", "factory": "#58acff"},   // factory: the exact colour an undyed vehicle wears (optional)
   "glass": {"group": "windshield"},
+  "cockpit": {"group": ["cage", "windshield_frame", "mirrors"]},   // not drawn from a rider's own eyes (optional)
+  "rider_scale": 0.7,                                              // everyone aboard is this size (optional, 1)
   "sounds": {"engine": "vanillawheels:engine.petrol"}
 }
 ```

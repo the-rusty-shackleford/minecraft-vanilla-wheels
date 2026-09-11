@@ -58,6 +58,8 @@ public final class Appearance {
     public final BakedMesh body;
     public final BakedMesh lamps;
     public final BakedMesh glass;
+    /** The cage, frame and mirrors: not drawn for whoever looks out from aboard in first person. */
+    public final BakedMesh cockpit;
     public final List<Needle> needles;
     public final List<Hinge> doors;
     public final BakedMesh wheel;
@@ -91,6 +93,8 @@ public final class Appearance {
         remaining = remaining.without(lampMesh);
         Mesh glassMesh = p.glass().map(sel -> local.part(sel.transformed(t).selector())).orElse(local.part(f -> false));
         remaining = remaining.without(glassMesh);
+        Mesh cockpitMesh = p.cockpit().map(sel -> local.part(sel.transformed(t).selector())).orElse(local.part(f -> false));
+        remaining = remaining.without(cockpitMesh);
         Mesh bodyMesh = p.paint().map(paint -> local.part(paint.part().transformed(t).selector())).orElse(local.part(f -> false));
         remaining = remaining.without(bodyMesh);
         this.texture = p.texture().or(() -> MeshLibrary.INSTANCE.embeddedTexture(p.mesh())).orElse(MISSING);
@@ -99,6 +103,7 @@ public final class Appearance {
         this.body = BakedMesh.of(bodyMesh, scale);
         this.lamps = BakedMesh.of(lampMesh, scale);
         this.glass = BakedMesh.of(glassMesh, scale);
+        this.cockpit = BakedMesh.of(cockpitMesh, scale);
         this.needles = List.copyOf(ns);
         this.doors = List.copyOf(ds);
         Mesh wheelLocal = wheelMesh.transformed(t).orientedOutward();

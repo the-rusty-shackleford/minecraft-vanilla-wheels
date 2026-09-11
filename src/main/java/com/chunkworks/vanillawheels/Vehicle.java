@@ -427,6 +427,45 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * effects: a person may board while a seat is free; an animal while the
      * doors are open and the cargo has room for it; nothing else boards
      */
+    /** The scale modifier everyone aboard wears: the profile's rider scale, as a multiplier on the game's own. */
+    private static final ResourceLocation RIDER_SCALE_ID = VanillaWheels.id("rider_scale");
+
+    /**
+     * effects: on the server, sizes a living passenger to the profile's
+     * rider scale for as long as it is aboard -- the game's scale attribute,
+     * which scales the model, the box and the eye together and is synced to
+     * every client -- and takes the size back off as it leaves. A transient
+     * modifier, never saved: a passenger loaded aboard is sized again as it
+     * is re-added, and one that leaves by any door is unsized.
+     */
+    private void sizeRider(Entity passenger, boolean aboard) {
+        VehicleProfile p = profile();
+        if (level().isClientSide() || !(passenger instanceof LivingEntity living) || p == null) {
+            return;
+        }
+        net.minecraft.world.entity.ai.attributes.AttributeInstance scale = living.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.SCALE);
+        if (scale == null) {
+            return;
+        }
+        scale.removeModifier(RIDER_SCALE_ID);
+        if (aboard && p.riderScale() != 1.0) {
+            scale.addTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(RIDER_SCALE_ID, p.riderScale() - 1.0,
+                    net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+        }
+    }
+
+    @Override
+    protected void addPassenger(Entity passenger) {
+        super.addPassenger(passenger);
+        sizeRider(passenger, true);
+    }
+
+    @Override
+    protected void removePassenger(Entity passenger) {
+        super.removePassenger(passenger);
+        sizeRider(passenger, false);
+    }
+
     @Override
     protected boolean canAddPassenger(Entity passenger) {
         VehicleProfile p = profile();
@@ -565,11 +604,44 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (seat < 0 || seat >= p.seats().size()) {
                 return super.getPassengerAttachmentPoint(entity, dimensions, partialTick);
             }
-            local = p.localBlocks(p.seats().get(seat).at());
+            local = eyeAttachment(entity, p.seats().get(seat));
         }
         Suspension s = suspension(partialTick);
         Vec3 at = posed(local, s);
         return new Vec3(at.x, at.y + s.lift(), at.z);
+    }
+
+    /**
+     * effects: returns where {@code rider}'s vehicle attachment goes for
+     * {@code seat}, blocks in the body's frame: the seat itself, or, when the
+     * seat has an eye, the point that puts the rider's eye there -- the
+     * attachment sits under the eye by the rider's own eye height less its
+     * attachment height, both at whatever size the rider is
+     */
+    private Vec eyeAttachment(Entity rider, VehicleProfile.Seat seat) {
+        VehicleProfile p = profile();
+        if (seat.eye().isEmpty()) {
+            return p.localBlocks(seat.at());
+        }
+        double under = rider.getEyeHeight() - rider.getVehicleAttachmentPoint(this).y;
+        return p.localBlocks(seat.eye().get()).plus(new Vec(0.0, -under, 0.0));
+    }
+
+    /**
+     * effects: returns how far, in the world's frame, {@code rider} is drawn
+     * from where its entity is: zero for a seat without an eye, else from the
+     * eye's attachment to the seat's, so the body sits in the seat while the
+     * entity, and so the camera, is at the eye
+     */
+    public Vec3 drawOffset(Entity rider, float partialTick) {
+        VehicleProfile p = profile();
+        int seat = p == null ? -1 : seatOf(rider);
+        if (seat < 0 || seat >= p.seats().size() || p.seats().get(seat).eye().isEmpty()) {
+            return Vec3.ZERO;
+        }
+        VehicleProfile.Seat at = p.seats().get(seat);
+        Suspension s = suspension(partialTick);
+        return posed(p.localBlocks(at.at()), s).subtract(posed(eyeAttachment(rider, at), s));
     }
 
     /**

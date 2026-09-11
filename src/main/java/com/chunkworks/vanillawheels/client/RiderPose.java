@@ -29,7 +29,8 @@ import net.neoforged.neoforge.client.event.CalculateDetachedCameraDistanceEvent;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
 
 /**
- * Leans everyone aboard with the body, and backs the camera off for it.
+ * Leans everyone aboard with the body, draws a rider whose entity is at
+ * the seat's eye back in the seat, and backs the camera off for it.
  * The body is drawn pitched and
  * rolled by its {@link Suspension}; a rider drawn upright on a nose-up
  * truck looks bolted to the world, so before a living entity that rides a
@@ -50,7 +51,8 @@ public final class RiderPose {
             return;
         }
         Suspension s = v.suspension(event.getPartialTick());
-        if (s.pitch() == 0.0 && s.roll() == 0.0) {
+        Vec3 shift = v.drawOffset(rider, event.getPartialTick());
+        if (s.pitch() == 0.0 && s.roll() == 0.0 && shift.equals(Vec3.ZERO)) {
             return;
         }
         PoseStack pose = event.getPoseStack();
@@ -58,6 +60,8 @@ public final class RiderPose {
         // The seat point is where the rider's vehicle attachment meets the body: above the feet, where the stack's origin is.
         Vec3 seat = rider.getVehicleAttachmentPoint(v);
         pose.pushPose();
+        // A rider whose entity sits at the seat's eye is drawn back in the seat.
+        pose.translate(shift.x, shift.y, shift.z);
         pose.translate(seat.x, seat.y, seat.z);
         pose.mulPose(Axis.YP.rotationDegrees(-yaw));
         pose.mulPose(Axis.XP.rotation((float) s.pitch()));

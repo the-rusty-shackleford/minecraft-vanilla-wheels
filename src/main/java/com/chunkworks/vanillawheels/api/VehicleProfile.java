@@ -58,9 +58,17 @@ import net.minecraft.world.item.DyeColor;
 public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels wheels, Optional<Engine> engine,
                              Handling handling, double climb, double mass, Kit kit) {
 
-    /** What the vehicle looks like: its meshes, texture, units, hand, paint, glass and sounds. One flat object in the JSON. */
+    /**
+     * What the vehicle looks like: its meshes, texture, units, hand, paint, glass, cockpit, rider
+     * scale and sounds. One flat object in the JSON. {@code cockpit} names the parts -- a cage, a
+     * windshield's frame, mirrors -- that are not drawn for whoever looks out through their own eyes
+     * from aboard, so they never bar the view; everyone else sees them. {@code rider_scale} is the
+     * size everyone aboard is drawn and boxed at (the game's scale attribute), so a person fits a
+     * vehicle built to the world's scale rather than the vehicle being built to a person's.
+     */
     public record Look(ResourceLocation mesh, Optional<ResourceLocation> wheelMesh, Optional<ResourceLocation> texture, double scale,
-                       Handedness handedness, Optional<Paint> paint, Optional<PartSelector> glass, Sounds sounds) {
+                       Handedness handedness, Optional<Paint> paint, Optional<PartSelector> glass, Optional<PartSelector> cockpit,
+                       double riderScale, Sounds sounds) {
         public static final MapCodec<Look> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 ResourceLocation.CODEC.fieldOf("mesh").forGetter(Look::mesh),
                 ResourceLocation.CODEC.optionalFieldOf("wheel_mesh").forGetter(Look::wheelMesh),
@@ -69,6 +77,8 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
                 Handedness.CODEC.optionalFieldOf("handedness", Handedness.RIGHT).forGetter(Look::handedness),
                 Paint.CODEC.optionalFieldOf("paint").forGetter(Look::paint),
                 PartSelector.CODEC.optionalFieldOf("glass").forGetter(Look::glass),
+                PartSelector.CODEC.optionalFieldOf("cockpit").forGetter(Look::cockpit),
+                Codec.doubleRange(0.2, 2.0).optionalFieldOf("rider_scale", 1.0).forGetter(Look::riderScale),
                 Sounds.CODEC.optionalFieldOf("sounds", Sounds.NONE).forGetter(Look::sounds)
         ).apply(i, Look::new));
     }
@@ -103,6 +113,8 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     public Handedness handedness() { return look.handedness(); }
     public Optional<Paint> paint() { return look.paint(); }
     public Optional<PartSelector> glass() { return look.glass(); }
+    public Optional<PartSelector> cockpit() { return look.cockpit(); }
+    public double riderScale() { return look.riderScale(); }
     public Sounds sounds() { return look.sounds(); }
     public Optional<Fuel> fuel() { return kit.fuel(); }
     public Optional<Storage> storage() { return kit.storage(); }
@@ -205,11 +217,17 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         ).apply(i, HitBox::new));
     }
 
-    /** Where a rider sits, mesh units; the driver's seat is the one that steers. */
-    public record Seat(Vec at, boolean driver) {
+    /**
+     * Where a rider sits, mesh units; the driver's seat is the one that steers. {@code eye}, when
+     * given, is where the rider's eye goes instead: the rider's entity is placed so its eye is there
+     * -- so the first-person camera is there, forward of the pillars and centred in the glass -- while
+     * the rider is drawn sitting at {@code at}.
+     */
+    public record Seat(Vec at, boolean driver, Optional<Vec> eye) {
         public static final Codec<Seat> CODEC = RecordCodecBuilder.create(i -> i.group(
                 VEC.fieldOf("at").forGetter(Seat::at),
-                Codec.BOOL.optionalFieldOf("driver", false).forGetter(Seat::driver)
+                Codec.BOOL.optionalFieldOf("driver", false).forGetter(Seat::driver),
+                VEC.optionalFieldOf("eye").forGetter(Seat::eye)
         ).apply(i, Seat::new));
     }
 

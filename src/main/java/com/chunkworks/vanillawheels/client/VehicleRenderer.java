@@ -81,6 +81,13 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         rightBottom = right.getChild("bottom");
     }
 
+    /** effects: returns whether the frame is what someone aboard {@code vehicle} sees through their own eyes */
+    private static boolean throughOwnEyes(Vehicle vehicle) {
+        Minecraft mc = Minecraft.getInstance();
+        Entity camera = mc.getCameraEntity();
+        return camera != null && camera.getVehicle() == vehicle && mc.options.getCameraType().isFirstPerson();
+    }
+
     /**
      * effects: draws the game's own double chest where the profile puts it,
      * at the profile's scale, its front turned as the profile says, the lid up by the vehicle's
@@ -141,6 +148,9 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         int overlay = vehicle.getHurtTime() > 0 ? OverlayTexture.pack(0, true) : OverlayTexture.NO_OVERLAY;
         VertexConsumer solid = buffers.getBuffer(RenderType.entityCutoutNoCull(a.texture));
         MeshDrawer.draw(a.rest, poseStack.last(), solid, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
+        if (a.cockpit.quadCount() > 0 && !throughOwnEyes(vehicle)) {
+            MeshDrawer.draw(a.cockpit, poseStack.last(), solid, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
+        }
         MeshDrawer.draw(a.body, poseStack.last(), solid, paintOf(vehicle, p), packedLight, overlay, MeshDrawer.Shading.LIT);
         boolean lit = vehicle.lit();
         MeshDrawer.draw(a.lamps, poseStack.last(), solid, MeshDrawer.WHITE, lit ? LightTexture.FULL_BRIGHT : packedLight, overlay,

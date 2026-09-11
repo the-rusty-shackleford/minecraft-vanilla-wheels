@@ -39,10 +39,10 @@ public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
 
     /** The driver's state of the vehicle it drives. */
-    public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting) implements CustomPacketPayload {
+    public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {
         public static final Type<DriveState> TYPE = new Type<>(VanillaWheels.id("drive_state"));
         public static final StreamCodec<RegistryFriendlyByteBuf, DriveState> STREAM_CODEC = StreamCodec.composite(
                 ByteBufCodecs.VAR_INT, DriveState::vehicle,
@@ -50,6 +50,7 @@ public final class Payloads {
                 ByteBufCodecs.FLOAT, DriveState::steer,
                 ByteBufCodecs.VAR_INT, DriveState::throttle,
                 ByteBufCodecs.BOOL, DriveState::drifting,
+                ByteBufCodecs.FLOAT, DriveState::burn,
                 DriveState::new);
 
         @Override
@@ -85,7 +86,7 @@ public final class Payloads {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
         registrar.playToServer(DriveState.TYPE, DriveState.STREAM_CODEC, (payload, context) ->
-                driven(context, payload.vehicle()).ifPresent(v -> v.onDriveState(payload.speed(), payload.steer(), payload.throttle(), payload.drifting())));
+                driven(context, payload.vehicle()).ifPresent(v -> v.onDriveState(payload.speed(), payload.steer(), payload.throttle(), payload.drifting(), payload.burn())));
         registrar.playToServer(Horn.TYPE, Horn.STREAM_CODEC, (payload, context) ->
                 driven(context, payload.vehicle()).ifPresent(v -> v.setHorn(payload.held())));
         registrar.playToServer(Lights.TYPE, Lights.STREAM_CODEC, (payload, context) ->

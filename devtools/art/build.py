@@ -452,7 +452,7 @@ def write_ogg(path: Path, samples) -> None:
 
 # The shipped sounds: which recording, which seconds of it. Times are in
 # seconds, chosen from 100 ms RMS envelopes of the recordings. In-game
-# volumes: the horn 1.2, the engine 0.35..0.9 by speed, the skid 0.6, the
+# volumes: the horn 1.2, the engine 0.35..0.9 by speed, the skid 0.25..0.7 by speed, the
 # thud 0.9, the wrench 1.0, the fuel 0.8.
 SOUNDS = {
     # A pickup's horn, leaned on: 0.85 s from the middle of the first blast,
@@ -463,9 +463,12 @@ SOUNDS = {
     # steady middle of the take, looped with a 150 ms crossfade. The game
     # pitches it from 0.75 at idle to 1.6 at the top speed.
     "engine_petrol": lambda: loop("453741-performance-car-idle", 14.0, 18.15, 0.15, 0.8),
-    # The tyres of a Nissan Maxima in a handbrake turn: the squeal at its
-    # loudest, 0.75 s, re-triggered every 12 ticks while the tail is out.
-    "skid": lambda: assemble([take("71741-nissan-maxima-handbrake-turn", 6.15, 6.9, fade_in=0.02, fade_out=0.08)], 0.9),
+    # The tyres of a Chrysler LHS driven round the microphone: two seconds
+    # from where the squeal holds steadiest (within a decibel, 84% of its
+    # energy in the squeal band), looped with a 150 ms crossfade. The game
+    # loops it under every vehicle, silent on rails, swelling while the
+    # tail is out by speed (0.25..0.7) and pitched 0.9..1.15 by speed.
+    "skid": lambda: loop("71739-chrysler-lhs-tire-squeal-04", 11.3, 13.45, 0.15, 0.8),
     # A heavy body landing on dirt: the impact and its settle.
     "thud": lambda: assemble([take("504626-body-fall-heavy-dirt", 0.38, 1.5, fade_out=0.15)], 0.95),
     # A wrench struck against metal, once.
@@ -493,7 +496,8 @@ BOX_TRAILER_PROFILE = {
     "cargo": {"adults": 2, "young": 4, "slots": [[-4, 8, 2], [4, 8, 2]]},
     "doors": [{"part": {"group": "door_left"}, "hinge": [10, 15, -20.5], "axis": [0, 1, 0], "open": -1.9},
               {"part": {"group": "door_right"}, "hinge": [-10, 15, -20.5], "axis": [0, 1, 0], "open": 1.9}],
-    "paint": {"part": {"material": "body"}, "default": "white"},
+    # A factory colour, so the tow gametests can check that an undyed trailer wears it.
+    "paint": {"part": {"material": "body"}, "default": "white", "factory": "#c8a060"},
 }
 
 

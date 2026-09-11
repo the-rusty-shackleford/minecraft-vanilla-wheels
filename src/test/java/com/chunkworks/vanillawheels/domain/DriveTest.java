@@ -172,14 +172,39 @@ final class DriveTest {
         assertTrue(d.speed() > fast.speed() * 0.8, "a drift bleeds only a little speed: " + d.speed() + " of " + fast.speed());
         Drive.Step release = d.step(new Input(1, 1, false, true, true), T);
         assertTrue(release.effects().contains(Drive.Effect.BOOST));
-        assertTrue(release.next().speed() > T.maxSpeed(), "boosted past the top: " + release.next().speed());
-        assertTrue(release.next().speed() <= T.maxSpeed() * Drive.BOOST_CAP, "capped");
+        assertTrue(release.next().boosting());
+        assertEquals(Drive.BOOST_TICKS, release.next().boostTicks(), "a full charge pays the full boost");
         assertEquals(0.0, release.next().driftCharge());
         assertFalse(release.next().drifting());
         assertEquals(0, release.next().driftSide());
+        assertEquals(T.steer() * (1.0 - (1.0 - Drive.LOCK_AT_SPEED) * Math.min(1.0, release.next().speed() / T.maxSpeed())), release.next().steer(), 1e-9,
+                "on the release the wheels take the stick's angle at once, not the drift's lock");
+        // The boost is a surge the throttle cannot cancel: the speed climbs past the top within a few
+        // ticks of gas and stays there until the boost's ticks run out, then decays back to the top.
+        Drive boosted = run(release.next(), GAS, 6);
+        assertTrue(boosted.speed() > T.maxSpeed() * 1.1, "well past the top under full throttle: " + boosted.speed());
+        assertTrue(boosted.speed() <= T.maxSpeed() * Drive.BOOST_CAP + 1e-9, "capped");
+        Drive late = run(release.next(), GAS, Drive.BOOST_TICKS - 3);
+        assertTrue(late.boosting() && late.speed() > T.maxSpeed() * 1.1, "still surging near the end: " + late.speed());
+        assertTrue(late.burn(T) > 0 && late.burn(T) < 1.0, "and the burn tails off: " + late.burn(T));
         Drive settled = run(release.next(), GAS, 100);
+        assertFalse(settled.boosting());
+        assertEquals(0.0, settled.burn(T));
         assertTrue(settled.speed() <= T.maxSpeed() + 1e-9, "the boost decays back to the top");
         assertTrue(Math.abs(settled.slip()) < 0.02, "grip pulls the motion back to the heading");
+    }
+
+    @Test
+    void aShortDriftPaysAShortBoostAndTheBurnScalesWithIt() {
+        Input driftRight = new Input(1, 1, true, true, true);
+        Drive d = run(Drive.atRest(0.0), GAS, 400);
+        d = run(d, driftRight, (int) Math.ceil(T.driftChargeTicks() * 0.5));
+        double charge = d.driftCharge();
+        assertTrue(charge >= Drive.MIN_CHARGE && charge < 1.0, "half a charge: " + charge);
+        Drive released = d.step(GAS, T).next();
+        assertEquals(Math.round(Drive.BOOST_TICKS * charge), released.boostTicks());
+        assertTrue(released.boostPower() < T.driftBoost(), "a part charge pays a part boost: " + released.boostPower());
+        assertTrue(released.burn(T) < 1.0 && released.burn(T) > 0.3, "a lesser burn: " + released.burn(T));
     }
 
     @Test
@@ -239,9 +264,11 @@ final class DriveTest {
         assertThrows(IllegalArgumentException.class, () -> new Tuning(t.maxSpeed(), t.reverseSpeed(), t.acceleration(), t.brake(), t.drag(), t.grip(), t.driftGrip(), Math.PI / 2, t.driftBoost(), t.driftChargeTicks(), t.wheelBase(), t.climb(), t.mass()));
         assertThrows(IllegalArgumentException.class, () -> new Tuning(t.maxSpeed(), t.reverseSpeed(), t.acceleration(), t.brake(), t.drag(), t.grip(), t.driftGrip(), t.steer(), t.driftBoost(), 0, t.wheelBase(), t.climb(), t.mass()));
         assertThrows(IllegalArgumentException.class, () -> new Input(2, 0, false, true, true));
-        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 1.5, false, 0));
-        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.5, true, 0), "a drift has a side");
-        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.0, false, 1), "no side without a drift");
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 1.5, false, 0, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.5, true, 0, 0, 0), "a drift has a side");
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.0, false, 1, 0, 0), "no side without a drift");
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.0, false, 0, 5, 0), "a boost has power");
+        assertThrows(IllegalArgumentException.class, () -> new Drive(0, 0, 0, 0, 0.0, false, 0, 0, 0.1), "and ticks");
     }
 
     @Test

@@ -18,8 +18,13 @@ Right-click a vehicle to board the nearest free seat, the driver's first. Moveme
 drive and steer; **jump** held while turning above a third of top speed drifts the kart
 way: the nose swings out to a slip angle on the side you turned, steering leans the
 slide tighter or wider, the car keeps sliding the way it was going and comes round only
-as fast as `drift_grip` lets it, a charge builds, and releasing pays a boost
-proportional to it. **Left Control** is the horn while held; **H** cycles the headlights
+as fast as `drift_grip` lets it, the tyres squeal (a loop that swells with speed and dies
+when the slide ends), a charge builds, and releasing pays a boost proportional to it: the
+wheels take the stick's angle at once so the car goes where it points, and for the
+charge's share of two seconds the top speed is raised by the charge's share of
+`drift_boost` and the speed climbs to it -- the throttle cannot cancel it -- while an
+afterburner streams from the tail, blue at the core of a full burn, thinning as the boost
+runs out. Every client sees the flames. **Left Control** is the horn while held; **H** cycles the headlights
 off, on, auto (auto lights below a configurable darkness); the mode sits at the lower
 left of the screen beside the hotbar, a lamp icon and its word, whenever you ride. Both
 keys are live only while riding one of these vehicles, so Left Control stays sprint
@@ -29,13 +34,31 @@ A vehicle climbs any ledge up to its profile's `climb` (two blocks for a pickup)
 a jump: the collision box steps up the way the game steps a player up a slab, and the
 suspension eases the body and the riders up over a few ticks so nothing snaps. The body
 also cants: each tick the ground under every wheel is probed, and the body pitches nose
-up on a climb and rolls across a slope, the riders and the camera with it. Off the
-throttle, drag and rolling resistance bring it to rest within a few seconds; it never
-rolls backward on its own.
+up on a climb and rolls across a slope, and everyone aboard leans with it -- a rider's
+seat rides up with the nose and the rider is drawn turned by the body's pitch and roll
+about where they sit -- and riders turn with the body as a boat's do, so the view goes
+round with a drift. In third person the camera stands back in proportion to the
+vehicle's length (one and a half blocks a block, plus one and a half), where the game's
+four blocks would sit on a truck's tailgate. Off the throttle, drag and rolling
+resistance bring it to rest within a few seconds; it never rolls backward on its own.
+
+The collision box is the profile's `body`: as wide and long as the hull and as tall as
+the hull, not the cage or windshield over it, which pass through a low canopy the way a
+cage pushes through leaves. Nobody aboard takes the wall's damage for it. The only
+walls a vehicle's move meets are blocks and other vehicles (never its own trailer or
+tower): a boat stops dead at anything pushable, and a car that did would stall at every
+cow and bystander. The living are run over instead (below).
 
 The driver's client drives (the boat rule), the server re-runs the same move and resets a
 client that disagrees by more than a quarter block, and every other client is told the
-speed, steer and drift for its wheels and engine sound.
+speed, steer, drift and burn for its wheels, sounds and flames. Two things make the
+re-run agree: a copy that is not at the wheel keeps its model on the synced heading and
+speed, and seeds it again the tick control begins, so boarding drives on from where the
+vehicle points rather than snapping it to where that copy was born; and the server
+stands its copy back on the ground before re-running a reported move, since the client
+presses its copy down before every move and can always step, while the reported rise of
+a step leaves the server's copy airborne and unable to -- without which a ramp of slabs
+at speed had the server refuse every tick and snap the vehicle back.
 
 ## Fuel, storage, records, the wrench
 
@@ -98,7 +121,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
   "climb": 2.0, "mass": 1.45,
   "fuel": {"capacity": 24000},                        // burn ticks, as the furnace counts them
-  "storage": {"rows": 6, "region": {"z_max": -12.5}, "chest": {"at": [0, 16, -35], "yaw": 180}},   // the chest, where to click for it, and where the game's double chest is drawn (optional)
+  "storage": {"rows": 6, "region": {"z_max": -12.5}, "chest": {"at": [0, 16, -35], "yaw": 180, "scale": 1.0}},   // the chest, where to click for it, and where the game's double chest is drawn and how big (optional)
   "gauges": [{"kind": "speed", "part": {"material": "needle", "x_max": -5}, "pivot": [-8, 17, 21.9], "axis": [0, 0, 1], "zero": 0.3, "sweep": 4.7}],
   "headlights": {"at": [[-13, 15.5, 40.5], [13, 15.5, 40.5]], "part": {"material": "gauge"}, "range": 10},
   "horn": "vanillawheels:horn.truck",

@@ -286,14 +286,17 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
 
     /**
      * A real double chest, the game's own model and texture, drawn on the
-     * vehicle with its bottom centred at {@code at} (mesh units) and its
+     * vehicle with its bottom centred at {@code at} (mesh units), its
      * front turned {@code yaw} degrees from forward (180: it faces the
-     * rear). Its lid opens while anyone has the storage open.
+     * rear), at {@code scale} times its block size (1: two blocks wide, as
+     * it stands in the world; a small vehicle draws it smaller to fit its
+     * bed). Its lid opens while anyone has the storage open.
      */
-    public record Chest(Vec at, double yaw) {
+    public record Chest(Vec at, double yaw, double scale) {
         public static final Codec<Chest> CODEC = RecordCodecBuilder.create(i -> i.group(
                 VEC.fieldOf("at").forGetter(Chest::at),
-                Codec.DOUBLE.optionalFieldOf("yaw", 180.0).forGetter(Chest::yaw)
+                Codec.DOUBLE.optionalFieldOf("yaw", 180.0).forGetter(Chest::yaw),
+                Codec.doubleRange(0.05, 4.0).optionalFieldOf("scale", 1.0).forGetter(Chest::scale)
         ).apply(i, Chest::new));
     }
 

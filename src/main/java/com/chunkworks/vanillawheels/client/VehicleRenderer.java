@@ -83,7 +83,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
 
     /**
      * effects: draws the game's own double chest where the profile puts it,
-     * its front turned as the profile says, the lid up by the vehicle's
+     * at the profile's scale, its front turned as the profile says, the lid up by the vehicle's
      * openness -- the left half on the chest's own left, as the game lays
      * a double chest
      */
@@ -93,6 +93,8 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         poseStack.pushPose();
         poseStack.translate(at.x(), at.y(), at.z());
         poseStack.mulPose(Axis.YP.rotationDegrees((float) -chest.yaw()));
+        float k = (float) chest.scale();
+        poseStack.scale(k, k, k);
         VertexConsumer left = Sheets.CHEST_LOCATION_LEFT.buffer(buffers, RenderType::entityCutout);
         poseStack.pushPose();
         poseStack.translate(0.0, 0.0, -0.5);

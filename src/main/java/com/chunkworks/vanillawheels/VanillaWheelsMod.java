@@ -45,5 +45,6 @@ public final class VanillaWheelsMod {
                 event.dataPackRegistry(VanillaWheels.VEHICLES, VehicleProfile.CODEC, VehicleProfile.CODEC));
         modBus.addListener(ModContent::buildCreativeTabs);
         NeoForge.EVENT_BUS.addListener(Vehicle::onEntityJoin);
+        NeoForge.EVENT_BUS.addListener(Vehicle::onIncomingDamage);
     }
 }

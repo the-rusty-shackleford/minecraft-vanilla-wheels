@@ -12,6 +12,7 @@ previews); `build.py` cuts, loops and normalizes them into
 | `450821-pickup-horn-honks.ogg` | truck pickup horn honk aggressive annoyed various1.wav | kyles | https://freesound.org/people/kyles/sounds/450821/ | CC0 1.0 |
 | `453741-performance-car-idle.ogg` | auto performance car rumbly engine idle close bassy.flac | kyles | https://freesound.org/people/kyles/sounds/453741/ | CC0 1.0 |
 | `71741-nissan-maxima-handbrake-turn.ogg` | Nissan Maxima handbrake turn (04-25-2009).wav | audible-edge | https://freesound.org/people/audible-edge/sounds/71741/ | CC0 1.0 |
+| `71739-chrysler-lhs-tire-squeal-04.ogg` | Chrysler LHS tire squeal 04 (04-25-2009).wav | audible-edge | https://freesound.org/people/audible-edge/sounds/71739/ | CC0 1.0 |
 | `504626-body-fall-heavy-dirt.ogg` | BODY FALL - V HVY - DIRT | leonelmail | https://freesound.org/people/leonelmail/sounds/504626/ | CC0 1.0 |
 | `835173-wrench-impact.ogg` | wrench_impact.wav | Mihacappy | https://freesound.org/people/Mihacappy/sounds/835173/ | CC0 1.0 |
 | `386145-forge-adding-coal.ogg` | Forge - Adding coal shortest | ldezem | https://freesound.org/people/ldezem/sounds/386145/ | CC0 1.0 |
@@ -20,7 +21,7 @@ previews); `build.py` cuts, loops and normalizes them into
 |---|---|
 | `horn_truck` | 0.85 s from the middle of the pickup horn's first blast |
 | `engine_petrol` | 4 s of the idle's steady middle, crossfaded into a loop |
-| `skid` | 0.75 s of the handbrake turn's squeal at its loudest |
+| `skid` | 2 s of the Chrysler's squeal where it holds steadiest (11.3 s in), crossfaded into a loop |
 | `thud` | the body fall's impact and settle |
 | `wrench` | the wrench impact, whole |
 | `fuel` | the coal into the forge, whole |

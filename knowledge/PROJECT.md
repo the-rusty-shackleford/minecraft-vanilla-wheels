@@ -33,12 +33,12 @@ the client (renderer with the game's double chest and the rider's glass fade, me
 library with placeholder on a bad file, keys with a riding-only conflict context, the
 lights indicator by the hotbar, engine loop, radio, Luminance headlamps, the lift
 renderer and screen).
-`gametest`: the box car and box trailer, nineteen gametests, the photo booth.
+`gametest`: the box car and box trailer, twenty gametests, the photo booth.
 
 ## How it is verified
 
-`./gradlew check`: 62 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); nineteen gametests on a headless server driving a scripted box car, towing
+`./gradlew check`: 64 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+fixtures); twenty gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -55,7 +55,8 @@ list, not a recipe type; a 5 x 7 deck (5 x 6 since 1.3.0); the index in the part
 D-0005 towing: the server tows its own copy from its own tower, no client payload; the
 trailer's axle follows the hitch line; animals are passengers on cargo slots. D-0006
 Blockbench: the `.bbmodel` is read as saved, the dye is lifted a quarter toward white,
-the glass clears for the rider.
+the glass clears for the rider. D-0007 the playtest: only vehicles are walls, the
+server's re-run starts on the ground, the boost is a timed surge, riders lean and turn.
 
 ## Next
 
@@ -71,4 +72,12 @@ normals point out -- the truck had been lit inside out. 1.4.0 (2026-09-10, pack 
 profile's `factory` paint colour, an exact RGB an undyed vehicle wears, because the lifted
 light-blue dye cannot reach the reference's blue; the `.bbmodel` reader takes a Blockbench 5
 project's folder names from its `groups` list. The Trailblazer is now a hand-built Blockbench
-project (its D-0003); the protocol's job is to read it as saved. Next: the tuning session on speed, drift and damage, watched in the booth.
+project (its D-0003); the protocol's job is to read it as saved. 1.5.0 (2026-09-10), from
+a scripted playtest beside an Automobility motorcar and the box's own log (D-0007): only
+other vehicles are walls, the server stands its copy on the ground before re-running a
+move (837 resets a day on the box, gone), boarding drives on from the vehicle's heading,
+the drift's boost is a two-second surge the throttle cannot cancel with an afterburner
+every client sees, the wheels re-centre on release, riders lean and turn with the body,
+the camera stands back by the vehicle's length, the tyres loop, riders take no wall
+damage, and a profile's chest has a `scale`. Next: the tuning session on speed, drift and
+damage, watched in the booth.

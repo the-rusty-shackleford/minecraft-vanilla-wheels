@@ -42,6 +42,7 @@ public final class VanillaWheelsClient {
         NeoForge.EVENT_BUS.addListener(Controls::onClientTick);
         NeoForge.EVENT_BUS.addListener(Radio::onClientTick);
         NeoForge.EVENT_BUS.addListener(Radio::onLoggingOut);
+        RiderPose.register(NeoForge.EVENT_BUS);
         if (ModList.get().isLoaded("luminance")) {
             event.enqueueWork(Headlamps::register);
         }

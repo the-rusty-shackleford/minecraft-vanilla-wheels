@@ -108,6 +108,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private static final EntityDataAccessor<Float> DATA_SPEED = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_STEER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> DATA_DRIFTING = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
+    /** How hard the boost burns, 0..1, for the flames every client draws. */
+    private static final EntityDataAccessor<Float> DATA_BURN = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<ItemStack> DATA_DISC = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.ITEM_STACK);
     /** The entity id of the vehicle towing this one, -1 for none. */
     private static final EntityDataAccessor<Integer> DATA_TOWER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
@@ -129,6 +131,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private Tuning tuning = Tuning.pickup();
 
     private Drive drive = Drive.atRest(0.0);
+    /** Whether the last tick stepped the drive here: the wheel was this instance's. */
+    private boolean wasAtTheWheel;
     private Suspension suspension = Suspension.LEVEL;
     private Suspension suspensionO = Suspension.LEVEL;
     private double wheelTravel;
@@ -275,6 +279,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_SPEED, 0.0f);
         builder.define(DATA_STEER, 0.0f);
         builder.define(DATA_DRIFTING, false);
+        builder.define(DATA_BURN, 0.0f);
         builder.define(DATA_DISC, ItemStack.EMPTY);
         builder.define(DATA_TOWER, -1);
         builder.define(DATA_TRAILER, -1);
@@ -562,14 +567,29 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             }
             local = p.localBlocks(p.seats().get(seat).at());
         }
-        Vec3 at = rotate(local);
         Suspension s = suspension(partialTick);
+        Vec3 at = posed(local, s);
         return new Vec3(at.x, at.y + s.lift(), at.z);
+    }
+
+    /**
+     * effects: returns {@code local} (blocks, the body's frame) turned as the
+     * body is drawn under {@code s}: rolled, pitched, then yawed -- so a seat
+     * rides up with the nose on a climb and leans with the body in a bank
+     */
+    public Vec3 posed(Vec local, Suspension s) {
+        // Vec3's xRot and zRot turn the other way from the renderer's Axis.XP and Axis.ZP rotations.
+        return new Vec3(local.x(), local.y(), local.z()).zRot((float) -s.roll()).xRot((float) -s.pitch()).yRot(-getYRot() * Mth.DEG_TO_RAD);
     }
 
     @Override
     protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
         super.positionRider(passenger, callback);
+        // Riders turn with the body, as a boat's do: the view goes round with the drift instead of
+        // sitting still in the world while the body spins under it to the clamp.
+        float turn = Mth.wrapDegrees(getYRot() - yRotO);
+        passenger.setYRot(passenger.getYRot() + turn);
+        passenger.setYHeadRot(passenger.getYHeadRot() + turn);
         clampRotation(passenger);
     }
 
@@ -723,7 +743,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
         }
         setYRot((float) Math.toDegrees(f.heading()));
-        drive = new Drive(f.travelled(), f.heading(), f.heading(), 0.0, 0.0, false, 0);
+        drive = Drive.onRails(f.travelled(), f.heading(), 0.0, 0);
         wheelTravel += f.travelled();
         entityData.set(DATA_SPEED, (float) f.travelled());
         entityData.set(DATA_STEER, 0.0f);
@@ -796,7 +816,15 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         double yBefore = getY();
         Vehicle tower = tower();
         boolean towedHere = tower != null && (!level().isClientSide() || isControlledByLocalInstance());
-        if (tower == null && isControlledByLocalInstance()) {
+        boolean atTheWheel = tower == null && isControlledByLocalInstance();
+        if (atTheWheel && !wasAtTheWheel) {
+            // Taking the wheel: drive on from where the world has this, not from where this copy was born.
+            // A client boards a copy it may have seen for a single tick, or none, so there is no earlier
+            // tick to have kept the model current.
+            drive = synced();
+        }
+        wasAtTheWheel = atTheWheel;
+        if (atTheWheel) {
             Input in = level().isClientSide() ? Controls.input(this)
                     : scripted != null ? new Input(scripted.throttle(), scripted.steer(), scripted.drift(), onGround(), hasFuel())
                     : Input.coasting(onGround(), hasFuel());
@@ -821,12 +849,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 entityData.set(DATA_SPEED, (float) drive.speed());
                 entityData.set(DATA_STEER, (float) drive.steer());
                 entityData.set(DATA_DRIFTING, drive.drifting());
+                entityData.set(DATA_BURN, (float) drive.burn(tuning));
             } else {
                 syncDriveData();
             }
         } else if (!towedHere) {
             setDeltaMovement(Vec3.ZERO);
             wheelTravel += entityData.get(DATA_SPEED);
+            drive = synced();
         }
         double dy = getY() - yBefore;
         if (Math.abs(dy) > 0.3 && Math.abs(dy) <= Suspension.MAX_LIFT) {
@@ -839,9 +869,18 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             trailer.follow(this);
         }
         placeParts();
-        if (!level().isClientSide()) {
+        if (level().isClientSide()) {
+            Controls.exhaust(this);   // after the move, so the tail's travel this tick is known
+        } else {
             serverTick(p);
         }
+    }
+
+    /** effects: returns the drive as the world tells it: the synced speed, steer and drift, on rails along the yaw */
+    private Drive synced() {
+        float steer = entityData.get(DATA_STEER);
+        boolean drifting = entityData.get(DATA_DRIFTING);
+        return Drive.onRails(entityData.get(DATA_SPEED), Math.toRadians(getYRot()), steer, drifting ? (steer < 0 ? -1 : 1) : 0);
     }
 
     /**
@@ -959,6 +998,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         entityData.set(DATA_SPEED, (float) drive.speed());
         entityData.set(DATA_STEER, (float) drive.steer());
         entityData.set(DATA_DRIFTING, drive.drifting());
+        entityData.set(DATA_BURN, (float) drive.burn(tuning));
     }
 
     /** The server's per-tick duties: fuel, lights, the horn, running things over. */
@@ -1019,7 +1059,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         if (slowest != speed) {
             entityData.set(DATA_SPEED, (float) slowest);
-            drive = new Drive(slowest, drive.heading(), drive.motion(), drive.steer(), drive.driftCharge(), drive.drifting(), drive.driftSide());
+            drive = new Drive(slowest, drive.heading(), drive.motion(), drive.steer(), drive.driftCharge(), drive.drifting(), drive.driftSide(), drive.boostTicks(), drive.boostPower());
         }
     }
 
@@ -1033,12 +1073,35 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /** effects: takes the driver's state as their client reports it */
-    public void onDriveState(float speed, float steer, int throttle, boolean drifting) {
+    public void onDriveState(float speed, float steer, int throttle, boolean drifting, float burn) {
         this.throttle = throttle;
         entityData.set(DATA_SPEED, speed);
         entityData.set(DATA_STEER, steer);
         entityData.set(DATA_DRIFTING, drifting);
-        drive = new Drive(speed, Math.toRadians(getYRot()), drive.motion(), steer, drive.driftCharge(), drifting, drifting ? (drive.driftSide() == 0 ? (steer < 0 ? -1 : 1) : drive.driftSide()) : 0);
+        entityData.set(DATA_BURN, burn);
+        drive = new Drive(speed, Math.toRadians(getYRot()), drive.motion(), steer, drive.driftCharge(), drifting, drifting ? (drive.driftSide() == 0 ? (steer < 0 ? -1 : 1) : drive.driftSide()) : 0,
+                drive.boostTicks(), drive.boostPower());
+    }
+
+    /**
+     * effects: moves as the game does, except that a move the driver's
+     * client reported (the server re-running it) starts from the ground when
+     * this stands on any: the client presses its copy down a little before
+     * every move, so it is always on the ground and may always step up,
+     * while the delta it reports carries the rise of every step, which by the
+     * game's rule leaves this copy airborne after it and unable to step --
+     * and the game also shaves a millionth off the reported rise, which sinks
+     * this copy into the next block's top just far enough to count as a wall.
+     * Without this, a ramp of half steps at speed has the server refuse the
+     * client's move every tick and snap the vehicle back.
+     */
+    @Override
+    public void move(MoverType type, Vec3 delta) {
+        if (type == MoverType.PLAYER && !level().isClientSide() && !onGround()
+                && !level().noCollision(this, getBoundingBox().move(0.0, -0.05, 0.0))) {
+            setOnGround(true);
+        }
+        super.move(type, delta);
     }
 
     @Override
@@ -1046,9 +1109,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return (float) tuning.climb();
     }
 
+    /**
+     * effects: returns whether {@code entity} is a wall to this one's move:
+     * only another vehicle that is neither its trailer nor its tower. A boat
+     * stops at anything pushable, and a car that did would stop dead at every
+     * cow and every bystander -- and stall, since the driver's client and the
+     * server never quite agree where a mob stands, so the server would refuse
+     * the move the client made. The living are run over instead.
+     */
     @Override
     public boolean canCollideWith(Entity entity) {
-        return (entity.canBeCollidedWith() || entity.isPushable()) && !isPassengerOfSameVehicle(entity);
+        return entity instanceof Vehicle v && v != this && v != trailer() && v != tower();
     }
 
     @Override
@@ -1084,6 +1155,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     public boolean drifting() {
         return entityData.get(DATA_DRIFTING);
+    }
+
+    /** effects: returns how hard the boost burns, 0..1, as synced */
+    public float burn() {
+        return entityData.get(DATA_BURN);
     }
 
     /** effects: returns the suspension state {@code partialTick} of the way through this tick */
@@ -1578,6 +1654,18 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /** effects: when a vehicle joins a client level, starts its sounds */
+    /**
+     * effects: spares anyone aboard a vehicle the wall's damage: the body's
+     * box stops at the hull, so a rider's head passes through a low canopy or
+     * lintel the truck drives under, and a passenger who cannot move is not
+     * to be crushed for it
+     */
+    public static void onIncomingDamage(net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent event) {
+        if (event.getSource().is(net.minecraft.world.damagesource.DamageTypes.IN_WALL) && event.getEntity().getVehicle() instanceof Vehicle) {
+            event.setCanceled(true);
+        }
+    }
+
     public static void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide() && event.getEntity() instanceof Vehicle vehicle) {
             Controls.onVehicleJoined(vehicle);

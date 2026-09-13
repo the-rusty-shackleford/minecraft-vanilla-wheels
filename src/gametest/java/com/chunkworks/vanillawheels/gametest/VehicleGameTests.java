@@ -160,8 +160,10 @@ public final class VehicleGameTests {
         helper.runAtTickTime(150, () -> {
             helper.assertTrue(v.getX() > helper.absoluteVec(new Vec3(24, 0, 0)).x, "past the step: " + (v.getX() - helper.absoluteVec(new Vec3(0, 0, 0)).x));
             helper.assertTrue(Math.abs(v.getY() - (floorY + 2.0)) < 0.1, "standing two blocks higher: " + (v.getY() - floorY));
-            helper.assertTrue(v.suspension(1.0f).isSettled(), "the body has settled onto the box: " + v.suspension(1.0f) + " ground " + java.util.Arrays.toString(v.ground()) + " at " + v.position());
-            helper.assertTrue(noseUp[0] < -Math.toRadians(15), "the body pitched nose-up on the way: " + Math.toDegrees(noseUp[0]) + " degrees");
+            helper.assertTrue(v.suspension(1.0f).isSettled(), "the body has settled onto the box: " + v.suspension(1.0f) + " at " + v.position());
+            // The plane fit spreads one riser over the whole footprint and the springs ease into it: a
+            // clear cant, not the old per-axle nod.
+            helper.assertTrue(noseUp[0] < -Math.toRadians(8), "the body pitched nose-up on the way: " + Math.toDegrees(noseUp[0]) + " degrees");
             helper.succeed();
         });
     }

@@ -46,5 +46,6 @@ public final class VanillaWheelsMod {
         modBus.addListener(ModContent::buildCreativeTabs);
         NeoForge.EVENT_BUS.addListener(Vehicle::onEntityJoin);
         NeoForge.EVENT_BUS.addListener(Vehicle::onIncomingDamage);
+        NeoForge.EVENT_BUS.addListener(TickClock::onLevelTick);
     }
 }

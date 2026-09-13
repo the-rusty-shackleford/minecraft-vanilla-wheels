@@ -66,6 +66,8 @@ public record Drive(double speed, double heading, double motion, double steer, d
 
     /** Below this fraction of top speed nothing turns and no drift starts. */
     public static final double CREEP = 0.02;
+    /** A standing car with the stick held pivots as if rolling at this, blocks per tick: about two degrees a tick. nfx's turn-in-place. */
+    public static final double TURN_IN_PLACE = 0.15;
     /** The fraction of top speed under which a drift cannot begin. */
     public static final double DRIFT_FLOOR = 0.35;
     /** How much of the lock the wheels keep at top speed. */
@@ -170,8 +172,9 @@ public record Drive(double speed, double heading, double motion, double steer, d
      * fuel or off the ground; drag always takes its fraction and rolling
      * resistance a fixed amount whenever the throttle is off; the wheels
      * ease toward the lock the steer asks for, scaled down with speed; the
-     * heading turns by the bicycle rule; the motion follows the heading at
-     * the grip's rate. A drift begins when the key is held above the floor
+     * heading turns by the bicycle rule, a standing car with the stick held
+     * pivoting as if it rolled at TURN_IN_PLACE; the motion follows the
+     * heading at the grip's rate. A drift begins when the key is held above the floor
      * speed with the wheels turned, and from then on the nose swings to a
      * slip angle on that side (tighter with the stick into the turn, wider
      * against it) while the body slides round an arc whose curvature is the
@@ -247,9 +250,13 @@ public record Drive(double speed, double heading, double motion, double steer, d
             h = wrap(m + slipNext);
             v *= 1.0 - DRIFT_BLEED;
         } else {
-            // The heading turns by the bicycle rule; nothing turns at a creep.
-            if (driving && Math.abs(v) > t.maxSpeed() * CREEP) {
-                h = wrap(h + Math.tan(s) * v / t.wheelBase());
+            // The heading turns by the bicycle rule -- and a standing car turns in place: with the
+            // stick held and the car (nearly) stopped, the heading turns as if rolling at
+            // TURN_IN_PLACE, the way it points, while the position stays put.
+            double turning = in.steer() != 0 && driving && Math.abs(v) < TURN_IN_PLACE
+                    ? (v != 0.0 ? Math.signum(v) : (in.throttle() < 0 ? -1.0 : 1.0)) * TURN_IN_PLACE : v;
+            if (driving && Math.abs(turning) > t.maxSpeed() * CREEP) {
+                h = wrap(h + Math.tan(s) * turning / t.wheelBase());
             }
             // The motion follows the heading at the grip's rate.
             if (driving) {

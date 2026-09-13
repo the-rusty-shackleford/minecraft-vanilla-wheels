@@ -148,7 +148,7 @@ public final class TowGameTests {
     }
 
     @GameTest(template = "runway", timeoutTicks = 100)
-    public void aLeadLoadsAnimalsThroughOpenDoorsUpToTheRoomAndADoorClickLetsThemOut(GameTestHelper helper) {
+    public void aLeadLoadsAnimalsThroughOpenDoorsUpToTheRoomAndALeadAtTheDoorLetsThemOut(GameTestHelper helper) {
         layFloor(helper);
         Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
         Player p = helper.makeMockPlayer(GameType.SURVIVAL);
@@ -205,9 +205,15 @@ public final class TowGameTests {
             for (var c : trailer.animals()) {
                 helper.assertTrue(c.position().distanceTo(trailer.position()) < 1.5, "aboard, near the body: " + c.position().distanceTo(trailer.position()));
             }
-            // A crouching, empty-handed click on the open door with animals aboard lets them out behind.
+            // A crouching, empty-handed click on the open door only shuts it: a load can be shut in.
             p.setShiftKeyDown(true);
             p.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            helper.assertTrue(trailer.interactAt(p, door, InteractionHand.MAIN_HAND).consumesAction(), "the door click was taken");
+            helper.assertValueEqual(trailer.animals().size(), 3, "the door click keeps everyone aboard");
+            helper.assertTrue(!trailer.doorsOpen(), "and shuts the doors on them");
+            helper.assertTrue(trailer.interactAt(p, door, InteractionHand.MAIN_HAND).consumesAction(), "opened again");
+            // Crouching with a lead in hand at the open doors with animals aboard lets them out behind.
+            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
             helper.assertTrue(trailer.interactAt(p, door, InteractionHand.MAIN_HAND).consumesAction(), "the unload click was taken");
             helper.assertValueEqual(trailer.animals().size(), 0, "everyone is off");
             helper.assertTrue(trailer.doorsOpen(), "the doors stay open");
@@ -217,7 +223,8 @@ public final class TowGameTests {
                     helper.assertTrue(c.getX() < trailer.getX() - 1.5, "behind the trailer, which faces east: " + (c.getX() - trailer.getX()));
                 }
             }
-            // Empty and open, a click shuts them.
+            // Empty and open, the empty-handed click shuts them.
+            p.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
             helper.assertTrue(trailer.interactAt(p, door, InteractionHand.MAIN_HAND).consumesAction(), "the shut click was taken");
             helper.assertTrue(!trailer.doorsOpen(), "shut again");
             helper.succeed();
@@ -264,5 +271,28 @@ public final class TowGameTests {
                 helper.succeed();
             });
         });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 60)
+    public void aTrailerItemOnAHitchedCarPutsItDownCouplerOnTheBallHitched(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle car = spawn(helper, BOX_CAR, 10.5, 7.5, -90.0f);
+        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        Vec3 at = helper.absoluteVec(new Vec3(8.5, FLOOR, 7.5));
+        p.setPos(at.x, at.y, at.z);
+        p.setItemInHand(InteractionHand.MAIN_HAND, com.chunkworks.vanillawheels.ModContent.vehicleStack(BOX_TRAILER));
+        helper.assertTrue(car.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "the click with a trailer in hand was taken");
+        helper.assertTrue(p.getVehicle() == null, "and did not seat the player");
+        helper.assertTrue(p.getItemInHand(InteractionHand.MAIN_HAND).isEmpty(), "the trailer item was used");
+        Vehicle trailer = car.trailer();
+        helper.assertTrue(trailer != null, "a trailer hangs behind the car");
+        helper.assertTrue(trailer.tower() == car, "and knows its tower");
+        helper.assertTrue(Vehicle.flatDistance(trailer.tongue(), car.hitchPoint()) < 0.05, "its coupler on the ball: " + Vehicle.flatDistance(trailer.tongue(), car.hitchPoint()));
+        helper.assertTrue(Math.abs(net.minecraft.util.Mth.wrapDegrees(trailer.getYRot() - car.getYRot())) < 0.5, "facing the car's way");
+        // A second trailer in hand does nothing: the ball is taken.
+        p.setItemInHand(InteractionHand.MAIN_HAND, com.chunkworks.vanillawheels.ModContent.vehicleStack(BOX_TRAILER));
+        car.interact(p, InteractionHand.MAIN_HAND);
+        helper.assertTrue(!p.getItemInHand(InteractionHand.MAIN_HAND).isEmpty(), "the second trailer stays in hand");
+        helper.succeed();
     }
 }

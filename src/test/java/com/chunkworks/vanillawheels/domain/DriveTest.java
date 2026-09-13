@@ -121,9 +121,16 @@ final class DriveTest {
     }
 
     @Test
-    void steeringTurnsWithSpeedAndNotAtRest() {
+    void steeringTurnsWithSpeedAndAStandingCarPivotsInPlace() {
         Drive still = Drive.atRest(0.0).step(new Input(0, 1, false, true, true), T).next();
-        assertEquals(0.0, still.heading(), "no turning at rest");
+        assertTrue(still.heading() > 0, "a standing car with the stick right pivots right");
+        assertEquals(0.0, still.speed(), "without moving");
+        Drive pivoted = run(Drive.atRest(0.0), new Input(0, 1, false, true, true), 40);
+        assertTrue(pivoted.heading() > Math.toRadians(30) && pivoted.heading() < Math.toRadians(120), "a couple of degrees a tick: " + Math.toDegrees(pivoted.heading()));
+        Drive backing = Drive.atRest(0.0).step(new Input(-1, 1, false, true, true), T).next();
+        assertTrue(backing.heading() < 0, "backing with the stick right swings the nose left, as a reversing car does");
+        Drive aloft = Drive.atRest(0.0).step(new Input(0, 1, false, false, true), T).next();
+        assertEquals(0.0, aloft.heading(), "not in the air");
         Input rightSlow = new Input(1, 1, false, true, true);
         Drive slow = run(Drive.atRest(0.0), rightSlow, 20);
         assertTrue(slow.heading() > 0, "a right turn raises the heading (the game's yaw)");

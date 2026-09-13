@@ -57,17 +57,18 @@ public final class RiderPose {
         }
         PoseStack pose = event.getPoseStack();
         float yaw = Mth.rotLerp(event.getPartialTick(), v.yRotO, v.getYRot());
-        // The seat point is where the rider's vehicle attachment meets the body: above the feet, where the stack's origin is.
-        Vec3 seat = rider.getVehicleAttachmentPoint(v);
+        // The model turns about the point the seat anchors on: a rider's eye (its seat hangs down
+        // from the eye, so the eye is what the body carries), an animal's feet.
+        double about = rider instanceof net.minecraft.world.entity.animal.Animal ? 0.0 : rider.getEyeHeight();
         pose.pushPose();
         // A rider whose entity sits at the seat's eye is drawn back in the seat.
         pose.translate(shift.x, shift.y, shift.z);
-        pose.translate(seat.x, seat.y, seat.z);
+        pose.translate(0.0, about, 0.0);
         pose.mulPose(Axis.YP.rotationDegrees(-yaw));
         pose.mulPose(Axis.XP.rotation((float) s.pitch()));
         pose.mulPose(Axis.ZP.rotation((float) s.roll()));
         pose.mulPose(Axis.YP.rotationDegrees(yaw));
-        pose.translate(-seat.x, -seat.y, -seat.z);
+        pose.translate(0.0, -about, 0.0);
         pushed = true;
     }
 

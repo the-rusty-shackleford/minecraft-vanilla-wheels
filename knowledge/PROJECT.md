@@ -20,7 +20,8 @@ data-only repos. Nothing here depends on Automobility, which the pack may drop.
 `Input` and a `Tuning`, returning the next state and the effects to emit (skid, boost,
 stalled); `Suspension` -- the body's smoothed lift, pitch and roll that hide the step-up
 snap; `Impact`, `Tank`; `Tow` -- a trailer's axle dragged along the line to the hitch;
-`Cargo` -- adults and young against a trailer's room; `Paint` -- the dye lifted toward
+`Terrain` -- the drawn pose on the ground, a plane through the footprint on springs, and
+the towed lever pose; `Cargo` -- adults and young against a trailer's room; `Paint` -- the dye lifted toward
 white; and the mesh library (`Obj.parse`, `BbModel.parse` over its own `Json` reader,
 `Mesh` with Newell normals oriented outward per convex piece and parts by `Selector`,
 `Transform`/`Rotation`/`Dial`/`WheelSpin`/`BodyPose`, `BakedMesh`). `main`: `api/VehicleProfile` (the contract, a flat
@@ -33,12 +34,12 @@ the client (renderer with the game's double chest and the rider's glass fade, me
 library with placeholder on a bad file, keys with a riding-only conflict context, the
 lights indicator by the hotbar, engine loop, radio, Luminance headlamps, the lift
 renderer and screen).
-`gametest`: the box car and box trailer, twenty gametests, the photo booth.
+`gametest`: the box car and box trailer, twenty-one gametests, the photo booth.
 
 ## How it is verified
 
-`./gradlew check`: 64 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty gametests on a headless server driving a scripted box car, towing
+`./gradlew check`: 68 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+fixtures); twenty-one gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -80,4 +81,12 @@ the drift's boost is a two-second surge the throttle cannot cancel with an after
 every client sees, the wheels re-centre on release, riders lean and turn with the body,
 the camera stands back by the vehicle's length, the tyres loop, riders take no wall
 damage, and a profile's chest has a `scale`. Next: the tuning session on speed, drift and
-damage, watched in the booth.
+damage, watched in the booth. Then, 2026-09-13 (D-0008): nfx's handoff of the 11th --
+two days of driving-feel work as bytecode patches over 1.4.0, plus his V4 truck, Trailer 2
+and a Farmer's Pickup -- ported into source: `domain/Terrain` (his plane-fit pose and the
+towed lever pose, under JUnit), turn-in-place, the tow tick order on a pass clock, lights
+up the chain, flat catch distances, trailer placed by clicking a car with the item, the
+door click only toggling and a lead unloading, solid trailer bodies, marker lamps for
+unpowered vehicles; plus ceilings never read as ground and the lift raising its vehicle.
+The seat's `eye`, `cockpit` and `rider_scale` fields stay in the contract, unused by the
+Trailblazer (Rusty chose nfx's full-size truck and level camera for the view).

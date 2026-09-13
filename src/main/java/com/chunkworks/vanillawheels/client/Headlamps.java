@@ -32,7 +32,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The headlamps' light in the world, through Luminance: for a lit vehicle,
  * one line of light per lamp from the lamp to the profile's range ahead,
- * along the body's heading. This class names Luminance's types, so it is
+ * along the body's heading; for a lit unpowered one, a point at each lens. This class names Luminance's types, so it is
  * loaded only when Luminance is there (see {@link VanillaWheelsClient}).
  */
 final class Headlamps {
@@ -49,16 +49,25 @@ final class Headlamps {
             return List.of();
         }
         VehicleProfile.Headlights lights = p.headlights().get();
-        List<Line> out = new ArrayList<>(lights.at().size());
+        List<Source> out = new ArrayList<>(lights.at().size());
         double heading = Math.toRadians(vehicle.getYRot());
         double fx = -Math.sin(heading);
         double fz = Math.cos(heading);
+        // An unpowered vehicle (a trailer) has no headlamps to aim: its lamps are markers, a point
+        // at each lens of luminance twice the range -- Luminance falls one level a block, so a
+        // marker of range 3 is at 6 on its lens, 3 at three blocks, gone at six. nfx's rewrite.
+        boolean markers = !p.isPowered();
+        int level = Math.max(1, Math.min(Source.MAX_LUMINANCE, 2 * lights.range()));
         for (Vec at : lights.at()) {
             Vec3 lamp = vehicle.rotate(p.localBlocks(at));
             double x0 = vehicle.getX() + lamp.x;
             double y0 = vehicle.getY() + lamp.y;
             double z0 = vehicle.getZ() + lamp.z;
-            out.add(new Line(x0, y0, z0, x0 + fx * lights.range(), y0 - 0.5, z0 + fz * lights.range(), 15));
+            if (markers) {
+                out.add(new com.chunkworks.luminance.domain.Point(x0, y0, z0, level));
+            } else {
+                out.add(new Line(x0, y0, z0, x0 + fx * lights.range(), y0 - 0.5, z0 + fz * lights.range(), 15));
+            }
         }
         return out;
     }

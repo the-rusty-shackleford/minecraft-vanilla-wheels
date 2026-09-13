@@ -30,17 +30,27 @@ left of the screen beside the hotbar, a lamp icon and its word, whenever you rid
 keys are live only while riding one of these vehicles, so Left Control stays sprint
 everywhere else. Crouch to dismount, as from a boat.
 
-A vehicle climbs any ledge up to its profile's `climb` (two blocks for a pickup) without
-a jump: the collision box steps up the way the game steps a player up a slab, and the
-suspension eases the body and the riders up over a few ticks so nothing snaps. The body
-also cants: each tick the ground under every wheel is probed, and the body pitches nose
-up on a climb and rolls across a slope, and everyone aboard leans with it -- a rider's
-seat rides up with the nose and the rider is drawn turned by the body's pitch and roll
-about where they sit -- and riders turn with the body as a boat's do, so the view goes
-round with a drift. In third person the camera stands back in proportion to the
-vehicle's length (one and a half blocks a block, plus one and a half), where the game's
-four blocks would sit on a truck's tailgate. Off the throttle, drag and rolling
-resistance bring it to rest within a few seconds; it never rolls backward on its own.
+A vehicle climbs any ledge up to its profile's `climb` (one block for a pickup; a
+two-block ledge is a wall, use a ramp) without a jump: the collision box steps up the way
+the game steps a player up a slab. What is drawn is posed on the ground nfx's way
+(`domain/Terrain`): every wheel is probed as a disc, which starts riding up a step one
+radius early along a quarter circle; one plane is fitted through the terrain along both
+wheel tracks over the whole footprint, a block past each end, with the walk along a track
+ending at a wall face, so a staircase is one steady angle and a wall flattens the fit;
+pitch and roll are critically damped springs toward the plane (a first-order filter
+stutters at 20 Hz in first person); the height follows the plane directly, since a spring
+cannot track a ramp, bounded so no wheel sits more than a block under its ground; and the
+descending end is kept clear of the ground under it. A ceiling -- a canopy, a bridge, a
+lintel -- is never ground: a solid run with air under it is skipped and the surface below
+it read. Everyone aboard leans with the body: a seat is anchored on the rider's eye, which
+turns with the body, and the rider is drawn turned about it (loaded animals about their
+feet); riders turn with the body as a boat's do, so the view goes round with a drift, and
+the first-person camera itself stays level, the smoothest ride there is with the body on
+springs. A standing car with the stick held turns in place, about two degrees a tick. In
+third person the camera stands back in proportion to the vehicle's length (one and a half
+blocks a block, plus one and a half), where the game's four blocks would sit on a truck's
+tailgate. Off the throttle, drag and rolling resistance bring it to rest within a few
+seconds; it never rolls backward on its own.
 
 The collision box is the profile's `body`: as wide and long as the hull and as tall as
 the hull, not the cage or windshield over it, which pass through a low canopy the way a
@@ -168,24 +178,36 @@ vertex, vanish that way.
 
 ## Towing and animals
 
-A trailer is a profile with no engine, no seats and a `hitch.front`, its tongue. Back a
-vehicle's rear hitch (`hitch.rear`) to within half a block of a loose trailer's tongue
-while moving and it catches with a clunk; crouch and right-click the tongue to let go, and
-the trailer rolls to a stop on its own. A hitched trailer goes where its tower goes: its
-axle is dragged along the line to the hitch, so it tracks a turn the way a real trailer
-does and never folds past a right angle, and it climbs and drops with the ground like
-anything else. The driver's client moves it with the car and the server moves its own
-copy from its own copy of the car; nothing about the trailer is ever taken from a client.
-A trailer that the world holds back until its tongue is a block from the hitch is let go.
-Trailers can tow trailers. The link is saved by UUID and comes back after a reload.
+A trailer is a profile with no engine, no seats and a `hitch.front`, its tongue. Hold a
+trailer item and right-click a vehicle that has a rear hitch (`hitch.rear`) and nothing
+behind it: the trailer is put down coupler on the ball, facing the same way, hitched, and
+the item is used up (nothing happens if there is no room). Or back the hitch to within half
+a block of a loose trailer's tongue, measured in the ground plane, while moving, and it
+catches with a clunk. Crouch and right-click the tongue to let go, and the trailer rolls to
+a stop on its own. A hitched trailer goes where its tower goes: its axle is dragged along
+the line to the hitch, so it tracks a turn the way a real trailer does and never folds past
+a right angle, and it climbs and drops with the ground like anything else. Its drawn pose
+is a lever on its axle: the coupler sits on the car's drawn ball, the axle on a line fitted
+along the trailer's own wheel tracks, the pitch solved from both, so it follows the car's
+smoothed pose exactly and never pitches for terrain that is under the car rather than
+under it. It shows its tower's lights, since nothing can cycle its own. The driver's
+client moves it with the car and the server moves its own copy from its own copy of the
+car; nothing about the trailer is ever taken from a client. A trailer moved from the car's
+tick before its own would be drawn in steps (the level's snapshot of its old position lands
+between the two), so a trailer whose car ticks first catches up at the top of its own tick
+instead. A trailer that the world holds back until its tongue is a block from the hitch, in
+the ground plane, is let go. Trailers can tow trailers. The link is saved by UUID and comes
+back after a reload. A seatless vehicle's hit boxes are solid to walkers, so nobody walks
+through a trailer's body.
 
 A trailer with `cargo` carries animals: crouch and right-click a door to open it, then
 right-click the trailer holding a lead and every animal on your leads within ten blocks
 boards while there is room -- an adult takes a whole share, a young one a half, so room
 for four adults is room for eight calves or two cows and four calves -- and each lead
-comes back to you. Crouch and right-click an open door with animals aboard to let them
-out behind; empty and open, the same click shuts it. Animals never board through shut
-doors. `doors` swing about their hinges when open.
+comes back to you. Crouch and right-click a door, empty-handed, to shut or open it, load
+or no load. Crouch and right-click the trailer holding a lead with the doors open and
+animals aboard to let them out behind. Animals never board through shut doors. `doors`
+swing about their hinges when open. Loaded animals lean with the floor as riders do.
 
 ## Parts, recipes, the Mechanic Lift
 
@@ -208,8 +230,8 @@ when the parts match no vehicle, or when the deck is not clear -- the button is 
 with the server's verdict and the status line says which. **Paint** colours the vehicle
 standing on the deck with the dye in the slot and takes one; a chassis in the slot is
 never painted, since paint only ever finds an entity on the deck. Either job raises the
-deck half a block for two seconds with the rams' sound. Closing the menu hands the parts
-back.
+deck half a block for two seconds with the rams' sound, and the vehicle on it rises with
+the deck, riders and all. Closing the menu hands the parts back.
 
 `vanillawheels:vehicle` and `vanillawheels:chassis` carry the profile id in the
 `vanillawheels:vehicle` component (paint, fuel and the disc in their own); one of each per
@@ -255,7 +277,8 @@ player (Build spawns the car facing the front and takes exactly its parts; Paint
 the car on the deck and refuses one beside it), and keeps its job across a save; the car
 catches the trailer's tongue, tows it straight and through a turn with the tongue on the
 hitch, lets go on a click; a lead loads a cow and two calves through open doors and no
-more, shut doors refuse, a door click unloads them behind; the tow link survives a save.
+more, shut doors refuse, the door click shuts them in and a lead at the open door unloads
+them behind; the tow link survives a save.
 The booth photographs the stock car, a red one, the dash from the driver's seat, the lamps at
 night from behind (the beam on the ground, through Luminance) and from the front (the
 faces aglow), and the lift: placed, its menu, the deck up with the car just built on it,

@@ -24,6 +24,7 @@ import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.Suspension;
+import com.chunkworks.vanillawheels.domain.Terrain;
 import com.chunkworks.vanillawheels.domain.Cargo;
 import com.chunkworks.vanillawheels.domain.Tank;
 import com.chunkworks.vanillawheels.domain.Tow;
@@ -135,6 +136,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private boolean wasAtTheWheel;
     private Suspension suspension = Suspension.LEVEL;
     private Suspension suspensionO = Suspension.LEVEL;
+    /** The terrain pose's memory: the eased body and its springs, absolute height. Null until first posed. */
+    @Nullable private Terrain.Pose pose;
+    private Terrain.TowedPose towedPose = Terrain.TowedPose.LEVEL;
+    /** Towing's bookkeeping: the pass of this body's last own tick, the pass its tower last moved it, and the old pose to restore (see tick). */
+    long lastOwnPass = Long.MIN_VALUE;
+    private long lastFollowedPass = Long.MIN_VALUE;
+    @Nullable private double[] preFollow;
     private double wheelTravel;
     private double wheelTravelO;
     /** The driver's throttle as the server last heard it: what burns fuel. */
@@ -160,7 +168,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private float doorSwing;
     private float doorSwingO;
     /** The ground under the axles and the sides as last probed, relative to the body. */
-    private double[] ground = new double[4];
     /** The chest lid on the client, 0 shut to 1 open, eased toward whether anyone has the storage open. */
     private float lid;
     private float lidO;
@@ -399,6 +406,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return box != null;
         }
 
+        /** effects: returns whether walkers meet this box: only a seatless vehicle's (a trailer's), so nobody walks through its body; a seated vehicle's riders dismount beside the body and would land inside a solid box */
+        @Override
+        public boolean canBeCollidedWith() {
+            VehicleProfile p = getParent().profile();
+            return box != null && p != null && p.seats().isEmpty();
+        }
+
         @Override
         public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
             return getParent().hurt(source, amount);
@@ -604,33 +618,30 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (seat < 0 || seat >= p.seats().size()) {
                 return super.getPassengerAttachmentPoint(entity, dimensions, partialTick);
             }
-            local = eyeAttachment(entity, p.seats().get(seat));
+            // Anchored on the eye, nfx's way: the game hangs a rider's eye a fixed height straight up
+            // from the attachment, so on a tilted body an upright rider's head left the cabin. The
+            // eye point is what turns with the body, and the attachment hangs back down from it.
+            VehicleProfile.Seat seat0 = p.seats().get(seat);
+            double e = eyeOver(entity);
+            Vec eye = seat0.eye().map(p::localBlocks).orElseGet(() -> p.localBlocks(seat0.at()).plus(new Vec(0.0, e, 0.0)));
+            Suspension s = suspension(partialTick);
+            Vec3 at = posed(eye, s);
+            return new Vec3(at.x, at.y - e + s.lift(), at.z);
         }
         Suspension s = suspension(partialTick);
         Vec3 at = posed(local, s);
         return new Vec3(at.x, at.y + s.lift(), at.z);
     }
 
-    /**
-     * effects: returns where {@code rider}'s vehicle attachment goes for
-     * {@code seat}, blocks in the body's frame: the seat itself, or, when the
-     * seat has an eye, the point that puts the rider's eye there -- the
-     * attachment sits under the eye by the rider's own eye height less its
-     * attachment height, both at whatever size the rider is
-     */
-    private Vec eyeAttachment(Entity rider, VehicleProfile.Seat seat) {
-        VehicleProfile p = profile();
-        if (seat.eye().isEmpty()) {
-            return p.localBlocks(seat.at());
-        }
-        double under = rider.getEyeHeight() - rider.getVehicleAttachmentPoint(this).y;
-        return p.localBlocks(seat.eye().get()).plus(new Vec(0.0, -under, 0.0));
+    /** effects: returns how far {@code rider}'s eye sits over its vehicle attachment, blocks, at its present size */
+    static double eyeOver(Entity rider) {
+        return rider instanceof LivingEntity ? Math.max(0.0, rider.getEyeHeight() - rider.getVehicleAttachmentPoint(rider.getVehicle() == null ? rider : rider.getVehicle()).y) : 0.0;
     }
 
     /**
      * effects: returns how far, in the world's frame, {@code rider} is drawn
      * from where its entity is: zero for a seat without an eye, else from the
-     * eye's attachment to the seat's, so the body sits in the seat while the
+     * seat's eye to the seat itself, so the body sits in the seat while the
      * entity, and so the camera, is at the eye
      */
     public Vec3 drawOffset(Entity rider, float partialTick) {
@@ -641,7 +652,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         VehicleProfile.Seat at = p.seats().get(seat);
         Suspension s = suspension(partialTick);
-        return posed(p.localBlocks(at.at()), s).subtract(posed(eyeAttachment(rider, at), s));
+        double e = eyeOver(rider);
+        return posed(p.localBlocks(at.at()).plus(new Vec(0.0, e, 0.0)), s).subtract(posed(p.localBlocks(at.eye().get()), s));
     }
 
     /**
@@ -781,15 +793,51 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
     }
 
+    /** True where this side simulates this body's tow behind {@code tower}: the server, or the driver's client. */
+    private boolean simulatesTow(Vehicle tower) {
+        return tower.trailer() == this && (!level().isClientSide() || isControlledByLocalInstance());
+    }
+
+    /**
+     * effects: called from {@code tower}'s tick: moves this body behind it
+     * unless it already caught up in its own tick this pass, or ticks later
+     * this pass and will catch up then -- after the level's snapshot of its
+     * old position, so the old and new bracket one tick of motion. A body
+     * moved from its tower's tick before its own is drawn in steps otherwise:
+     * the snapshot overwrites "old" with the moved position (nfx's finding).
+     */
+    void followFrom(Vehicle tower, long pass) {
+        if (!simulatesTow(tower) || lastFollowedPass == pass) {
+            return;
+        }
+        if (lastOwnPass == pass - 1) {
+            return;   // ticks after the tower this pass: it catches up at the top of its own tick
+        }
+        preFollow = new double[] {pass, xOld, yOld, zOld, yRotO};
+        moveBehind(tower, pass);
+        VehicleProfile p = profile();
+        if (lastOwnPass == pass && p != null && !rideTowed(p, tower)) {
+            rideTheGround(p);   // it ticked before the tower: pose it here, at the position it was moved to
+        }
+    }
+
+    private void moveBehind(Vehicle tower, long pass) {
+        follow(tower);
+        lastFollowedPass = pass;
+    }
+
     /**
      * effects: one tick of being towed by {@code tower}: the tongue is put
      * on the tower's hitch by {@link Tow}, the body moved there through the
      * world (so it climbs and falls like anything else), turned to the new
      * heading, its wheels rolled; if the world held it back so far that the
-     * tongue is STRETCH from the hitch, the server lets go. Tows its own
-     * trailer on in turn.
+     * tongue is STRETCH from the hitch in the ground plane, the server lets
+     * go. Tows its own trailer on in turn. Distances are horizontal: a
+     * drawbar is rigid only in the ground plane, each body keeps its own
+     * height, and a 3-D test spent the catch radius on the height between a
+     * low coupler and a high ball and broke the chain at a one-block step.
      */
-    void follow(Vehicle tower) {
+    private void follow(Vehicle tower) {
         VehicleProfile p = profile();
         Vec3 hitch = tower.hitchPoint();
         if (p == null || hitch == null || p.hitch().front().isEmpty()) {
@@ -801,7 +849,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (length <= 0.05) {
             return;
         }
-        double yBefore = getY();
         Vec3 axle = position().add(rotate(new Vec(0.0, 0.0, axleZ)));
         Tow.Follow f = Tow.follow(hitch.x, hitch.z, axle.x, axle.z, Math.toRadians(getYRot()), length, Math.toRadians(tower.getYRot()));
         Vec3 axleOffset = new Vec3(0.0, 0.0, axleZ).yRot((float) -f.heading());
@@ -819,19 +866,68 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         wheelTravel += f.travelled();
         entityData.set(DATA_SPEED, (float) f.travelled());
         entityData.set(DATA_STEER, 0.0f);
-        double dy = getY() - yBefore;
-        if (Math.abs(dy) > 0.3 && Math.abs(dy) <= Suspension.MAX_LIFT) {
-            suspension = suspension.jumped(dy);
-        }
         if (!level().isClientSide()) {
             Vec3 tongue = tongue();
-            if (tongue != null && tongue.distanceTo(tower.hitchPoint()) > STRETCH) {
+            if (tongue != null && flatDistance(tongue, tower.hitchPoint()) > STRETCH) {
                 unhitch();
             }
         }
         Vehicle next = trailer();
         if (next != null) {
-            next.follow(this);
+            next.followFrom(this, TickClock.now(level()));
+        }
+    }
+
+    /** effects: returns the distance between {@code a} and {@code b} in the ground plane */
+    public static double flatDistance(Vec3 a, Vec3 b) {
+        return Math.hypot(a.x - b.x, a.z - b.z);
+    }
+
+    /** effects: returns the profile id of the trailer {@code stack} holds -- a built vehicle with a front hitch -- or null */
+    @Nullable
+    private ResourceLocation trailerProfile(ItemStack stack) {
+        if (!(stack.getItem() instanceof VehicleItem)) {
+            return null;
+        }
+        ResourceLocation id = VanillaWheels.vehicleOf(stack).orElse(null);
+        if (id == null) {
+            return null;
+        }
+        VehicleProfile tp = VanillaWheels.profile(level().registryAccess(), id).map(net.minecraft.core.Holder.Reference::value).orElse(null);
+        return tp != null && tp.hitch().front().isPresent() ? id : null;
+    }
+
+    /**
+     * effects: on the server, puts the trailer in {@code stack} behind this vehicle with its
+     * coupler on the hitch ball, facing the same way, hitched; as the item's own placement, the
+     * item's saved state is loaded, the spot must be clear (told on the screen otherwise), and
+     * survival consumes the item. A trailer that fails the room check was never added, and is not
+     * discarded: removing it would spill its loaded contents.
+     */
+    private void placeTrailer(ServerLevel server, ItemStack stack, Player player) {
+        ResourceLocation id = trailerProfile(stack);
+        Vec3 ball = hitchPoint();
+        if (id == null || ball == null || trailer() != null) {
+            return;
+        }
+        Vehicle t = Vehicle.create(server, id, ball, getYRot());
+        if (t == null) {
+            return;
+        }
+        t.loadFromItem(stack);
+        VehicleProfile tp = t.profile();
+        Vec3 coupler = t.rotate(tp.localBlocks(tp.hitch().front().get()));
+        t.setPos(ball.x - coupler.x, getY(), ball.z - coupler.z);
+        t.setYRot(getYRot());
+        t.yRotO = getYRot();
+        if (!server.noCollision(t, t.getBoundingBox().deflate(0.05))) {
+            player.displayClientMessage(Component.translatable("vanillawheels.no_room"), true);
+            return;
+        }
+        server.addFreshEntity(t);
+        hitch(t);
+        if (!player.hasInfiniteMaterials()) {
+            stack.shrink(1);
         }
     }
 
@@ -843,7 +939,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         for (Vehicle other : level().getEntitiesOfClass(Vehicle.class, getBoundingBox().inflate(4.0), v -> v != this && v.hasTongue() && v.tower() == null && v.towerUuid == null)) {
             Vec3 tongue = other.tongue();
-            if (tongue != null && tongue.distanceTo(hitch) < CATCH && other.trailer() != this) {
+            if (tongue != null && flatDistance(tongue, hitch) < CATCH && other.trailer() != this) {
                 hitch(other);
                 return;
             }
@@ -885,9 +981,23 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             doorSwing = Mth.clamp(doorSwing + (doorsOpen() ? 0.15f : -0.15f), 0.0f, 1.0f);
             lid = Mth.clamp(lid + (entityData.get(DATA_OPENERS) > 0 ? 0.1f : -0.1f), 0.0f, 1.0f);
         }
-        double yBefore = getY();
+        // Towing's bookkeeping: which pass this is, and whether the tower has moved this body yet.
+        long pass = TickClock.now(level());
+        lastOwnPass = pass;
+        if (preFollow != null && (long) preFollow[0] == pass) {
+            // The tower's tick moved this body before this, its own, tick: the level then snapshotted
+            // "old" as the new position, so the renderer would draw no motion. Put the old back.
+            xOld = xo = preFollow[1];
+            yOld = yo = preFollow[2];
+            zOld = zo = preFollow[3];
+            yRotO = (float) preFollow[4];
+            preFollow = null;
+        }
         Vehicle tower = tower();
-        boolean towedHere = tower != null && (!level().isClientSide() || isControlledByLocalInstance());
+        boolean towedHere = tower != null && simulatesTow(tower);
+        if (towedHere && lastFollowedPass != pass && tower.lastOwnPass == pass) {
+            moveBehind(tower, pass);   // the tower ticked first: catch up now, and pose below at the new position
+        }
         boolean atTheWheel = tower == null && isControlledByLocalInstance();
         if (atTheWheel && !wasAtTheWheel) {
             // Taking the wheel: drive on from where the world has this, not from where this copy was born.
@@ -930,15 +1040,20 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             wheelTravel += entityData.get(DATA_SPEED);
             drive = synced();
         }
-        double dy = getY() - yBefore;
-        if (Math.abs(dy) > 0.3 && Math.abs(dy) <= Suspension.MAX_LIFT) {
-            suspension = suspension.jumped(dy);
+        if (towedHere) {
+            if (lastFollowedPass == pass) {
+                if (!rideTowed(p, tower)) {
+                    rideTheGround(p);
+                }
+            }
+            // else: the tower ticks later this pass and moves and poses this body then
+        } else {
+            rideTheGround(p);
         }
-        rideTheGround(p);
-        // The trailer goes where this went, this very tick, wherever this is moved: the driver's client or the server.
+        // The trailer goes where this went, this very pass, wherever this is moved: the driver's client or the server.
         Vehicle trailer = trailer();
-        if (trailer != null && tower == null && (!level().isClientSide() || isControlledByLocalInstance())) {
-            trailer.follow(this);
+        if (trailer != null && (!level().isClientSide() || isControlledByLocalInstance())) {
+            trailer.followFrom(this, pass);
         }
         placeParts();
         if (level().isClientSide()) {
@@ -956,74 +1071,89 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /**
-     * effects: steps the suspension toward what the ground under the wheels
-     * says: the front and rear axles' ground heights give the pitch, the
-     * two sides' the roll, their mean the lift -- so a body whose box has
-     * stepped onto a ledge pitches nose-up while its rear wheels are still
-     * below, and levels as they follow
+     * effects: poses the body on the ground under it, nfx's way ({@link Terrain}): the wheels
+     * probed as discs from where the last pose drew them, one plane fitted through the terrain
+     * over the whole footprint, pitch and roll on critically damped springs toward it, the height
+     * on the plane within the sink and float bounds, the descending end kept clear -- so a
+     * staircase is one steady angle, a wall flattens the fit, and a physics step-up never shows
      */
-    private void rideTheGround(VehicleProfile p) {
-        List<VehicleProfile.WheelPosition> wheels = p.wheels().positions();
-        double meanForward = 0.0;
-        for (VehicleProfile.WheelPosition w : wheels) {
-            meanForward += w.forward();
-        }
-        meanForward /= wheels.size();
-        double front = 0.0, rear = 0.0, left = 0.0, right = 0.0;
-        int nf = 0, nr = 0, nl = 0, nrt = 0;
-        for (VehicleProfile.WheelPosition w : wheels) {
-            Vec3 at = position().add(rotate(new Vec(-p.blocks(w.right()), 0.0, p.blocks(w.forward()))));
-            double h = groundUnder(at.x, at.z);
-            if (w.forward() >= meanForward) {
-                front += h;
-                nf++;
-            } else {
-                rear += h;
-                nr++;
-            }
-            if (w.right() <= 0) {
-                left += h;
-                nl++;
-            } else {
-                right += h;
-                nrt++;
-            }
-        }
-        front = nf > 0 ? front / nf : 0.0;
-        rear = nr > 0 ? rear / nr : front;
-        left = nl > 0 ? left / nl : 0.0;
-        right = nrt > 0 ? right / nrt : left;
-        ground = new double[] {front, rear, left, right};
-        suspension = suspension.step(front, rear, left, right, tuning.wheelBase(), p.track());
-    }
-
-    /** effects: returns the ground heights the suspension last chased: front, rear, left, right, blocks relative to the body */
-    public double[] ground() {
-        return ground.clone();
+    void rideTheGround(VehicleProfile p) {
+        pose = Terrain.step(columns(), frame(), shape(p), getY(), pose == null ? Terrain.Pose.level(getY() + suspension.lift()) : pose);
+        suspension = pose.suspension(getY());
     }
 
     /**
-     * effects: returns the height of the ground in the column at (x, z)
-     * relative to the body's own height: the top of the highest block
-     * collision within {@link Suspension#MAX_LIFT} above or below it; the
-     * bottom of that range when there is nothing (a wheel over a drop)
+     * effects: poses this body as towed by {@code tower}: a lever on its axle hung from the
+     * tower's drawn hitch ball, the axle on a line along its own tracks ({@link Terrain#towed});
+     * returns false, leaving the pose to {@link #rideTheGround}, when either end lacks a hitch
      */
-    private double groundUnder(double x, double z) {
-        double top = getY() + Suspension.MAX_LIFT;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        int bx = Mth.floor(x);
-        int bz = Mth.floor(z);
-        for (int by = Mth.floor(top); by >= Mth.floor(getY() - Suspension.MAX_LIFT); by--) {
-            pos.set(bx, by, bz);
-            net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos).getCollisionShape(level(), pos);
-            if (!shape.isEmpty()) {
-                double h = by + shape.max(net.minecraft.core.Direction.Axis.Y);
-                if (h <= top + 1e-6) {
-                    return h - getY();
-                }
-            }
+    private boolean rideTowed(VehicleProfile p, Vehicle tower) {
+        VehicleProfile tp = tower.profile();
+        if (tp == null || tp.hitch().rear().isEmpty() || p.hitch().front().isEmpty()) {
+            return false;
         }
-        return -Suspension.MAX_LIFT;
+        Suspension ts = tower.suspension(1.0f);
+        Vec ball = tp.localBlocks(tp.hitch().rear().get());
+        double ballY = tower.getY() + ts.lift()
+                + (ball.x() * Math.sin(ts.roll()) + ball.y() * Math.cos(ts.roll())) * Math.cos(ts.pitch()) - ball.z() * Math.sin(ts.pitch());
+        Vec coupler = p.localBlocks(p.hitch().front().get());
+        Terrain.Towed t = Terrain.towed(columns(), frame(), shape(p), getY(), p.axleForward(), coupler.z(),
+                new Terrain.Ball(ballY - getY(), ball.y()), towedPose);
+        towedPose = t.next();
+        suspension = t.suspension();
+        pose = new Terrain.Pose(suspension.pitch(), suspension.roll(), getY() + suspension.lift(), 0.0, 0.0);
+        return true;
+    }
+
+    /** effects: returns the ground as {@link Terrain} reads it: block collision tops in a column, relative to this body's y */
+    private Terrain.Columns columns() {
+        double y = getY();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        return (x, z, lo, hi) -> {
+            int bx = Mth.floor(x), bz = Mth.floor(z);
+            int floor = Mth.floor(y + lo);
+            for (int by = Mth.floor(y + hi); by >= floor; by--) {
+                net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos.set(bx, by, bz)).getCollisionShape(level(), pos);
+                if (shape.isEmpty()) {
+                    continue;
+                }
+                double top = by + shape.max(net.minecraft.core.Direction.Axis.Y) - y;
+                // Ground stands on something: the solid run this block belongs to must reach down to
+                // the body's own floor level, or as far down as the sensing looks. A run with air
+                // under it -- a canopy, a bridge, a lintel -- is a ceiling, and the ground is below it.
+                int b = by;
+                net.minecraft.world.phys.shapes.VoxelShape lowest = shape;
+                while (b - 1 >= floor - 1) {
+                    net.minecraft.world.phys.shapes.VoxelShape under = level().getBlockState(pos.set(bx, b - 1, bz)).getCollisionShape(level(), pos);
+                    if (under.isEmpty()) {
+                        break;
+                    }
+                    b--;
+                    lowest = under;
+                }
+                double bottom = b + lowest.min(net.minecraft.core.Direction.Axis.Y) - y;
+                if (bottom <= 0.01 || b <= floor) {
+                    return top;
+                }
+                by = b;   // a ceiling: carry on below its run
+            }
+            return Double.NEGATIVE_INFINITY;
+        };
+    }
+
+    private Terrain.Frame frame() {
+        return new Terrain.Frame(getX(), getZ(), Math.toRadians(getYRot()));
+    }
+
+    /** effects: returns what the terrain pose needs of {@code p}: the wheels in the body's frame (+x is the mesh's left, so a wheel's x is minus its "right") */
+    private static Terrain.Shape shape(VehicleProfile p) {
+        List<VehicleProfile.WheelPosition> wheels = p.wheels().positions();
+        double[] wx = new double[wheels.size()], wz = new double[wheels.size()];
+        for (int i = 0; i < wheels.size(); i++) {
+            wx[i] = -p.blocks(wheels.get(i).right());
+            wz[i] = p.blocks(wheels.get(i).forward());
+        }
+        return new Terrain.Shape(p.blocks(p.wheels().radius()), Math.max(0.0, p.climb()), p.body().length(), p.track(), wx, wz);
     }
 
     private void tickLerp() {
@@ -1234,11 +1364,30 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return entityData.get(DATA_BURN);
     }
 
-    /** effects: returns the suspension state {@code partialTick} of the way through this tick */
+    /** effects: returns the suspension state {@code partialTick} of the way through this tick, standing on the lift's deck if it is raised */
     public Suspension suspension(float partialTick) {
-        return new Suspension(Mth.lerp(partialTick, suspensionO.lift(), suspension.lift()),
+        return new Suspension(Mth.lerp(partialTick, suspensionO.lift(), suspension.lift()) + deckRaise(partialTick),
                 Mth.lerp(partialTick, suspensionO.pitch(), suspension.pitch()),
                 Mth.lerp(partialTick, suspensionO.roll(), suspension.roll()));
+    }
+
+    /**
+     * effects: returns how far the Mechanic Lift under this vehicle has its deck raised, blocks:
+     * the deck is drawn rising half a block through a job, and a vehicle standing on it rises
+     * with it, riders and all. Zero off a lift, or with no job running.
+     */
+    public double deckRaise(float partialTick) {
+        BlockPos under = BlockPos.containing(getX(), getY() - 0.01, getZ());
+        net.minecraft.world.level.block.state.BlockState state = level().getBlockState(under);
+        BlockPos controller;
+        if (state.is(ModContent.LIFT_PART.get())) {
+            controller = com.chunkworks.vanillawheels.lift.LiftPartBlock.controller(state, under);
+        } else if (state.is(ModContent.LIFT_CONTROLLER.get())) {
+            controller = under;
+        } else {
+            return 0.0;
+        }
+        return level().getBlockEntity(controller) instanceof com.chunkworks.vanillawheels.lift.LiftBlockEntity lift && lift.busy() ? lift.raise(partialTick) : 0.0;
     }
 
     /** effects: returns how far the wheels have rolled, blocks, interpolated */
@@ -1252,7 +1401,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** effects: returns whether the headlamps are lit right now */
     public boolean lit() {
-        return entityData.get(DATA_LIT);
+        // A towed body shows its tower's lights: nothing can cycle a seatless body's own (H acts on
+        // the vehicle you ride), so a trailer's markers follow the head of its chain.
+        Vehicle head = this;
+        for (int i = 0; i < 8; i++) {
+            Vehicle t = head.tower();
+            if (t == null || t == this) {
+                break;
+            }
+            head = t;
+        }
+        return head.entityData.get(DATA_LIT);
     }
 
     /** effects: sets the mode to the next: off, on, auto */
@@ -1325,16 +1484,18 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }
-            // A door, empty-handed: open it; open with animals aboard, let them out; open and empty, shut it.
+            // A door, empty-handed: toggles it, and only that. Unloading is its own gesture (a lead in
+            // hand, below): when the door click also unloaded, open doors could never be shut on a load.
             if (held.isEmpty() && nearADoor(p, hit)) {
                 if (!level().isClientSide()) {
-                    if (!doorsOpen()) {
-                        toggleDoors();
-                    } else if (!animals().isEmpty()) {
-                        unload();
-                    } else {
-                        toggleDoors();
-                    }
+                    toggleDoors();
+                }
+                return InteractionResult.sidedSuccess(level().isClientSide());
+            }
+            // Crouch with a lead in hand at open doors with animals aboard: set them down behind.
+            if (held.is(Items.LEAD) && p.cargo().isPresent() && doorsOpen() && !animals().isEmpty()) {
+                if (!level().isClientSide()) {
+                    unload();
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }
@@ -1381,6 +1542,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
+        // A trailer in hand, on a vehicle with a rear hitch and nothing behind it: the trailer is put
+        // down coupler on the ball and hitched, instead of the click seating the player.
+        if (hitchPoint() != null && trailer() == null && trailerProfile(held) != null) {
+            if (level() instanceof ServerLevel server) {
+                placeTrailer(server, held, player);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
         // Animals on a lead board through the open doors.
         if (p.cargo().isPresent() && held.is(Items.LEAD)) {
             if (!level().isClientSide()) {

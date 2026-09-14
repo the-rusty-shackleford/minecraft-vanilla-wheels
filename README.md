@@ -52,18 +52,24 @@ the first-person camera itself stays level, the smoothest ride there is with the
 springs. A standing car with the stick held turns in place, about two degrees a tick. In
 third person the camera stands back in proportion to the vehicle's length (one and a half
 blocks a block, plus one and a half), where the game's four blocks would sit on a truck's
-tailgate. Off the throttle, drag and rolling resistance bring it to rest within a few
+tailgate, clipped to the first block behind by the game's own rule -- a block's visual
+shape, so grass, flowers and crops never pull it in -- and through leaves, so a cage in a
+canopy does not collapse the view onto the rider's head. Off the throttle, drag and rolling resistance bring it to rest within a few
 seconds; it never rolls backward on its own.
 
 The collision box is the profile's `body`: a square of the hull's width, as tall as the
 hull, not the cage or windshield over it, which pass through a low canopy the way a cage
 pushes through leaves. Nobody aboard takes the wall's damage for it. The overhangs beyond
 the square have their own collision: before every move, the nose's and tail's corners and
-centres on the body's rectangle are checked at the destination, and a move that would put
-one inside a wall -- a block spanning the climb line and rising above it, which the box
-could never step onto -- is cut short at the wall's face, on both sides alike so the
-server's re-run agrees. A wall, met by the box or the footprint, stops the vehicle dead:
-the speed is gone, not spent spinning the wheels against it.
+centres on the body's rectangle are checked at the destination, each reached by a walk
+from the body's centre that follows the ground a block at a time, and a move that would
+put one against a wall -- a block rising more than the climb over the ground just before
+it, which the box could never step onto -- is cut short at the wall's face, on both sides
+alike so the server's re-run agrees. A hillside of one-block risers is no wall however
+many the nose overhangs; a two-block riser is. A wall met at a slant is slid along, as the
+game slides a box, rather than stopping the body at a corner's graze. The speed the world
+refuses is gone, not spent spinning the wheels: all of it at a wall met square, a little
+scraped along one.
 
 A vehicle built to the world's scale is too small for a person, so a profile may set
 `rider_scale`: everyone aboard is sized to it through the game's own scale attribute
@@ -101,8 +107,9 @@ at speed had the server refuse every tick and snap the vehicle back.
   refuses the throttle. `fuelRequired = false` in the config turns all of this off.
 - **Chests**: a profile's `storage.chests` are the game's own double chests, drawn where
   and at the size the profile says, each its own inventory of its own rows. Right-click a
-  chest to open it, crouching or not, as a chest block; right-click anywhere else on the
-  body and you board. A rider presses the inventory key for the first chest, since
+  chest to open it, crouching or not, as a chest block -- aim at it from anywhere: the
+  click's line is followed on from the hull into the bed, so a chest sunk in a bed opens
+  from outside; right-click anywhere else on the body and you board. A rider presses the inventory key for the first chest, since
   crouching dismounts. A chest's lid is up, with the chest's sounds, while anyone has it
   open. Contents ride with the vehicle and spill when it is wrenched or destroyed.
 - **Records**: crouch and right-click a vehicle that has a radio while holding a music
@@ -282,7 +289,8 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 PATH="$JAVA_HOME/bin:$PATH"
 ```
 
 The gametests drive the box car on a runway: it reaches speed and coasts to a stop,
-climbs a two-block step and settles level on top, hurts and shoves a cow at speed and
+climbs a two-block step and settles level on top, slides along a wall met at a slant
+without stopping, hurts and shoves a cow at speed and
 nothing at a walk, takes coal and refuses a coal block and a throttle with an empty tank,
 keeps its chest across a wrench and a placement, takes and ejects a disc, cycles its lamps
 and lights them by itself at night, and its profile round-trips through the codec; a

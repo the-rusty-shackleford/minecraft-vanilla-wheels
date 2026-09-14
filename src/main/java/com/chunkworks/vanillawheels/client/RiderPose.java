@@ -34,6 +34,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
 
 /**
  * Leans everyone aboard with the body, draws a rider whose entity is at
@@ -111,7 +112,10 @@ public final class RiderPose {
      * the view is the back of the rider's head. This runs right after the
      * game's setup, before the view matrix is built, and clips again from
      * the eye through leaves, so the camera sits at the first real block
-     * behind, or at its full distance.
+     * behind, or at its full distance. A real block is one with a visual
+     * shape, the game's own rule for its camera: grass, flowers and crops
+     * have none, and a clip on their outlines had the camera jumping in and
+     * out at every tuft a meadow put behind the truck.
      */
     public static void onFov(ViewportEvent.ComputeFov event) {
         Camera camera = event.getCamera();
@@ -132,7 +136,7 @@ public final class RiderPose {
                 if (state.isAir() || state.is(BlockTags.LEAVES)) {
                     return null;
                 }
-                return state.getShape(level, pos).clip(from, to, pos);
+                return state.getVisualShape(level, pos, CollisionContext.empty()).clip(from, to, pos);
             }, ctx -> null);
             if (hit != null) {
                 zoom = Math.min(zoom, hit.getLocation().distanceTo(eye));

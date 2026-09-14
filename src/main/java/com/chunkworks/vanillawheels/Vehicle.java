@@ -23,6 +23,7 @@ import com.chunkworks.vanillawheels.client.Controls;
 import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
+import com.chunkworks.vanillawheels.domain.RayBox;
 import com.chunkworks.vanillawheels.domain.Suspension;
 import com.chunkworks.vanillawheels.domain.Terrain;
 import com.chunkworks.vanillawheels.domain.Cargo;
@@ -587,27 +588,42 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return position().add(rotate(p.localBlocks(p.storage().get().chests().get(index).at())));
     }
 
+    /** How far past the hit point a click's ray is followed for a chest, blocks: into a bed, not across the body. */
+    private static final double CHEST_REACH = 1.5;
+
     /**
-     * effects: returns the index of the chest {@code hit} (relative to the body's position, the
-     * world's frame) lands on: inside the double chest's own box at the profile's scale, turned by
-     * the chest's yaw and the body's; -1 for none
+     * effects: returns the index of the first chest the click's ray meets, from {@code hit}
+     * (relative to the body's position, the world's frame) onward along the line from
+     * {@code eye} through it, within {@code reach} blocks: each chest the game's double chest's
+     * own box at the profile's scale, turned by the chest's yaw and the body's; -1 for none.
+     * With no reach, the chest the hit itself lands in. The ray, not only the point: the hit
+     * lands on the hull's box, and a chest in a bed sits inside it, so a click aimed down at
+     * the chest from outside lands on the hull over it.
      */
-    private int chestAt(VehicleProfile p, Vec3 hit) {
+    private int chestAt(VehicleProfile p, Vec3 hit, Vec3 eye, double reach) {
         if (p.storage().isEmpty()) {
             return -1;
         }
-        Vec3 local = hit.yRot(getYRot() * Mth.DEG_TO_RAD);   // into the body's frame
+        Vec3 ray = hit.add(position()).subtract(eye);
+        Vec3 dir = ray.lengthSqr() < 1.0e-6 ? new Vec3(0.0, -1.0, 0.0) : ray.normalize();
+        float body = getYRot() * Mth.DEG_TO_RAD;
+        Vec3 o = hit.yRot(body), d = dir.yRot(body);   // into the body's frame
         List<VehicleProfile.Chest> chests = p.storage().get().chests();
+        int found = -1;
+        double nearest = Double.MAX_VALUE;
         for (int i = 0; i < chests.size(); i++) {
             VehicleProfile.Chest c = chests.get(i);
             Vec at = p.localBlocks(c.at());
-            Vec3 d = new Vec3(local.x - at.x(), local.y - at.y(), local.z - at.z()).yRot((float) Math.toRadians(c.yaw()));
+            float yaw = (float) Math.toRadians(c.yaw());
+            Vec3 oc = new Vec3(o.x - at.x(), o.y - at.y(), o.z - at.z()).yRot(yaw), dc = d.yRot(yaw);
             double hw = VehicleProfile.Chest.WIDTH * c.scale() / 2.0 + 0.05, hd = VehicleProfile.Chest.DEPTH * c.scale() / 2.0 + 0.05;
-            if (Math.abs(d.x) <= hw && Math.abs(d.z) <= hd && d.y >= -0.1 && d.y <= VehicleProfile.Chest.HEIGHT * c.scale() + 0.15) {
-                return i;
+            double t = RayBox.enter(new Vec(oc.x, oc.y, oc.z), new Vec(dc.x, dc.y, dc.z), new Vec(-hw, -0.1, -hd), new Vec(hw, VehicleProfile.Chest.HEIGHT * c.scale() + 0.15, hd));
+            if (t >= 0.0 && t <= reach && t < nearest) {
+                nearest = t;
+                found = i;
             }
         }
-        return -1;
+        return found;
     }
 
     /** effects: opens chest {@code index} for {@code player}: its own rows of the vehicle's items, as a chest screen */
@@ -1187,8 +1203,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (onGround() && getDeltaMovement().y < 0) {
                 setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
             }
-            if (footprintBlocked || (horizontalCollision && !minorHorizontalCollision)) {
-                drive = drive.halted();   // a wall: the speed is gone, not spent spinning the wheels against it
+            if (moveKept < 0.999) {
+                // A wall: the speed the world refused is gone, not spent spinning the wheels against
+                // it -- all of it met square, a little scraped along at a slant.
+                drive = drive.slowed(moveKept);
             }
             wheelTravel += drive.speed();
             if (level().isClientSide()) {
@@ -1469,12 +1487,23 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             setOnGround(true);
         }
         Vec3 clamped = footprintClamp(delta);
-        footprintBlocked = clamped != delta;
+        double x0 = getX(), z0 = getZ();
         super.move(type, clamped);
+        double asked = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
+        double got = Math.sqrt((getX() - x0) * (getX() - x0) + (getZ() - z0) * (getZ() - z0));
+        moveKept = asked < 1.0E-6 ? 1.0 : Mth.clamp(got / asked, 0.0, 1.0);
     }
 
-    /** Set by {@link #move}: the last move was cut short by the footprint meeting a wall. */
-    private boolean footprintBlocked;
+    /**
+     * Set by {@link #move}: the share of the last move's ground distance the world let through,
+     * the footprint's walls and the box's collisions together; 1 for a free move.
+     */
+    private double moveKept = 1.0;
+
+    /** effects: returns the share of the last move the world let through (see {@link #move}) */
+    public double moveKept() {
+        return moveKept;
+    }
 
     /** The footprint's points are checked from this far over the climb up to the hull's top; a step the box climbs is no wall. */
     private static final double OVER_CLIMB = 0.05;
@@ -1498,47 +1527,95 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (!footprintBlockedAt(p, getX() + delta.x, getZ() + delta.z)) {
             return delta;
         }
+        // As far as it goes along the move, or along either axis alone -- whichever carries it
+        // furthest: a wall met at a slant is slid along, as the game slides a box, instead of
+        // stopping the body dead at a corner's graze.
+        double t = clampAlong(p, delta.x, delta.z);
+        double tx = clampAlong(p, delta.x, 0.0);
+        double tz = clampAlong(p, 0.0, delta.z);
+        double along = t * Math.sqrt(delta.x * delta.x + delta.z * delta.z);
+        double xOnly = tx * Math.abs(delta.x), zOnly = tz * Math.abs(delta.z);
+        if (xOnly > along && xOnly >= zOnly) {
+            return new Vec3(delta.x * tx, delta.y, 0.0);
+        }
+        if (zOnly > along) {
+            return new Vec3(0.0, delta.y, delta.z * tz);
+        }
+        return new Vec3(delta.x * t, delta.y, delta.z * t);
+    }
+
+    /** effects: returns the share of the move ({@code dx}, {@code dz}) from here that leaves every footprint point clear of a wall, a little short of the wall itself */
+    private double clampAlong(VehicleProfile p, double dx, double dz) {
+        if (Math.abs(dx) < 1.0E-7 && Math.abs(dz) < 1.0E-7) {
+            return 0.0;
+        }
+        if (!footprintBlockedAt(p, getX() + dx, getZ() + dz)) {
+            return 1.0;
+        }
         double lo = 0.0, hi = 1.0;
         for (int i = 0; i < 7; i++) {
             double mid = (lo + hi) / 2.0;
-            if (footprintBlockedAt(p, getX() + delta.x * mid, getZ() + delta.z * mid)) {
+            if (footprintBlockedAt(p, getX() + dx * mid, getZ() + dz * mid)) {
                 hi = mid;
             } else {
                 lo = mid;
             }
         }
-        double t = Math.max(0.0, lo - 0.02);
-        return new Vec3(delta.x * t, delta.y, delta.z * t);
+        return Math.max(0.0, lo - 0.02);
     }
+
+    /** The walk out to a footprint point samples the ground at most this far apart, blocks. */
+    private static final double WALK = 1.0;
+    /** The ground is followed down at most this far per sample; a deeper hole is no ground at all. */
+    private static final int DROP = 2;
 
     /**
      * effects: returns whether any of the footprint's points, with the body's origin at (x, z), meets a
-     * wall: a solid block in its column that spans the climb line (its bottom at or under {@code y +
-     * climb}) and rises above it -- what the box could not step onto. Looked for from the hull's top
-     * plus the climb down to the floor, so a lintel the hull passes under and a canopy over it are no
-     * walls, and a step the box climbs is none either.
+     * wall. Each point is reached by a walk from the origin in samples at most a block apart, the
+     * ground followed under each -- the top of the highest solid block within the climb of the
+     * ground before it, up or down -- and a wall is a solid block that spans the climb line over
+     * that ground: its bottom at or under it, its top above it. So a hillside of risers each within
+     * the climb of the last is no wall, however many the nose overhangs (a riser every block once
+     * stopped a truck whose nose reached the second riser before its box had climbed the first),
+     * while a riser taller than the climb is one; and a lintel the hull passes under or a canopy over
+     * it is none, since only a block spanning the line counts.
      */
     private boolean footprintBlockedAt(VehicleProfile p, double x, double z) {
         double hw = p.body().width() / 2.0, hl = p.body().length() / 2.0;
         double yaw = Math.toRadians(getYRot());
         double c = Math.cos(yaw), s = Math.sin(yaw);
         double[][] points = {{-hw, hl}, {hw, hl}, {0.0, hl}, {-hw, -hl}, {hw, -hl}, {0.0, -hl}};
-        double climbLine = getY() + Math.max(0.0, p.climb()) + OVER_CLIMB;
-        int from = Mth.floor(getY() + Math.max(0.0, p.climb()) + p.body().height());
-        int to = Mth.floor(getY());
+        double climb = Math.max(0.0, p.climb()) + OVER_CLIMB;
+        double height = p.body().height();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (double[] pt : points) {
-            double px = x + pt[0] * c - pt[1] * s;
-            double pz = z + pt[1] * c + pt[0] * s;
-            int bx = Mth.floor(px), bz = Mth.floor(pz);
-            for (int by = from; by >= to; by--) {
-                net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos.set(bx, by, bz)).getCollisionShape(level(), pos);
-                if (shape.isEmpty()) {
-                    continue;
+            double dx = pt[0] * c - pt[1] * s;
+            double dz = pt[1] * c + pt[0] * s;
+            int steps = Math.max(1, Mth.ceil(Math.sqrt(dx * dx + dz * dz) / WALK));
+            double ground = getY();
+            for (int i = 1; i <= steps; i++) {
+                double sx = x + dx * i / steps, sz = z + dz * i / steps;
+                double line = ground + climb;
+                int bx = Mth.floor(sx), bz = Mth.floor(sz);
+                double top = Double.NEGATIVE_INFINITY;
+                for (int by = Mth.floor(line + height); by >= Mth.floor(ground) - DROP; by--) {
+                    net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos.set(bx, by, bz)).getCollisionShape(level(), pos);
+                    if (shape.isEmpty()) {
+                        continue;
+                    }
+                    net.minecraft.world.phys.AABB bounds = shape.bounds().move(bx, by, bz);
+                    if (!(bounds.minX <= sx && sx <= bounds.maxX && bounds.minZ <= sz && sz <= bounds.maxZ)) {
+                        continue;
+                    }
+                    if (bounds.maxY > line && bounds.minY <= line) {
+                        return true;
+                    }
+                    if (bounds.maxY <= line) {
+                        top = Math.max(top, bounds.maxY);
+                    }
                 }
-                net.minecraft.world.phys.AABB bounds = shape.bounds().move(bx, by, bz);
-                if (bounds.maxY > climbLine && bounds.minY <= climbLine && bounds.minX <= px && px <= bounds.maxX && bounds.minZ <= pz && pz <= bounds.maxZ) {
-                    return true;
+                if (top > Double.NEGATIVE_INFINITY) {
+                    ground = top;
                 }
             }
         }
@@ -1715,12 +1792,29 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
-        // A chest, clicked: opens, crouching or not, before anything else the click could mean.
-        int chest = chestAt(p, hit);
-        if (chest >= 0 && !(player.isSecondaryUseActive() && held.is(ModContent.WRENCH.get()))) {
+        boolean wrenching = player.isSecondaryUseActive() && held.is(ModContent.WRENCH.get());
+        // A chest the click lands in: opens, crouching or not, before anything else the click could
+        // mean. A chest further along the click's line waits its turn, after every other gesture,
+        // so a click on the radio ejects the disc even with a chest behind it.
+        int chest = chestAt(p, hit, player.getEyePosition(), 0.0);
+        if (chest >= 0 && !wrenching) {
             openChest(player, chest);
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
+        InteractionResult gesture = gestureAt(p, player, held, hit);
+        if (gesture != InteractionResult.PASS) {
+            return gesture;
+        }
+        chest = chestAt(p, hit, player.getEyePosition(), CHEST_REACH);
+        if (chest >= 0 && !wrenching) {
+            openChest(player, chest);
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
+        return InteractionResult.PASS;
+    }
+
+    /** effects: the crouching gestures at {@code hit}: the tongue, a door, unloading, the wrench, the radio; PASS for none */
+    private InteractionResult gestureAt(VehicleProfile p, Player player, ItemStack held, Vec3 hit) {
         if (player.isSecondaryUseActive()) {
             // The tongue, when hitched: let go.
             if (held.isEmpty() && tower() != null && p.hitch().front().isPresent() && inRegion(p, p.hitch().front().get(), 0.9, hit)) {

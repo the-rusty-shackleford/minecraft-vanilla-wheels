@@ -24,6 +24,8 @@ import com.chunkworks.vanillawheels.domain.LiftMotion;
 import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
 import com.chunkworks.vanillawheels.lift.LiftMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
@@ -229,6 +231,60 @@ public final class PhotoBooth {
             verdict("the driver is aboard", () -> mc.player != null && mc.player.getVehicle() instanceof Vehicle ? null : "vehicle " + (mc.player == null ? null : mc.player.getVehicle()));
             verdict("from the driver's seat the dash needles are in view", () -> needles > 40 ? null : "needle pixels " + needles);
         }));
+        // Third person from the seat, looking a little up so the camera's rays sweep the meadow
+        // behind the car, as a hillside's does on a descent: the camera keeps its full distance,
+        // as the game's own would, since grass has no visual shape. Its outline once clipped it
+        // at every tuft (Rusty: "the screen keeps stuttering as if the camera keeps glitching
+        // perspectives").
+        s.add(new Step(t += 2, () -> {
+            mc.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);
+            if (mc.player != null && mc.player.getVehicle() instanceof Vehicle v) {
+                mc.player.setXRot(-8.0f);
+                mc.player.xRotO = -8.0f;
+            }
+            onServer(mc, sp -> {
+                ServerLevel level = sp.serverLevel();
+                double y = level.getMinBuildHeight() + 5;
+                for (int x = -12; x <= -1; x++) {
+                    for (int z = -3; z <= 3; z++) {
+                        BlockPos at = BlockPos.containing(X + x, y, Z + AHEAD + z);
+                        while (level.getBlockState(at.below()).canBeReplaced()) {
+                            at = at.below();   // the air over the ground's top block
+                        }
+                        BlockState plant = ((x + z) & 1) == 0 ? net.minecraft.world.level.block.Blocks.SHORT_GRASS.defaultBlockState() : net.minecraft.world.level.block.Blocks.DANDELION.defaultBlockState();
+                        if (level.getBlockState(at).isAir() && plant.canSurvive(level, at)) {
+                            level.setBlockAndUpdate(at, plant);
+                        } else {
+                            LOG.warn("booth: no plant at {} ({} under it)", at, level.getBlockState(at.below()));
+                        }
+                    }
+                }
+            });
+        }));
+        s.add(new Step(t += SETTLE / 2, () -> {
+            shoot(mc, "booth-behind-meadow");
+            double have = mc.gameRenderer.getMainCamera().getPosition().distanceTo(mc.player.getEyePosition(1.0f));
+            double want = mc.player.getVehicle() instanceof Vehicle v && v.profile() != null ? 1.5 + 1.5 * v.profile().body().length() : -1.0;
+            verdict("in third person the camera sits at its full distance behind the car through a meadow", () -> Math.abs(have - want) < 0.05 ? null : "camera " + have + " blocks from the eye, wanted " + want);
+            mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
+            onServer(mc, sp -> {
+                ServerLevel level = sp.serverLevel();
+                double y = level.getMinBuildHeight() + 5;
+                for (int x = -12; x <= -1; x++) {
+                    for (int z = -3; z <= 3; z++) {
+                        for (int dy = -2; dy <= 0; dy++) {
+                            BlockPos at = BlockPos.containing(X + x, y + dy, Z + AHEAD + z);
+                            BlockState there = level.getBlockState(at);
+                            if (!there.isAir() && there.getCollisionShape(level, at).isEmpty()) {   // a plant, flowers included
+                                level.setBlockAndUpdate(at, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                            }
+                        }
+                    }
+                }
+                // A plant that popped is an item on the ground, and an item in a cell stops the lift's placement.
+                level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new AABB(X - 13, y - 1, Z + AHEAD - 4, X + 1, y + 3, Z + AHEAD + 4)).forEach(net.minecraft.world.entity.item.ItemEntity::discard);
+            });
+        }));
         // Out, up and behind the car for the night shots: the car turned
         // south so its beams run away from the camera, the player hovering
         // behind it looking down over the roof at the ground ahead.
@@ -300,7 +356,10 @@ public final class PhotoBooth {
             liftPos = ctx.getClickedPos();
             InteractionResult r = ModContent.LIFT_ITEM.get().place(ctx);
             if (!r.consumesAction()) {
-                LOG.error("booth: FAIL the lift is placed -- {}", r);
+                com.chunkworks.vanillawheels.domain.Footprint.Cell cell = com.chunkworks.vanillawheels.lift.LiftControllerBlock.blocked(level, liftPos, Direction.NORTH);
+                BlockPos at = cell == null ? null : com.chunkworks.vanillawheels.lift.LiftControllerBlock.at(liftPos, Direction.NORTH, cell);
+                LOG.error("booth: FAIL the lift is placed -- {}; blocked cell {} at {}: {} entities {}", r, cell, at,
+                    at == null ? null : level.getBlockState(at), at == null ? null : level.getEntities(null, new AABB(at)));
             }
             sp.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         })));

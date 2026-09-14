@@ -132,6 +132,22 @@ public record Drive(double speed, double heading, double motion, double steer, d
         return new Drive(0.0, heading, motion, steer, 0.0, false, 0, 0, 0.0);
     }
 
+    /**
+     * requires: 0 <= kept <= 1
+     * effects: returns this drive with the speed scaled by {@code kept}, the share of its move the
+     * world let through: a wall scraped along at a slant costs a little, a wall met square costs
+     * all ({@link #halted}, boost and drift included, once less than a tenth is kept)
+     */
+    public Drive slowed(double kept) {
+        if (kept < 0.0 || kept > 1.0) {
+            throw new IllegalArgumentException("kept " + kept);
+        }
+        if (kept < 0.1) {
+            return halted();
+        }
+        return new Drive(speed * kept, heading, motion, steer, driftCharge, drifting, driftSide, boostTicks, boostPower);
+    }
+
     /** effects: returns whether a boost is running */
     public boolean boosting() {
         return boostTicks > 0;

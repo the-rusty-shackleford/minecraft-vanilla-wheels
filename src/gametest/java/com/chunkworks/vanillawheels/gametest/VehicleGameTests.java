@@ -275,7 +275,16 @@ public final class VehicleGameTests {
             List<ItemEntity> spilled = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0));
             int apples = spilled.stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
             int sticks = spilled.stream().filter(e -> e.getItem().is(Items.STICK)).mapToInt(e -> e.getItem().getCount()).sum();
-            helper.assertValueEqual(apples, 7, "the apples are still here");
+            // Once in a while, under a full build, they are gone by now with the sticks, nowhere in the
+            // level: the lift test's sixteen-block sweep was one taker and is fixed; the rest is unknown.
+            String wider = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(64.0)).stream().map(e -> e.getItem() + "@" + e.position()).toList().toString();
+            long everywhere = 0;
+            for (net.minecraft.world.entity.Entity e : helper.getLevel().getAllEntities()) {
+                if (e instanceof ItemEntity) {
+                    everywhere++;
+                }
+            }
+            helper.assertValueEqual(apples, 7, "the apples are still here (sticks " + sticks + "; items within 64: " + wider + "; item entities in the level: " + everywhere + ")");
             helper.assertValueEqual(sticks, 3, "the sticks spilled");
             helper.succeed();
         });
@@ -361,6 +370,39 @@ public final class VehicleGameTests {
         });
     }
 
+    @GameTest(template = "runway", timeoutTicks = 200)
+    public void aWallMetAtASlantIsSlidAlongNotStoppedAt(GameTestHelper helper) {
+        layFloor(helper);
+        // A wall three high down the runway's north side from x = 10, and the car aimed twelve
+        // degrees into it: the nose corner meets it first, and the body slides east along it.
+        for (int x = 10; x < LENGTH; x++) {
+            for (int y = 0; y < 3; y++) {
+                helper.setBlock(new BlockPos(x, FLOOR + y, 3), Blocks.STONE);
+            }
+        }
+        Vehicle v = car(helper, 4.5, 8.0, true);
+        v.setYRot(-102.0f);
+        v.yRotO = -102.0f;
+        double x0 = v.getX();
+        v.setScriptedInput(GAS);
+        StringBuilder trace = new StringBuilder();
+        int[] tick = {0};
+        helper.onEachTick(() -> {
+            if (tick[0]++ % 5 == 0) {
+                trace.append(String.format(java.util.Locale.ROOT, " t%d:x%.1f,z%.2f,v%.2f,kept%.2f", tick[0], v.getX() - x0, v.getZ() - helper.absoluteVec(new Vec3(0, 0, 0)).z, v.speed(), v.moveKept()));
+            }
+        });
+        // By eighty ticks it has slid some twenty-five blocks; by ninety the nose reaches the barrier
+        // the framework stands at the runway's end.
+        helper.runAtTickTime(80, () -> {
+            double x = v.getX() - x0;
+            helper.assertTrue(x > 20.0, "a long way east along the wall: " + x);
+            helper.assertTrue(v.speed() > 0.15, "still under way against it: " + v.speed() + trace);
+            helper.assertTrue(v.getZ() - helper.absoluteVec(new Vec3(0, 0, 4)).z > 0.6, "the body kept out of the wall: z = " + (v.getZ() - helper.absoluteVec(new Vec3(0, 0, 0)).z));
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 60)
     public void theServerSeatsARiderWithThePoseTheDriverShares(GameTestHelper helper) {
         layFloor(helper);
@@ -394,8 +436,16 @@ public final class VehicleGameTests {
         VehicleProfile.Chest c = p.storage().orElseThrow().chests().get(0);
         Vec3 onChest = v.rotate(p.localBlocks(c.at())).add(0.0, VehicleProfile.Chest.HEIGHT * c.scale() / 2.0, 0.0);
         helper.assertTrue(v.interactAt(player, onChest, InteractionHand.MAIN_HAND).consumesAction(), "the chest takes the click");
-        // Beside it, on the bed between the chests, a plain click is not a chest's.
+        // From outside, the click lands on the hull's box over the chest, the player's eye above it
+        // looking down: the ray runs on into the chest, and the chest takes it.
+        Vec3 overChest = v.rotate(p.localBlocks(c.at())).add(0.0, p.body().height(), 0.0);
+        Vec3 eyeAbove = v.position().add(overChest).add(0.0, 2.0, 0.0);
+        player.setPos(eyeAbove.x, eyeAbove.y - player.getEyeHeight(), eyeAbove.z);
+        helper.assertTrue(v.interactAt(player, overChest, InteractionHand.MAIN_HAND).consumesAction(), "a click on the hull over the chest, from above, opens it");
+        // Beside it, on the bed between the chests, a plain click straight down is not a chest's.
         Vec3 beside = v.rotate(p.localBlocks(new com.chunkworks.vanillawheels.domain.Vec(0, 10, -14))).add(0.0, 0.2, 0.0);
+        Vec3 eyeBeside = v.position().add(beside).add(0.0, 2.0, 0.0);
+        player.setPos(eyeBeside.x, eyeBeside.y - player.getEyeHeight(), eyeBeside.z);
         helper.assertTrue(!v.interactAt(player, beside, InteractionHand.MAIN_HAND).consumesAction(), "between the chests the click passes to the body");
         helper.succeed();
     }

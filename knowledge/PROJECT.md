@@ -39,7 +39,7 @@ renderer and screen).
 ## How it is verified
 
 `./gradlew check`: 69 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-four gametests on a headless server driving a scripted box car, towing
+fixtures); twenty-five gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -103,4 +103,12 @@ failed one run in ten were the world's random offset, not load: a lift test swep
 item within sixteen blocks of its controller, into the next runway, and took the
 chest-spill test's apples when it had spilled first (the sweep now takes lift items in its
 own bounds); and the lead loader took the herd in entity-section order, so two adults
-sometimes filled the trailer before the calves (it loads nearest first now).
+sometimes filled the trailer before the calves (it loads nearest first now). The spill
+test failed once more after that fix, in a full run, with the apples nowhere in the level
+five ticks on; its message now lists the sticks, every item within 64 blocks and the
+level's item count, for the next time. After the 1.31.0 release (2026-09-13): the
+third-person camera clips on the visual shape (grass no longer stutters it; a booth check
+across a meadow), a chest opens along the click's line from outside (`RayBox`), the
+footprint's wall rule walks the ground out to each point (hillsides of one-block risers
+climb; two Trailblazer gametests), the clamp slides along a slanted wall and the stall is
+proportional (`Drive.slowed`).

@@ -40,7 +40,8 @@ import org.junit.jupiter.api.Test;
  * to one and stops, a skid is reported while the tail is out, speed bleeds
  * a little; released: a boost proportional to the charge, capped, decaying
  * back to the top speed; released early or without fuel: nothing. Tuning:
- * each bound refused. Angles wrap.
+ * each bound refused. Angles wrap. Slowed by the world: the speed scaled by the share
+ * kept, boost and drift untouched; under a tenth kept is a halt; out of range refused.
  */
 final class DriveTest {
     private static final Tuning T = Tuning.pickup();
@@ -286,5 +287,19 @@ final class DriveTest {
         assertEquals(0.5, Drive.wrap(0.5 + 4 * Math.PI), 1e-12);
         Drive d = run(Drive.atRest(3.0), new Input(1, 1, false, true, true), 200);
         assertTrue(d.heading() > -Math.PI && d.heading() <= Math.PI, "heading stays wrapped: " + d.heading());
+    }
+
+    @Test
+    void aScrapeKeepsMostOfTheSpeedAndASquareWallAllOfIt() {
+        Drive d = run(Drive.atRest(0.0), GAS, 60);
+        Drive scraped = d.slowed(0.98);
+        assertEquals(d.speed() * 0.98, scraped.speed(), 1e-12);
+        assertEquals(d.boostTicks(), scraped.boostTicks());
+        assertEquals(d.drifting(), scraped.drifting());
+        assertEquals(d.heading(), scraped.heading(), 0.0);
+        assertEquals(0.0, d.slowed(0.05).speed(), 0.0, "under a tenth kept is a wall");
+        assertEquals(d.speed(), d.slowed(1.0).speed(), 0.0);
+        assertThrows(IllegalArgumentException.class, () -> d.slowed(1.5));
+        assertThrows(IllegalArgumentException.class, () -> d.slowed(-0.1));
     }
 }

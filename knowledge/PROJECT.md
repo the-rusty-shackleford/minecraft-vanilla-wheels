@@ -90,3 +90,12 @@ door click only toggling and a lead unloading, solid trailer bodies, marker lamp
 unpowered vehicles; plus ceilings never read as ground and the lift raising its vehicle.
 The seat's `eye`, `cockpit` and `rider_scale` fields stay in the contract, unused by the
 Trailblazer (Rusty chose nfx's full-size truck and level camera for the view).
+
+Open, from nfx's handoff, not yet done: footprint collision (the overhangs beyond the
+square box have none, so a stalled nose ends up inside a wall -- multiple boxes or a
+custom collide, to be designed); the terrain samples' floor at 2.5 blocks under the box
+ripples the height on a steep hill for a long truck (let non-wall samples scan to
+length/2 + LOOK + 1); a reported first-person flip of the Trailblazer after his wall-rule
+change, unconfirmed; door meshes cannot be dyed (a painted sub-mesh for hinges); whether
+to sync the pose so passengers and the server agree with the driver (not yet: the server
+keeps a level seat, and every client runs the same pose for what it sees).

@@ -94,6 +94,19 @@ public final class VehicleGameTests {
         return v;
     }
 
+    /**
+     * effects: returns a mock player standing at {@code v}, for boarding it. A mock player is
+     * made at the world's origin, and a riding player's pickup sweep is the box round itself
+     * and its vehicle together: a rider still at the origin on its first tick aboard sweeps
+     * the millions of blocks between, every test's runway included, and took the spill test's
+     * apples whenever the grid fell on the origin's side of its car.
+     */
+    private static Player riderAt(GameTestHelper helper, Vehicle v) {
+        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        p.setPos(v.getX(), v.getY(), v.getZ());
+        return p;
+    }
+
     @GameTest(template = "runway", timeoutTicks = 100)
     public void aProfileMakesASizedSeatedNamedVehicle(GameTestHelper helper) {
         layFloor(helper);
@@ -104,9 +117,9 @@ public final class VehicleGameTests {
         helper.assertTrue(v.getParts().length == Vehicle.MAX_PARTS, "the fixed parts exist");
         helper.assertTrue(v.getParts()[0].getBbWidth() > 1.0f && v.getParts()[2].getBbWidth() < 0.1f, "two parts configured, the rest specks");
         helper.assertValueEqual(v.getName().getString(), "Box Car", "named by its profile");
-        Player driver = helper.makeMockPlayer(GameType.SURVIVAL);
-        Player passenger = helper.makeMockPlayer(GameType.SURVIVAL);
-        Player third = helper.makeMockPlayer(GameType.SURVIVAL);
+        Player driver = riderAt(helper, v);
+        Player passenger = riderAt(helper, v);
+        Player third = riderAt(helper, v);
         helper.assertTrue(driver.startRiding(v), "the first rider boards");
         helper.assertTrue(v.getControllingPassenger() == driver, "and takes the wheel");
         helper.assertTrue(passenger.startRiding(v), "the second boards");
@@ -270,21 +283,13 @@ public final class VehicleGameTests {
         helper.assertValueEqual(held.get(ModContent.FUEL.get()), fuel, "its fuel");
         helper.assertValueEqual(VanillaWheels.vehicleOf(held).orElse(null), BOX_CAR, "its vehicle");
         helper.runAtTickTime(5, () -> {
-            // Five ticks on, they are still here: a neighbouring test's sweep once took them
-            // (LiftGameTests.sweepLiftItems tells it).
+            // Five ticks on, they are still here.
             List<ItemEntity> spilled = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0));
             int apples = spilled.stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
             int sticks = spilled.stream().filter(e -> e.getItem().is(Items.STICK)).mapToInt(e -> e.getItem().getCount()).sum();
-            // Once in a while, under a full build, they are gone by now with the sticks, nowhere in the
-            // level: the lift test's sixteen-block sweep was one taker and is fixed; the rest is unknown.
-            String wider = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(64.0)).stream().map(e -> e.getItem() + "@" + e.position()).toList().toString();
-            long everywhere = 0;
-            for (net.minecraft.world.entity.Entity e : helper.getLevel().getAllEntities()) {
-                if (e instanceof ItemEntity) {
-                    everywhere++;
-                }
-            }
-            helper.assertValueEqual(apples, 7, "the apples are still here (sticks " + sticks + "; items within 64: " + wider + "; item entities in the level: " + everywhere + ")");
+            // Two takers once had them by now: a lift test's sixteen-block sweep (sweepLiftItems) and
+            // another test's mock rider still at the world's origin on its first tick aboard (riderAt).
+            helper.assertValueEqual(apples, 7, "the apples are still here (sticks " + sticks + ")");
             helper.assertValueEqual(sticks, 3, "the sticks spilled");
             helper.succeed();
         });
@@ -407,7 +412,7 @@ public final class VehicleGameTests {
     public void theServerSeatsARiderWithThePoseTheDriverShares(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 7.5, 7.5, true);
-        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        Player p = riderAt(helper, v);
         p.startRiding(v, true);
         helper.runAtTickTime(5, () -> {
             double level = v.getPassengerRidingPosition(p).y;

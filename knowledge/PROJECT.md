@@ -104,9 +104,13 @@ item within sixteen blocks of its controller, into the next runway, and took the
 chest-spill test's apples when it had spilled first (the sweep now takes lift items in its
 own bounds); and the lead loader took the herd in entity-section order, so two adults
 sometimes filled the trailer before the calves (it loads nearest first now). The spill
-test failed once more after that fix, in a full run, with the apples nowhere in the level
-five ticks on; its message now lists the sticks, every item within 64 blocks and the
-level's item count, for the next time. After the 1.31.0 release (2026-09-13): the
+test failed once more after that fix, and the second taker was found by hooking every
+item's removal and pickup with a stack trace in the gametest mod (the hooks stay): a mock
+player is made at the world's origin, and a riding player's pickup sweep is the box round
+itself and its vehicle together, so another test's mock rider, still at the origin on its
+first tick aboard, swept the millions of blocks between and took any spilled item on the
+origin's side of its car -- which side the grid fell on was the random position. Mock
+riders now stand at the car before boarding (`VehicleGameTests.riderAt`). After the 1.31.0 release (2026-09-13): the
 third-person camera clips on the visual shape (grass no longer stutters it; a booth check
 across a meadow), a chest opens along the click's line from outside (`RayBox`), the
 footprint's wall rule walks the ground out to each point (hillsides of one-block risers

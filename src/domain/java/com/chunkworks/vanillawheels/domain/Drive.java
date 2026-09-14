@@ -127,6 +127,11 @@ public record Drive(double speed, double heading, double motion, double steer, d
         return new Drive(speed, heading, heading, steer, 0.0, side != 0, side, 0, 0.0);
     }
 
+    /** effects: returns this drive stopped dead, as by a wall: no speed, no boost, the drift over; heading, motion and steer kept */
+    public Drive halted() {
+        return new Drive(0.0, heading, motion, steer, 0.0, false, 0, 0, 0.0);
+    }
+
     /** effects: returns whether a boost is running */
     public boolean boosting() {
         return boostTicks > 0;

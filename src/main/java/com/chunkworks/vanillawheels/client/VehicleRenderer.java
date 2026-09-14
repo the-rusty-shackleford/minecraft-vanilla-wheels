@@ -173,6 +173,9 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
                 rotateAround(poseStack, new Rotation(open.pivot(), open.axis(), open.radians() * swing));
             }
             MeshDrawer.draw(door.mesh(), poseStack.last(), solid, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
+            if (door.painted().quadCount() > 0) {
+                MeshDrawer.draw(door.painted(), poseStack.last(), solid, paintOf(vehicle, p), packedLight, overlay, MeshDrawer.Shading.LIT);
+            }
             poseStack.popPose();
         }
 

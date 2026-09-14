@@ -45,7 +45,8 @@ public final class Appearance {
     public record Needle(BakedMesh mesh, Dial dial, VehicleProfile.GaugeKind kind) {}
 
     /** A door and its hinge, in blocks. */
-    public record Hinge(BakedMesh mesh, Rotation open) {}
+    /** A door: what swings on the hinge, split into the painted part (drawn with the paint) and the rest. */
+    public record Hinge(BakedMesh mesh, BakedMesh painted, Rotation open) {}
 
     /** A wheel's place in blocks, whether it steers, and which side it is on (right-side wheels are turned round). */
     public record WheelSlot(Vec at, boolean steers, boolean right) {}
@@ -84,8 +85,10 @@ public final class Appearance {
         for (VehicleProfile.Door d : p.doors()) {
             Mesh part = remaining.part(d.part().transformed(t).selector());
             remaining = remaining.without(part);
+            // A door's painted panels take the dye like the body's: the paint selector is applied within the door.
+            Mesh painted = p.paint().map(paint -> part.part(paint.part().transformed(t).selector())).orElse(part.part(f -> false));
             Rotation open = new Rotation(d.hinge(), d.axis(), d.open()).mirrored(t);
-            ds.add(new Hinge(BakedMesh.of(part, scale), new Rotation(open.pivot().times(scale), open.axis(), open.radians())));
+            ds.add(new Hinge(BakedMesh.of(part.without(painted), scale), BakedMesh.of(painted, scale), new Rotation(open.pivot().times(scale), open.axis(), open.radians())));
         }
         Mesh lampMesh = p.headlights().flatMap(VehicleProfile.Headlights::part).map(sel -> {
             return local.part(sel.transformed(t).selector());

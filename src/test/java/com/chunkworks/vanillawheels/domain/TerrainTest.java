@@ -169,4 +169,24 @@ class TerrainTest {
         assertTrue(dropped.suspension().pitch() < Math.toRadians(-5), "nose up over a dropped axle: " + Math.toDegrees(dropped.suspension().pitch()));
         assertTrue(dropped.suspension().lift() < 0.0, "the axle sits lower");
     }
+
+    @Test
+    void downAStaircaseALongBodyKeepsOneAngleAndItsHeightRunsSmooth() {
+        // A 1:1 staircase down from z = 4: the body's tail samples reach more than 2.5 blocks over the
+        // body's y as it descends (the box is on the lower step, the tail's ground far above), and its
+        // nose samples far under. Deep sampling keeps them all real.
+        DoubleUnaryOperator ground = z -> Math.min(0.0, -(z - 3));
+        double[][] run = drive(ground, 0.5, 60, 0.0);
+        // On the slope (past the crest, where the sink bound holds the body up until the springs have
+        // pitched it enough to free the rear wheels -- one hitch, the design's), every tick's descent
+        // is the speed within a hair: with samples only 2.5 blocks deep it rippled by 0.03 a tick.
+        double worstOff = 0.0;
+        for (int t = 16; t < run.length; t++) {
+            worstOff = Math.max(worstOff, Math.abs(Math.abs(run[t][2] - run[t - 1][2]) - 0.5));
+        }
+        assertTrue(worstOff < 0.02, "the descent runs at the speed a tick, no ripple: " + worstOff);
+        double late = run[run.length - 1][3], earlier = run[run.length - 10][3];
+        assertTrue(late > Math.toRadians(30), "nose down near the staircase's angle: " + Math.toDegrees(late));
+        assertEquals(late, earlier, Math.toRadians(3), "and steady");
+    }
 }

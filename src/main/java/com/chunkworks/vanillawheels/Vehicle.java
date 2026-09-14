@@ -1026,6 +1026,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (onGround() && getDeltaMovement().y < 0) {
                 setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
             }
+            if (footprintBlocked || (horizontalCollision && !minorHorizontalCollision)) {
+                drive = drive.halted();   // a wall: the speed is gone, not spent spinning the wheels against it
+            }
             wheelTravel += drive.speed();
             if (level().isClientSide()) {
                 entityData.set(DATA_SPEED, (float) drive.speed());
@@ -1303,7 +1306,81 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 && !level().noCollision(this, getBoundingBox().move(0.0, -0.05, 0.0))) {
             setOnGround(true);
         }
-        super.move(type, delta);
+        Vec3 clamped = footprintClamp(delta);
+        footprintBlocked = clamped != delta;
+        super.move(type, clamped);
+    }
+
+    /** Set by {@link #move}: the last move was cut short by the footprint meeting a wall. */
+    private boolean footprintBlocked;
+
+    /** The footprint's points are checked from this far over the climb up to the hull's top; a step the box climbs is no wall. */
+    private static final double OVER_CLIMB = 0.05;
+
+    /**
+     * effects: returns {@code delta} cut short so that none of the footprint's
+     * points -- the nose's and tail's corners and centres, on the body's own
+     * rectangle, turned to its yaw -- ends inside a block taller than the
+     * climb. The collision box is a square of the body's width, so the
+     * overhangs beyond it had no collision at all and a stalled nose ended
+     * up inside a wall; this is the collision the overhangs lacked. A move
+     * that starts with a point already inside a wall is let through, so a
+     * body can always back out. Both sides run it, so the server's re-run of
+     * a driver's move agrees with the client's.
+     */
+    private Vec3 footprintClamp(Vec3 delta) {
+        VehicleProfile p = profile();
+        if (p == null || (Math.abs(delta.x) < 1.0E-7 && Math.abs(delta.z) < 1.0E-7) || footprintBlockedAt(p, getX(), getZ())) {
+            return delta;
+        }
+        if (!footprintBlockedAt(p, getX() + delta.x, getZ() + delta.z)) {
+            return delta;
+        }
+        double lo = 0.0, hi = 1.0;
+        for (int i = 0; i < 7; i++) {
+            double mid = (lo + hi) / 2.0;
+            if (footprintBlockedAt(p, getX() + delta.x * mid, getZ() + delta.z * mid)) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        double t = Math.max(0.0, lo - 0.02);
+        return new Vec3(delta.x * t, delta.y, delta.z * t);
+    }
+
+    /**
+     * effects: returns whether any of the footprint's points, with the body's origin at (x, z), meets a
+     * wall: a solid block in its column that spans the climb line (its bottom at or under {@code y +
+     * climb}) and rises above it -- what the box could not step onto. Looked for from the hull's top
+     * plus the climb down to the floor, so a lintel the hull passes under and a canopy over it are no
+     * walls, and a step the box climbs is none either.
+     */
+    private boolean footprintBlockedAt(VehicleProfile p, double x, double z) {
+        double hw = p.body().width() / 2.0, hl = p.body().length() / 2.0;
+        double yaw = Math.toRadians(getYRot());
+        double c = Math.cos(yaw), s = Math.sin(yaw);
+        double[][] points = {{-hw, hl}, {hw, hl}, {0.0, hl}, {-hw, -hl}, {hw, -hl}, {0.0, -hl}};
+        double climbLine = getY() + Math.max(0.0, p.climb()) + OVER_CLIMB;
+        int from = Mth.floor(getY() + Math.max(0.0, p.climb()) + p.body().height());
+        int to = Mth.floor(getY());
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (double[] pt : points) {
+            double px = x + pt[0] * c - pt[1] * s;
+            double pz = z + pt[1] * c + pt[0] * s;
+            int bx = Mth.floor(px), bz = Mth.floor(pz);
+            for (int by = from; by >= to; by--) {
+                net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos.set(bx, by, bz)).getCollisionShape(level(), pos);
+                if (shape.isEmpty()) {
+                    continue;
+                }
+                net.minecraft.world.phys.AABB bounds = shape.bounds().move(bx, by, bz);
+                if (bounds.maxY > climbLine && bounds.minY <= climbLine && bounds.minX <= px && px <= bounds.maxX && bounds.minZ <= pz && pz <= bounds.maxZ) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

@@ -77,6 +77,16 @@ public final class Terrain {
 
     /** What the sensing needs to know of the vehicle: wheels as (x, z) pairs in the body's frame, blocks. */
     public record Shape(double wheelRadius, double climb, double bodyLength, double track, double[] wheelX, double[] wheelZ) {
+        /**
+         * effects: returns how far under the body's y a terrain sample may look: as far as the fit's
+         * window is long, so on a steep descent the samples behind a long body read the real ground
+         * rather than bottoming out at BELOW -- a floor that shifted with every step-up and rippled
+         * the fitted height (nfx's open item)
+         */
+        public double sampleBelow() {
+            return Math.max(BELOW, bodyLength / 2.0 + LOOK + 1.0);
+        }
+
         public Shape {
             if (wheelX.length != wheelZ.length || wheelX.length == 0) {
                 throw new IllegalArgumentException("wheels come in (x, z) pairs, at least one");
@@ -144,11 +154,12 @@ public final class Terrain {
     public static double wheelGround(Columns ground, Frame frame, Shape s, double x, double z, boolean wallRule, double base) {
         double fx = -Math.sin(frame.yaw()), fz = Math.cos(frame.yaw());
         double sx = Math.cos(frame.yaw()), sz = Math.sin(frame.yaw());
-        double best = column(ground, x, z, s.climb(), wallRule, base);
-        best = Math.max(best, alongRay(ground, x, z, fx, fz, s, wallRule, base));
-        best = Math.max(best, alongRay(ground, x, z, -fx, -fz, s, wallRule, base));
-        best = Math.max(best, alongRay(ground, x, z, sx, sz, s, wallRule, base));
-        best = Math.max(best, alongRay(ground, x, z, -sx, -sz, s, wallRule, base));
+        double below = wallRule ? BELOW : s.sampleBelow();
+        double best = column(ground, x, z, s.climb(), wallRule, base, below);
+        best = Math.max(best, alongRay(ground, x, z, fx, fz, s, wallRule, base, below));
+        best = Math.max(best, alongRay(ground, x, z, -fx, -fz, s, wallRule, base, below));
+        best = Math.max(best, alongRay(ground, x, z, sx, sz, s, wallRule, base, below));
+        best = Math.max(best, alongRay(ground, x, z, -sx, -sz, s, wallRule, base, below));
         return best;
     }
 
@@ -163,9 +174,9 @@ public final class Terrain {
      * found exactly (distance {@code t}) and the column beyond it lowered by the rim height
      * {@code r - sqrt(r^2 - t^2)}.
      */
-    private static double alongRay(Columns ground, double x, double z, double dx, double dz, Shape s, boolean wallRule, double base) {
+    private static double alongRay(Columns ground, double x, double z, double dx, double dz, Shape s, boolean wallRule, double base, double below) {
         double r = s.wheelRadius();
-        double best = -BELOW, t = 0.0;
+        double best = -below, t = 0.0;
         for (int guard = 0; guard < 6; guard++) {
             double px = x + dx * t, pz = z + dz * t;
             double tx = dx > 1e-9 ? (Math.floor(px) + 1.0 - px) / dx : dx < -1e-9 ? (px - Math.floor(px)) / -dx : Double.POSITIVE_INFINITY;
@@ -175,18 +186,18 @@ public final class Terrain {
                 break;
             }
             double d = t + 1.0E-4;
-            double h = column(ground, x + dx * d, z + dz * d, s.climb(), wallRule, base) - (r - Math.sqrt(r * r - t * t));
+            double h = column(ground, x + dx * d, z + dz * d, s.climb(), wallRule, base, below) - (r - Math.sqrt(r * r - t * t));
             best = Math.max(best, h);
         }
         return best;
     }
 
-    /** effects: returns one column's surface with the wall rule and the reach applied; -BELOW for nothing within reach */
-    static double column(Columns ground, double x, double z, double climb, boolean wallRule, double base) {
+    /** effects: returns one column's surface with the wall rule and the reach applied; -below for nothing within reach */
+    static double column(Columns ground, double x, double z, double climb, boolean wallRule, double base, double below) {
         double reach = wallRule ? base + climb : climb + ABOVE;
-        double top = ground.top(x, z, -BELOW, reach);
+        double top = ground.top(x, z, -below, reach);
         if (top == Double.NEGATIVE_INFINITY) {
-            return -BELOW;
+            return -below;
         }
         if (wallRule && top > reach + 1.0E-6) {
             return Math.min(base, 0.0);

@@ -40,7 +40,9 @@ ending at a wall face, so a staircase is one steady angle and a wall flattens th
 pitch and roll are critically damped springs toward the plane (a first-order filter
 stutters at 20 Hz in first person); the height follows the plane directly, since a spring
 cannot track a ramp, bounded so no wheel sits more than a block under its ground; and the
-descending end is kept clear of the ground under it. A ceiling -- a canopy, a bridge, a
+descending end is kept clear of the ground under it. Terrain samples look as far under the
+body as the fit's window is long, so a long body descending a steep hill reads real ground
+behind it instead of a floor that shifts with every step. A ceiling -- a canopy, a bridge, a
 lintel -- is never ground: a solid run with air under it is skipped and the surface below
 it read. Everyone aboard leans with the body: a seat is anchored on the rider's eye, which
 turns with the body, and the rider is drawn turned about it (loaded animals about their
@@ -52,9 +54,15 @@ blocks a block, plus one and a half), where the game's four blocks would sit on 
 tailgate. Off the throttle, drag and rolling resistance bring it to rest within a few
 seconds; it never rolls backward on its own.
 
-The collision box is the profile's `body`: as wide and long as the hull and as tall as
-the hull, not the cage or windshield over it, which pass through a low canopy the way a
-cage pushes through leaves. Nobody aboard takes the wall's damage for it.
+The collision box is the profile's `body`: a square of the hull's width, as tall as the
+hull, not the cage or windshield over it, which pass through a low canopy the way a cage
+pushes through leaves. Nobody aboard takes the wall's damage for it. The overhangs beyond
+the square have their own collision: before every move, the nose's and tail's corners and
+centres on the body's rectangle are checked at the destination, and a move that would put
+one inside a wall -- a block spanning the climb line and rising above it, which the box
+could never step onto -- is cut short at the wall's face, on both sides alike so the
+server's re-run agrees. A wall, met by the box or the footprint, stops the vehicle dead:
+the speed is gone, not spent spinning the wheels against it.
 
 A vehicle built to the world's scale is too small for a person, so a profile may set
 `rider_scale`: everyone aboard is sized to it through the game's own scale attribute
@@ -148,7 +156,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "hitch": {"rear": [0, 4, -34]},                     // a trailer: {"front": [0, 6, 42]}
   "cargo": {"adults": 4, "young": 8, "slots": [[-8, 3, 5], [8, 3, 5], [-8, 3, -12], [8, 3, -12]]},   // a trailer
   "doors": [{"part": {"group": "left_door"}, "hinge": [-15, 20, -40], "axis": [0, 1, 0], "open": -1.9}],   // radians
-  "paint": {"part": {"group": "body"}, "default": "light_blue", "factory": "#58acff"},   // factory: the exact colour an undyed vehicle wears (optional)
+  "paint": {"part": {"group": "body"}, "default": "light_blue", "factory": "#58acff"},   // factory: the exact colour an undyed vehicle wears (optional); a door's painted part takes the dye too
   "glass": {"group": "windshield"},
   "cockpit": {"group": ["cage", "windshield_frame", "mirrors"]},   // not drawn from a rider's own eyes (optional)
   "rider_scale": 0.7,                                              // everyone aboard is this size (optional, 1)

@@ -331,4 +331,29 @@ public final class VehicleGameTests {
         helper.assertTrue(json.getAsJsonObject().has("mesh") && json.getAsJsonObject().has("fuel"), "the JSON is flat: " + json.getAsJsonObject().keySet());
         helper.succeed();
     }
+
+    @GameTest(template = "runway", timeoutTicks = 160)
+    public void theNoseStopsAtAWallTheBoxNeverReaches(GameTestHelper helper) {
+        layFloor(helper);
+        // A wall three blocks high across the runway at x = 24: taller than the climb, and the box is a
+        // square of the body's width, so without footprint collision the nose would end up inside it.
+        for (int x = 24; x < 26; x++) {
+            for (int z = 0; z < WIDTH; z++) {
+                for (int y = FLOOR; y < FLOOR + 3; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.STONE);
+                }
+            }
+        }
+        Vehicle v = car(helper, 4.5, 7.5, true);
+        double half = v.profile().body().length() / 2.0;
+        double wallX = helper.absoluteVec(new Vec3(24, 0, 0)).x;
+        v.setScriptedInput(GAS);
+        helper.runAtTickTime(120, () -> {
+            double nose = v.getX() + half;
+            helper.assertTrue(nose <= wallX + 0.01, "the nose stops at the wall's face: nose " + nose + " wall " + wallX);
+            helper.assertTrue(nose > wallX - 1.0, "and close to it, not a block short: nose " + nose + " wall " + wallX);
+            helper.assertTrue(Math.abs(v.speed()) < 0.05, "stalled against it, not spinning its wheels: " + v.speed());
+            helper.succeed();
+        });
+    }
 }

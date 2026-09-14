@@ -359,7 +359,8 @@ BOX_CAR_PROFILE = {
     "climb": 2.0,
     "mass": 1.0,
     "fuel": {"capacity": 24000},
-    "storage": {"rows": 3, "region": {"z_max": -8}},
+    # Two small chests side by side in the bed, three rows each: the slices of one item list, both drawn.
+    "storage": {"chests": [{"at": [8, 10, -14], "yaw": 180, "scale": 0.3, "rows": 3}, {"at": [-8, 10, -14], "yaw": 180, "scale": 0.3, "rows": 3}]},
     "gauges": [{"kind": "speed", "part": {"material": "needle", "x_max": 0}, "pivot": [-6, 16, 9.2], "axis": [0, 0, 1], "zero": 0.3, "sweep": -3.0},
                {"kind": "fuel", "part": {"material": "needle", "x_min": 0}, "pivot": [6, 16, 9.2], "axis": [0, 0, 1], "zero": -0.3, "sweep": 3.0}],
     "headlights": {"at": [[-8, 10.5, 24.5], [8, 10.5, 24.5]], "part": {"material": "lamp"}, "range": 10},

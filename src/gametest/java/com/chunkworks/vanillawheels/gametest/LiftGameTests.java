@@ -222,6 +222,15 @@ public final class LiftGameTests {
         helper.succeed();
     }
 
+    /**
+     * effects: removes the dropped lift items inside this test's own bounds. Only those, and only
+     * there: a sweep sixteen blocks round the controller once reached into the neighbouring
+     * runway and took the chest test's spilled apples, whenever that test had spilled first.
+     */
+    private static void sweepLiftItems(GameTestHelper helper) {
+        helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds(), e -> e.getItem().is(ModContent.LIFT_ITEM.get())).forEach(ItemEntity::discard);
+    }
+
     @GameTest(template = "arena", timeoutTicks = 100)
     public void breakingAnyPartOrTheControllerDropsOneLiftAndTakesAllAndCreativeDropsNone(GameTestHelper helper) {
         layFloor(helper);
@@ -231,13 +240,13 @@ public final class LiftGameTests {
         helper.assertTrue(sp.gameMode.destroyBlock(helper.absolutePos(farPost)), "broke a post");
         helper.assertValueEqual(liftBlocks(helper), 0, "the lift is gone");
         helper.assertValueEqual(liftItemsDropped(helper), 1, "one lift dropped");
-        helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(CONTROLLER)).inflate(16)).forEach(ItemEntity::discard);
+        sweepLiftItems(helper);
 
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed again");
         helper.assertTrue(sp.gameMode.destroyBlock(helper.absolutePos(CONTROLLER)), "broke the controller");
         helper.assertValueEqual(liftBlocks(helper), 0, "the lift is gone again");
         helper.assertValueEqual(liftItemsDropped(helper), 1, "one lift dropped again");
-        helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(CONTROLLER)).inflate(16)).forEach(ItemEntity::discard);
+        sweepLiftItems(helper);
 
         ServerPlayer creative = player(helper, GameType.CREATIVE);
         helper.assertTrue(place(helper, creative, CONTROLLER, Direction.NORTH).consumesAction(), "placed by a creative player");

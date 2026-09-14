@@ -175,7 +175,8 @@ public final class TowGameTests {
         Vec3 door = trailer.rotate(trailer.profile().localBlocks(trailer.profile().doors().get(0).hinge()));
         helper.assertTrue(trailer.interactAt(p, door, InteractionHand.MAIN_HAND).consumesAction(), "the door click was taken");
         helper.assertTrue(trailer.doorsOpen(), "the doors are open");
-        // The lead again: an adult and two calves fill it; the third calf and the second adult stay on the lead.
+        // The lead again, nearest first: the two calves beside the player and the adult behind fill
+        // it; the adult and the calf at the corners stay on the lead.
         p.setShiftKeyDown(false);
         p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
         helper.assertTrue(trailer.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "the lead click was taken");

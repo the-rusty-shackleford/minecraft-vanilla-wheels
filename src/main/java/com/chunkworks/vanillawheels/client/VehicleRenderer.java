@@ -89,14 +89,14 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
     }
 
     /**
-     * effects: draws the game's own double chest where the profile puts it,
-     * at the profile's scale, its front turned as the profile says, the lid up by the vehicle's
-     * openness -- the left half on the chest's own left, as the game lays
+     * effects: draws the game's own double chest where the profile puts chest
+     * {@code index}, at its scale, its front turned as the profile says, the lid up by that
+     * chest's openness -- the left half on the chest's own left, as the game lays
      * a double chest
      */
-    private void drawChest(Vehicle vehicle, VehicleProfile p, VehicleProfile.Chest chest, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight, int overlay) {
+    private void drawChest(Vehicle vehicle, VehicleProfile p, int index, VehicleProfile.Chest chest, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight, int overlay) {
         Vec at = p.localBlocks(chest.at());
-        float lid = vehicle.lidOpenness(partialTick);
+        float lid = vehicle.lidOpenness(index, partialTick);
         poseStack.pushPose();
         poseStack.translate(at.x(), at.y(), at.z());
         poseStack.mulPose(Axis.YP.rotationDegrees((float) -chest.yaw()));
@@ -198,7 +198,12 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
             poseStack.popPose();
         }
 
-        p.storage().flatMap(VehicleProfile.Storage::chest).ifPresent(chest -> drawChest(vehicle, p, chest, partialTick, poseStack, buffers, packedLight, overlay));
+        if (p.storage().isPresent()) {
+            java.util.List<VehicleProfile.Chest> chests = p.storage().get().chests();
+            for (int i = 0; i < chests.size(); i++) {
+                drawChest(vehicle, p, i, chests.get(i), partialTick, poseStack, buffers, packedLight, overlay);
+            }
+        }
 
         if (a.glass.quadCount() > 0) {
             VertexConsumer glass = buffers.getBuffer(RenderType.entityTranslucent(a.texture));

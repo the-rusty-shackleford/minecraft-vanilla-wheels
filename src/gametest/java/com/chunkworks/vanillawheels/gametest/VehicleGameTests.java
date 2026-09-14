@@ -247,7 +247,7 @@ public final class VehicleGameTests {
     public void theChestSpillsOnAWrenchAndTheItemKeepsPaintAndFuel(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 4.5, 7.5, true);
-        helper.assertValueEqual(v.getContainerSize(), 27, "three rows");
+        helper.assertValueEqual(v.getContainerSize(), 54, "two chests of three rows");
         v.setItem(0, new ItemStack(Items.APPLE, 7));
         v.setItem(26, new ItemStack(Items.STICK, 3));
         v.setPaint(net.minecraft.world.item.DyeColor.RED);
@@ -257,6 +257,8 @@ public final class VehicleGameTests {
         p.setShiftKeyDown(true);
         v.interactAt(p, Vec3.ZERO, InteractionHand.MAIN_HAND);
         helper.assertTrue(v.isRemoved(), "the vehicle is gone");
+        int atOnce = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0)).stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
+        helper.assertValueEqual(atOnce, 7, "the apples spilled at once");
         ItemStack held = null;
         for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
             if (p.getInventory().getItem(i).is(ModContent.VEHICLE_ITEM.get())) {
@@ -268,13 +270,12 @@ public final class VehicleGameTests {
         helper.assertValueEqual(held.get(ModContent.FUEL.get()), fuel, "its fuel");
         helper.assertValueEqual(VanillaWheels.vehicleOf(held).orElse(null), BOX_CAR, "its vehicle");
         helper.runAtTickTime(5, () -> {
+            // Five ticks on, they are still here: a neighbouring test's sweep once took them
+            // (LiftGameTests.sweepLiftItems tells it).
             List<ItemEntity> spilled = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0));
-            // Seen to fail once in a while under a full build's load with no apples found at all; the
-            // wider look is for the next time, to say where they went.
-            String wider = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(64.0)).stream().map(e -> e.getItem() + "@" + e.position()).toList().toString();
             int apples = spilled.stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
             int sticks = spilled.stream().filter(e -> e.getItem().is(Items.STICK)).mapToInt(e -> e.getItem().getCount()).sum();
-            helper.assertValueEqual(apples, 7, "the apples spilled (items within 64: " + wider + ")");
+            helper.assertValueEqual(apples, 7, "the apples are still here");
             helper.assertValueEqual(sticks, 3, "the sticks spilled");
             helper.succeed();
         });
@@ -378,5 +379,24 @@ public final class VehicleGameTests {
                 helper.succeed();
             });
         });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public void aClickOnAChestOpensItAndAClickBesideItDoesNot(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 7.5, 7.5, true);
+        VehicleProfile p = v.profile();
+        helper.assertValueEqual(p.storage().orElseThrow().chests().size(), 2, "two chests");
+        helper.assertValueEqual(p.storage().orElseThrow().firstSlot(1), 27, "the second chest's slice starts after the first's rows");
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        // The hit lands on the first chest's lid, in the world's frame relative to the body.
+        VehicleProfile.Chest c = p.storage().orElseThrow().chests().get(0);
+        Vec3 onChest = v.rotate(p.localBlocks(c.at())).add(0.0, VehicleProfile.Chest.HEIGHT * c.scale() / 2.0, 0.0);
+        helper.assertTrue(v.interactAt(player, onChest, InteractionHand.MAIN_HAND).consumesAction(), "the chest takes the click");
+        // Beside it, on the bed between the chests, a plain click is not a chest's.
+        Vec3 beside = v.rotate(p.localBlocks(new com.chunkworks.vanillawheels.domain.Vec(0, 10, -14))).add(0.0, 0.2, 0.0);
+        helper.assertTrue(!v.interactAt(player, beside, InteractionHand.MAIN_HAND).consumesAction(), "between the chests the click passes to the body");
+        helper.succeed();
     }
 }

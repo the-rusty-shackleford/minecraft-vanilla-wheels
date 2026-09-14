@@ -34,12 +34,12 @@ the client (renderer with the game's double chest and the rider's glass fade, me
 library with placeholder on a bad file, keys with a riding-only conflict context, the
 lights indicator by the hotbar, engine loop, radio, Luminance headlamps, the lift
 renderer and screen).
-`gametest`: the box car and box trailer, twenty-three gametests, the photo booth.
+`gametest`: the box car and box trailer, twenty-four gametests, the photo booth.
 
 ## How it is verified
 
 `./gradlew check`: 69 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-three gametests on a headless server driving a scripted box car, towing
+fixtures); twenty-four gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -96,7 +96,11 @@ nose and tail stop at a wall the square box never reaches, and a wall stalls the
 terrain samples as deep as the fit's window, dyeable door panels; the first-person flip
 did not reproduce in the playtest's first-person run. And the pose is synced: the driver's
 client shares the tilt and lift it computed, for its truck and its trailer, and the server
-and every other client draw and seat with them. Known intermittent: the chest-spill
-gametest has failed under a full build's load a few times in a day (no item entities
-within 64 blocks five ticks after the wrench), never standalone in three runs; its
-assertion now lists the items it can see, for the next failure.
+and every other client draw and seat with them. Storage is a list of chests, each the
+game's double chest at its own place, scale and rows, opened by clicking it (Rusty: a
+chest in the Trailblazer's bed, one along each side of the pickup's). Two gametests that
+failed one run in ten were the world's random offset, not load: a lift test swept every
+item within sixteen blocks of its controller, into the next runway, and took the
+chest-spill test's apples when it had spilled first (the sweep now takes lift items in its
+own bounds); and the lead loader took the herd in entity-section order, so two adults
+sometimes filled the trailer before the calves (it loads nearest first now).

@@ -99,11 +99,12 @@ at speed had the server refuse every tick and snap the vehicle back.
   goes in the tank, whole, if it fits; the action bar shows the level. The engine burns
   one tick of fuel per tick of throttle; idling and coasting burn nothing. An empty tank
   refuses the throttle. `fuelRequired = false` in the config turns all of this off.
-- **Chest**: crouch and right-click the chest region (a pickup's bed) for the vehicle's
-  chest; a rider presses the inventory key instead, since crouching dismounts. Contents
-  ride with the vehicle and spill when it is wrenched or destroyed. A profile that
-  places `storage.chest` gets the game's own double chest drawn there, lid and all: it
-  opens with the chest sounds while anyone has the inventory up, as a chest block does.
+- **Chests**: a profile's `storage.chests` are the game's own double chests, drawn where
+  and at the size the profile says, each its own inventory of its own rows. Right-click a
+  chest to open it, crouching or not, as a chest block; right-click anywhere else on the
+  body and you board. A rider presses the inventory key for the first chest, since
+  crouching dismounts. A chest's lid is up, with the chest's sounds, while anyone has it
+  open. Contents ride with the vehicle and spill when it is wrenched or destroyed.
 - **Records**: crouch and right-click a vehicle that has a radio while holding a music
   disc, and it plays for everyone in range the way a jukebox does, with the now-playing
   toast; crouch and right-click the radio empty-handed to eject it. The disc stays until
@@ -154,7 +155,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
   "climb": 2.0, "mass": 1.45,
   "fuel": {"capacity": 24000},                        // burn ticks, as the furnace counts them
-  "storage": {"rows": 6, "region": {"z_max": -12.5}, "chest": {"at": [0, 16, -35], "yaw": 180, "scale": 1.0}},   // the chest, where to click for it, and where the game's double chest is drawn and how big (optional)
+  "storage": {"chests": [{"at": [0, 16, -35], "yaw": 180, "scale": 0.6, "rows": 6}]},   // the chests: each the game's double chest, drawn where and how big the profile says, its own rows (optional)
   "gauges": [{"kind": "speed", "part": {"material": "needle", "x_max": -5}, "pivot": [-8, 17, 21.9], "axis": [0, 0, 1], "zero": 0.3, "sweep": 4.7}],
   "headlights": {"at": [[-13, 15.5, 40.5], [13, 15.5, 40.5]], "part": {"material": "gauge"}, "range": 10},
   "horn": "vanillawheels:horn.truck",
@@ -216,9 +217,9 @@ through a trailer's body.
 
 A trailer with `cargo` carries animals: crouch and right-click a door to open it, then
 right-click the trailer holding a lead and every animal on your leads within ten blocks
-boards while there is room -- an adult takes a whole share, a young one a half, so room
-for four adults is room for eight calves or two cows and four calves -- and each lead
-comes back to you. Crouch and right-click a door, empty-handed, to shut or open it, load
+boards, nearest to you first, while there is room -- an adult takes a whole share, a
+young one a half, so room for four adults is room for eight calves or two cows and four
+calves -- and each lead comes back to you. Crouch and right-click a door, empty-handed, to shut or open it, load
 or no load. Crouch and right-click the trailer holding a lead with the doors open and
 animals aboard to let them out behind. Animals never board through shut doors. `doors`
 swing about their hinges when open. Loaded animals lean with the floor as riders do.

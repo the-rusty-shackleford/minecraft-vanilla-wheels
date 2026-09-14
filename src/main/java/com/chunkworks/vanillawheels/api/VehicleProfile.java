@@ -293,13 +293,37 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         ).apply(i, Fuel::new));
     }
 
-    /** A chest of {@code rows} rows of nine, opened by clicking inside {@code region} (mesh units). */
-    public record Storage(int rows, Optional<PartSelector> region, Optional<Chest> chest) {
+    /**
+     * The chests a vehicle carries, each its own inventory: the game's double chest drawn where the
+     * profile puts it and opened by right-clicking it, on the body or off. The inventories lie end
+     * to end in the vehicle's one item list, in this order.
+     */
+    public record Storage(List<Chest> chests) {
         public static final Codec<Storage> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.intRange(1, 6).fieldOf("rows").forGetter(Storage::rows),
-                PartSelector.CODEC.optionalFieldOf("region").forGetter(Storage::region),
-                Chest.CODEC.optionalFieldOf("chest").forGetter(Storage::chest)
+                Chest.CODEC.listOf(1, 8).fieldOf("chests").forGetter(Storage::chests)
         ).apply(i, Storage::new));
+
+        public Storage {
+            chests = List.copyOf(chests);
+        }
+
+        /** effects: returns the slots of every chest together */
+        public int slots() {
+            int n = 0;
+            for (Chest c : chests) {
+                n += c.rows() * 9;
+            }
+            return n;
+        }
+
+        /** effects: returns the first slot of chest {@code index} in the vehicle's item list */
+        public int firstSlot(int index) {
+            int n = 0;
+            for (int i = 0; i < index; i++) {
+                n += chests.get(i).rows() * 9;
+            }
+            return n;
+        }
     }
 
     /**
@@ -307,15 +331,20 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
      * vehicle with its bottom centred at {@code at} (mesh units), its
      * front turned {@code yaw} degrees from forward (180: it faces the
      * rear), at {@code scale} times its block size (1: two blocks wide, as
-     * it stands in the world; a small vehicle draws it smaller to fit its
-     * bed). Its lid opens while anyone has the storage open.
+     * it stands in the world; a small bed draws it smaller to fit), holding
+     * {@code rows} rows of nine. Right-click it to open it; its lid opens
+     * while anyone has it open.
      */
-    public record Chest(Vec at, double yaw, double scale) {
+    public record Chest(Vec at, double yaw, double scale, int rows) {
         public static final Codec<Chest> CODEC = RecordCodecBuilder.create(i -> i.group(
                 VEC.fieldOf("at").forGetter(Chest::at),
                 Codec.DOUBLE.optionalFieldOf("yaw", 180.0).forGetter(Chest::yaw),
-                Codec.doubleRange(0.05, 4.0).optionalFieldOf("scale", 1.0).forGetter(Chest::scale)
+                Codec.doubleRange(0.05, 4.0).optionalFieldOf("scale", 1.0).forGetter(Chest::scale),
+                Codec.intRange(1, 6).optionalFieldOf("rows", 6).forGetter(Chest::rows)
         ).apply(i, Chest::new));
+
+        /** The game's double chest: two blocks wide, one deep, seven eighths high, before the scale. */
+        public static final double WIDTH = 2.0, DEPTH = 1.0, HEIGHT = 0.875;
     }
 
     /** What a gauge shows. */

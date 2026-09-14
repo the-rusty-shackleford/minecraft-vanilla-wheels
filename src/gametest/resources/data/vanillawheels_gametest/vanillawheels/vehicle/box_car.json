@@ -89,10 +89,28 @@
     "capacity": 24000
   },
   "storage": {
-    "rows": 3,
-    "region": {
-      "z_max": -8
-    }
+    "chests": [
+      {
+        "at": [
+          8,
+          10,
+          -14
+        ],
+        "yaw": 180,
+        "scale": 0.3,
+        "rows": 3
+      },
+      {
+        "at": [
+          -8,
+          10,
+          -14
+        ],
+        "yaw": 180,
+        "scale": 0.3,
+        "rows": 3
+      }
+    ]
   },
   "gauges": [
     {

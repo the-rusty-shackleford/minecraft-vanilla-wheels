@@ -121,8 +121,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The entity id of the trailer this one tows, -1 for none. */
     private static final EntityDataAccessor<Integer> DATA_TRAILER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_DOORS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
-    /** How many players have the storage open: the chest's lid is up while it is above zero. */
-    private static final EntityDataAccessor<Integer> DATA_OPENERS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
+    /** Which chests are open, a bit each: a chest's lid is up while its bit is set. The server counts the openers per chest. */
+    private static final EntityDataAccessor<Integer> DATA_OPEN = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
+    private final int[] openers = new int[8];
     /** How close a tongue must come to a hitch to catch, blocks; how far it may stretch before it lets go. */
     public static final double CATCH = 0.5;
     public static final double STRETCH = 1.0;
@@ -173,8 +174,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private float doorSwingO;
     /** The ground under the axles and the sides as last probed, relative to the body. */
     /** The chest lid on the client, 0 shut to 1 open, eased toward whether anyone has the storage open. */
-    private float lid;
-    private float lidO;
+    /** The chests' lids on the client, 0 shut to 1 open each, eased toward whether anyone has the chest open. */
+    private final float[] lid = new float[8];
+    private final float[] lidO = new float[8];
     private long lootTableSeed;
     /** The most hit boxes a profile may add beyond the body's own square. */
     public static final int MAX_PARTS = 4;
@@ -236,7 +238,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         VehicleProfile p = profile();
         if (p != null) {
             tuning = p.tuning();
-            int slots = p.storage().map(s -> s.rows() * 9).orElse(0);
+            int slots = p.storage().map(VehicleProfile.Storage::slots).orElse(0);
             if (items.size() != slots) {
                 items = NonNullList.withSize(slots, ItemStack.EMPTY);
             }
@@ -298,7 +300,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_TOWER, -1);
         builder.define(DATA_TRAILER, -1);
         builder.define(DATA_DOORS, false);
-        builder.define(DATA_OPENERS, 0);
+        builder.define(DATA_OPEN, 0);
     }
 
     @Override
@@ -540,35 +542,118 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return Mth.lerp(partialTick, doorSwingO, doorSwing);
     }
 
-    /**
-     * effects: returns how far the chest's lid is up for drawing, 0 shut to
-     * 1 open, eased the way the game eases a chest's
-     */
-    public float lidOpenness(float partialTick) {
-        float o = 1.0f - Mth.lerp(partialTick, lidO, lid);
+    /** effects: returns how far chest {@code index}'s lid is open, 0 shut to 1 open, eased the way the game eases a chest's */
+    public float lidOpenness(int index, float partialTick) {
+        float o = 1.0f - Mth.lerp(partialTick, lidO[index], lid[index]);
         return 1.0f - o * o * o;
     }
 
-    @Override
-    public void startOpen(Player player) {
+    /** effects: on the server, counts a player in at chest {@code index}: its lid rises, with the chest's sound the first time */
+    void startOpen(int index) {
         if (!level().isClientSide()) {
-            int n = entityData.get(DATA_OPENERS);
-            entityData.set(DATA_OPENERS, n + 1);
-            if (n == 0) {
-                level().playSound(null, getX(), getY(), getZ(), SoundEvents.CHEST_OPEN, SoundSource.BLOCKS, 0.5f, level().random.nextFloat() * 0.1f + 0.9f);
+            if (openers[index]++ == 0) {
+                entityData.set(DATA_OPEN, entityData.get(DATA_OPEN) | (1 << index));
+                Vec3 at = chestWorld(index);
+                level().playSound(null, at.x, at.y, at.z, SoundEvents.CHEST_OPEN, SoundSource.BLOCKS, 0.5f, level().random.nextFloat() * 0.1f + 0.9f);
             }
         }
     }
 
-    @Override
-    public void stopOpen(Player player) {
+    /** effects: on the server, counts a player out of chest {@code index}: the last one shuts the lid, with its sound */
+    void stopOpen(int index) {
         if (!level().isClientSide()) {
-            int n = Math.max(0, entityData.get(DATA_OPENERS) - 1);
-            entityData.set(DATA_OPENERS, n);
-            if (n == 0) {
-                level().playSound(null, getX(), getY(), getZ(), SoundEvents.CHEST_CLOSE, SoundSource.BLOCKS, 0.5f, level().random.nextFloat() * 0.1f + 0.9f);
+            openers[index] = Math.max(0, openers[index] - 1);
+            if (openers[index] == 0) {
+                entityData.set(DATA_OPEN, entityData.get(DATA_OPEN) & ~(1 << index));
+                Vec3 at = chestWorld(index);
+                level().playSound(null, at.x, at.y, at.z, SoundEvents.CHEST_CLOSE, SoundSource.BLOCKS, 0.5f, level().random.nextFloat() * 0.1f + 0.9f);
             }
         }
+    }
+
+    /** The game's container hooks, for the whole vehicle as one container (a hopper, a loot fill): nothing to show */
+    @Override
+    public void startOpen(Player player) {}
+
+    @Override
+    public void stopOpen(Player player) {}
+
+    /** effects: returns where chest {@code index} sits in the world */
+    private Vec3 chestWorld(int index) {
+        VehicleProfile p = profile();
+        if (p == null || p.storage().isEmpty() || index >= p.storage().get().chests().size()) {
+            return position();
+        }
+        return position().add(rotate(p.localBlocks(p.storage().get().chests().get(index).at())));
+    }
+
+    /**
+     * effects: returns the index of the chest {@code hit} (relative to the body's position, the
+     * world's frame) lands on: inside the double chest's own box at the profile's scale, turned by
+     * the chest's yaw and the body's; -1 for none
+     */
+    private int chestAt(VehicleProfile p, Vec3 hit) {
+        if (p.storage().isEmpty()) {
+            return -1;
+        }
+        Vec3 local = hit.yRot(getYRot() * Mth.DEG_TO_RAD);   // into the body's frame
+        List<VehicleProfile.Chest> chests = p.storage().get().chests();
+        for (int i = 0; i < chests.size(); i++) {
+            VehicleProfile.Chest c = chests.get(i);
+            Vec at = p.localBlocks(c.at());
+            Vec3 d = new Vec3(local.x - at.x(), local.y - at.y(), local.z - at.z()).yRot((float) Math.toRadians(c.yaw()));
+            double hw = VehicleProfile.Chest.WIDTH * c.scale() / 2.0 + 0.05, hd = VehicleProfile.Chest.DEPTH * c.scale() / 2.0 + 0.05;
+            if (Math.abs(d.x) <= hw && Math.abs(d.z) <= hd && d.y >= -0.1 && d.y <= VehicleProfile.Chest.HEIGHT * c.scale() + 0.15) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** effects: opens chest {@code index} for {@code player}: its own rows of the vehicle's items, as a chest screen */
+    public void openChest(Player player, int index) {
+        VehicleProfile p = profile();
+        if (p == null || p.storage().isEmpty() || index < 0 || index >= p.storage().get().chests().size()) {
+            return;
+        }
+        if (player.level().isClientSide()) {
+            return;
+        }
+        unpackChestVehicleLootTable(player);
+        VehicleProfile.Chest c = p.storage().get().chests().get(index);
+        ChestSlice slice = new ChestSlice(index, p.storage().get().firstSlot(index), c.rows() * 9);
+        player.openMenu(new net.minecraft.world.SimpleMenuProvider((id, inventory, pl) -> new ChestMenu(switch (c.rows()) {
+            case 1 -> MenuType.GENERIC_9x1;
+            case 2 -> MenuType.GENERIC_9x2;
+            case 3 -> MenuType.GENERIC_9x3;
+            case 4 -> MenuType.GENERIC_9x4;
+            case 5 -> MenuType.GENERIC_9x5;
+            default -> MenuType.GENERIC_9x6;
+        }, id, inventory, slice, c.rows()), getName()));
+        gameEvent(GameEvent.CONTAINER_OPEN, player);
+    }
+
+    /** One chest's rows of the vehicle's items, as a container of its own: what its screen edits. */
+    private final class ChestSlice implements net.minecraft.world.Container {
+        private final int index, first, size;
+
+        ChestSlice(int index, int first, int size) {
+            this.index = index;
+            this.first = first;
+            this.size = size;
+        }
+
+        @Override public int getContainerSize() { return size; }
+        @Override public boolean isEmpty() { for (int i = 0; i < size; i++) { if (!getItem(i).isEmpty()) return false; } return true; }
+        @Override public ItemStack getItem(int slot) { return Vehicle.this.getItem(first + slot); }
+        @Override public ItemStack removeItem(int slot, int amount) { return Vehicle.this.removeItem(first + slot, amount); }
+        @Override public ItemStack removeItemNoUpdate(int slot) { return Vehicle.this.removeItemNoUpdate(first + slot); }
+        @Override public void setItem(int slot, ItemStack stack) { Vehicle.this.setItem(first + slot, stack); }
+        @Override public void setChanged() { Vehicle.this.setChanged(); }
+        @Override public boolean stillValid(Player player) { return Vehicle.this.stillValid(player); }
+        @Override public void clearContent() { for (int i = 0; i < size; i++) { Vehicle.this.setItem(first + i, ItemStack.EMPTY); } }
+        @Override public void startOpen(Player player) { Vehicle.this.startOpen(index); }
+        @Override public void stopOpen(Player player) { Vehicle.this.stopOpen(index); }
     }
 
     /** effects: opens the doors if shut, shuts them if open */
@@ -1043,13 +1128,16 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         suspensionO = suspension;
         wheelTravelO = wheelTravel;
         doorSwingO = doorSwing;
-        lidO = lid;
+        System.arraycopy(lid, 0, lidO, 0, lid.length);
         if (p == null) {
             return;
         }
         if (level().isClientSide()) {
             doorSwing = Mth.clamp(doorSwing + (doorsOpen() ? 0.15f : -0.15f), 0.0f, 1.0f);
-            lid = Mth.clamp(lid + (entityData.get(DATA_OPENERS) > 0 ? 0.1f : -0.1f), 0.0f, 1.0f);
+            int open = entityData.get(DATA_OPEN);
+            for (int i = 0; i < lid.length; i++) {
+                lid[i] = Mth.clamp(lid[i] + ((open & (1 << i)) != 0 ? 0.1f : -0.1f), 0.0f, 1.0f);
+            }
         }
         // Towing's bookkeeping: which pass this is, and whether the tower has moved this body yet.
         long pass = TickClock.now(level());
@@ -1627,6 +1715,12 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
+        // A chest, clicked: opens, crouching or not, before anything else the click could mean.
+        int chest = chestAt(p, hit);
+        if (chest >= 0 && !(player.isSecondaryUseActive() && held.is(ModContent.WRENCH.get()))) {
+            openChest(player, chest);
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
         if (player.isSecondaryUseActive()) {
             // The tongue, when hitched: let go.
             if (held.isEmpty() && tower() != null && p.hitch().front().isPresent() && inRegion(p, p.hitch().front().get(), 0.9, hit)) {
@@ -1669,12 +1763,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 if (!level().isClientSide()) {
                     player.getInventory().placeItemBackInInventory(disc());
                     entityData.set(DATA_DISC, ItemStack.EMPTY);
-                }
-                return InteractionResult.sidedSuccess(level().isClientSide());
-            }
-            if (p.storage().isPresent() && inStorageRegion(p, hit)) {
-                if (!level().isClientSide()) {
-                    openCustomInventoryScreen(player);
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }
@@ -1751,9 +1839,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /**
      * effects: every animal {@code player} holds on a lead within ten
-     * blocks boards, one by one, while the cargo has room and the doors
-     * are open; each lead comes back to the player; the player is told
-     * when the doors are shut or the trailer is full
+     * blocks boards, nearest first, one by one, while the cargo has room
+     * and the doors are open; each lead comes back to the player; the
+     * player is told when the doors are shut or the trailer is full
      */
     private void load(Player player) {
         if (!doorsOpen()) {
@@ -1761,6 +1849,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return;
         }
         List<Animal> led = level().getEntitiesOfClass(Animal.class, player.getBoundingBox().inflate(10.0), a -> a.getLeashHolder() == player);
+        // Nearest first: the level hands them back in entity-section order, which is the
+        // world's business, and who fits depends on who comes first.
+        led.sort(java.util.Comparator.comparingDouble(a -> a.distanceToSqr(player)));
         int boarded = 0;
         for (Animal a : led) {
             if (!canAddPassenger(a)) {
@@ -1792,17 +1883,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             a.stopRiding();
             a.setPos(at.x, at.y + 0.1, at.z);
         }
-    }
-
-    /** effects: returns whether {@code hit} (relative to the body's position) is inside the storage's region, or anywhere if none is named */
-    private boolean inStorageRegion(VehicleProfile p, Vec3 hit) {
-        VehicleProfile.Storage s = p.storage().orElseThrow();
-        if (s.region().isEmpty()) {
-            return true;
-        }
-        Vec3 local = hit.yRot(getYRot() * Mth.DEG_TO_RAD);
-        Vec mesh = p.toLocal().apply(new Vec(local.x / p.scale(), local.y / p.scale(), local.z / p.scale()));
-        return s.region().get().selector().region().contains(mesh);
     }
 
     /** effects: returns whether {@code hit} is within {@code radius} blocks of the profile point {@code at} */
@@ -1855,35 +1935,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     // --- the chest -------------------------------------------------------
 
+    /** effects: the rider's inventory key: opens the first chest, since a rider cannot crouch to reach one */
     @Override
     public void openCustomInventoryScreen(Player player) {
-        if (profile() == null || profile().storage().isEmpty()) {
-            return;
-        }
-        player.openMenu(this);
-        if (!player.level().isClientSide()) {
-            gameEvent(GameEvent.CONTAINER_OPEN, player);
-        }
+        openChest(player, 0);
     }
 
+    /** The vehicle as one container is never a menu of its own: each chest opens its own slice. */
     @Override
     @Nullable
     public AbstractContainerMenu createMenu(int id, net.minecraft.world.entity.player.Inventory inventory, Player player) {
-        VehicleProfile p = profile();
-        if (p == null || p.storage().isEmpty()) {
-            return null;
-        }
-        unpackChestVehicleLootTable(player);
-        int rows = p.storage().get().rows();
-        MenuType<ChestMenu> type = switch (rows) {
-            case 1 -> MenuType.GENERIC_9x1;
-            case 2 -> MenuType.GENERIC_9x2;
-            case 3 -> MenuType.GENERIC_9x3;
-            case 4 -> MenuType.GENERIC_9x4;
-            case 5 -> MenuType.GENERIC_9x5;
-            default -> MenuType.GENERIC_9x6;
-        };
-        return new ChestMenu(type, id, inventory, this, rows);
+        return null;
     }
 
     @Override

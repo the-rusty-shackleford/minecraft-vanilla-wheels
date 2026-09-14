@@ -96,4 +96,7 @@ nose and tail stop at a wall the square box never reaches, and a wall stalls the
 terrain samples as deep as the fit's window, dyeable door panels; the first-person flip
 did not reproduce in the playtest's first-person run. And the pose is synced: the driver's
 client shares the tilt and lift it computed, for its truck and its trailer, and the server
-and every other client draw and seat with them.
+and every other client draw and seat with them. Known intermittent: the chest-spill
+gametest has failed under a full build's load a few times in a day (no item entities
+within 64 blocks five ticks after the wrench), never standalone in three runs; its
+assertion now lists the items it can see, for the next failure.

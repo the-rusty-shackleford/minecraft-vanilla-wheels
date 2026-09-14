@@ -24,7 +24,8 @@ wheels take the stick's angle at once so the car goes where it points, and for t
 charge's share of two seconds the top speed is raised by the charge's share of
 `drift_boost` and the speed climbs to it -- the throttle cannot cancel it -- while an
 afterburner streams from the tail, blue at the core of a full burn, thinning as the boost
-runs out. Every client sees the flames. **Left Control** is the horn while held; **H** cycles the headlights
+runs out, and the engine climbs past its top note for as long as it burns. Every client
+sees the flames and hears the note. **Left Control** is the horn while held; **H** cycles the headlights
 off, on, auto (auto lights below a configurable darkness); the mode sits at the lower
 left of the screen beside the hotbar, a lamp icon and its word, whenever you ride. Both
 keys are live only while riding one of these vehicles, so Left Control stays sprint

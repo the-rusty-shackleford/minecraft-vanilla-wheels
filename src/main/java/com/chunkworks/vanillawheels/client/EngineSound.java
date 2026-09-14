@@ -29,7 +29,8 @@ import net.minecraft.util.Mth;
 
 /**
  * The engine, looping while the vehicle exists: silent with nobody at the
- * wheel, idling with a driver, and rising in pitch and volume with speed.
+ * wheel, idling with a driver, rising in pitch and volume with speed, and
+ * climbing past its top note while a boost burns.
  * Starts silent, as the game's own vehicle loops do, so the engine cannot
  * refuse it for being inaudible.
  */
@@ -81,7 +82,9 @@ public final class EngineSound extends AbstractTickableSoundInstance {
             return;
         }
         float fraction = Math.min(1.0f, Math.abs(vehicle.speed()) / (float) vehicle.tuning().maxSpeed());
-        pitch = Mth.lerp(fraction, 0.75f, 1.6f);
-        volume = Mth.lerp(fraction, 0.35f, 0.9f);
+        // A boost is heard: the engine climbs past its top note by the burn, and a little louder.
+        float burn = vehicle.burn();
+        pitch = Mth.lerp(fraction, 0.75f, 1.6f) + 0.35f * burn;
+        volume = Mth.lerp(fraction, 0.35f, 0.9f) + 0.1f * burn;
     }
 }

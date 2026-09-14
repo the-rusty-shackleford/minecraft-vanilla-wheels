@@ -34,12 +34,12 @@ the client (renderer with the game's double chest and the rider's glass fade, me
 library with placeholder on a bad file, keys with a riding-only conflict context, the
 lights indicator by the hotbar, engine loop, radio, Luminance headlamps, the lift
 renderer and screen).
-`gametest`: the box car and box trailer, twenty-two gametests, the photo booth.
+`gametest`: the box car and box trailer, twenty-three gametests, the photo booth.
 
 ## How it is verified
 
 `./gradlew check`: 69 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-two gametests on a headless server driving a scripted box car, towing
+fixtures); twenty-three gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -94,5 +94,6 @@ Trailblazer (Rusty chose nfx's full-size truck and level camera for the view).
 Later that day the open items from his handoff were closed: footprint collision (the
 nose and tail stop at a wall the square box never reaches, and a wall stalls the drive),
 terrain samples as deep as the fit's window, dyeable door panels; the first-person flip
-did not reproduce in the playtest's first-person run. Not done, on purpose: syncing the
-pose (the server keeps a level seat; every client runs the same pose for what it sees).
+did not reproduce in the playtest's first-person run. And the pose is synced: the driver's
+client shares the tilt and lift it computed, for its truck and its trailer, and the server
+and every other client draw and seat with them.

@@ -111,6 +111,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private static final EntityDataAccessor<Boolean> DATA_DRIFTING = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
     /** How hard the boost burns, 0..1, for the flames every client draws. */
     private static final EntityDataAccessor<Float> DATA_BURN = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
+    /** The drawn pose as the simulating side computed it, for every other side to draw and seat with. */
+    private static final EntityDataAccessor<Float> DATA_LIFT = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> DATA_PITCH = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> DATA_ROLL = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<ItemStack> DATA_DISC = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.ITEM_STACK);
     /** The entity id of the vehicle towing this one, -1 for none. */
     private static final EntityDataAccessor<Integer> DATA_TOWER = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
@@ -287,6 +291,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_STEER, 0.0f);
         builder.define(DATA_DRIFTING, false);
         builder.define(DATA_BURN, 0.0f);
+        builder.define(DATA_LIFT, 0.0f);
+        builder.define(DATA_PITCH, 0.0f);
+        builder.define(DATA_ROLL, 0.0f);
         builder.define(DATA_DISC, ItemStack.EMPTY);
         builder.define(DATA_TOWER, -1);
         builder.define(DATA_TRAILER, -1);
@@ -816,8 +823,71 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         preFollow = new double[] {pass, xOld, yOld, zOld, yRotO};
         moveBehind(tower, pass);
         VehicleProfile p = profile();
-        if (lastOwnPass == pass && p != null && !rideTowed(p, tower)) {
-            rideTheGround(p);   // it ticked before the tower: pose it here, at the position it was moved to
+        if (lastOwnPass == pass && p != null) {
+            poseTowed(p, tower);   // it ticked before the tower: pose it here, at the position it was moved to
+        }
+    }
+
+    /**
+     * effects: poses this towed body, where the pose is this side's to compute: a driver's client
+     * for the chain it drives, the server for a chain nobody drives. The server moves its copy of a
+     * player's trailer but takes the pose the driver's client shares, so the two never fight.
+     */
+    private void poseTowed(VehicleProfile p, Vehicle tower) {
+        if (!level().isClientSide() && playerAtTheHead()) {
+            takeSharedPose();
+            return;
+        }
+        if (!rideTowed(p, tower)) {
+            rideTheGround(p);
+        }
+        sharePose();
+    }
+
+    /** effects: returns whether a player drives the head of this body's tow chain */
+    private boolean playerAtTheHead() {
+        Vehicle head = this;
+        for (int i = 0; i < 8 && head.tower() != null; i++) {
+            head = head.tower();
+        }
+        return head.getControllingPassenger() instanceof Player;
+    }
+
+    /** effects: draws and seats with the pose the simulating side shared */
+    private void takeSharedPose() {
+        suspension = new Suspension(entityData.get(DATA_LIFT), entityData.get(DATA_PITCH), entityData.get(DATA_ROLL));
+    }
+
+    /** The last pose shared, to share only a change worth a packet. */
+    private float sharedLift = Float.NaN, sharedPitch, sharedRoll;
+
+    /**
+     * effects: gives the pose this side just computed to every other side: the server sets the
+     * synced data straight, a client tells the server, which sets it for all; only when it moved
+     * more than a hair since the last share
+     */
+    private void sharePose() {
+        float lift = (float) suspension.lift(), pitch = (float) suspension.pitch(), roll = (float) suspension.roll();
+        if (!Float.isNaN(sharedLift) && Math.abs(lift - sharedLift) < 0.005f && Math.abs(pitch - sharedPitch) < 0.003f && Math.abs(roll - sharedRoll) < 0.003f) {
+            return;
+        }
+        sharedLift = lift;
+        sharedPitch = pitch;
+        sharedRoll = roll;
+        if (level().isClientSide()) {
+            Controls.sharePose(this, lift, pitch, roll);
+        } else {
+            onPose(lift, pitch, roll);
+        }
+    }
+
+    /** effects: takes the pose the simulating side computed (a driver's client, or this server for its own) */
+    public void onPose(float lift, float pitch, float roll) {
+        entityData.set(DATA_LIFT, lift);
+        entityData.set(DATA_PITCH, pitch);
+        entityData.set(DATA_ROLL, roll);
+        if (!level().isClientSide()) {
+            suspension = new Suspension(lift, pitch, roll);
         }
     }
 
@@ -998,7 +1068,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (towedHere && lastFollowedPass != pass && tower.lastOwnPass == pass) {
             moveBehind(tower, pass);   // the tower ticked first: catch up now, and pose below at the new position
         }
-        boolean atTheWheel = tower == null && isControlledByLocalInstance();
+        // The wheel is this side's when the game says so on a client, and on the server whenever no
+        // player holds it: a player's own client drives, and the server only mirrors. (The game's own
+        // test asks the player, whose test double answers "local" everywhere.)
+        boolean atTheWheel = tower == null && (level().isClientSide() ? isControlledByLocalInstance() : !(getControllingPassenger() instanceof Player));
         if (atTheWheel && !wasAtTheWheel) {
             // Taking the wheel: drive on from where the world has this, not from where this copy was born.
             // A client boards a copy it may have seen for a single tick, or none, so there is no earlier
@@ -1045,13 +1118,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         if (towedHere) {
             if (lastFollowedPass == pass) {
-                if (!rideTowed(p, tower)) {
-                    rideTheGround(p);
-                }
+                poseTowed(p, tower);
             }
             // else: the tower ticks later this pass and moves and poses this body then
-        } else {
+        } else if (atTheWheel) {
             rideTheGround(p);
+            sharePose();
+        } else {
+            takeSharedPose();
         }
         // The trailer goes where this went, this very pass, wherever this is moved: the driver's client or the server.
         Vehicle trailer = trailer();

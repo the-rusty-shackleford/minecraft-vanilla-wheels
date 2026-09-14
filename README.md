@@ -79,7 +79,12 @@ cow and bystander. The living are run over instead (below).
 
 The driver's client drives (the boat rule), the server re-runs the same move and resets a
 client that disagrees by more than a quarter block, and every other client is told the
-speed, steer, drift and burn for its wheels, sounds and flames. Two things make the
+speed, steer, drift and burn for its wheels, sounds and flames -- and the pose. The tilt
+and lift are computed where the driving is, the driver's client (the server for a
+vehicle nobody drives), and shared whenever they move more than a hair; the server, the
+passengers' clients and the onlookers draw and seat with the shared numbers rather than
+computing their own, so every side agrees where a rider sits. A trailer's pose travels the
+same way from the client that drives its chain. Two things make the
 re-run agree: a copy that is not at the wheel keeps its model on the synced heading and
 speed, and seeds it again the tick control begins, so boarding drives on from where the
 vehicle points rather than snapping it to where that copy was born; and the server

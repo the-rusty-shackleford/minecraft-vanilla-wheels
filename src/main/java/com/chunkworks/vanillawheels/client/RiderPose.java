@@ -27,6 +27,13 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.event.CalculateDetachedCameraDistanceEvent;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.minecraft.client.Camera;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * Leans everyone aboard with the body, draws a rider whose entity is at
@@ -96,9 +103,48 @@ public final class RiderPose {
         }
     }
 
+    /**
+     * effects: puts the third-person camera back where it belongs behind a
+     * rider. The game clips the camera from the eye backwards against every
+     * block's visual shape, leaves included, and when the eye itself is in
+     * leaves -- a cage through a canopy -- the zoom collapses to nothing and
+     * the view is the back of the rider's head. This runs right after the
+     * game's setup, before the view matrix is built, and clips again from
+     * the eye through leaves, so the camera sits at the first real block
+     * behind, or at its full distance.
+     */
+    public static void onFov(ViewportEvent.ComputeFov event) {
+        Camera camera = event.getCamera();
+        if (!camera.isDetached() || !(camera.getEntity() instanceof LivingEntity rider) || !(rider.getVehicle() instanceof Vehicle v) || v.profile() == null) {
+            return;
+        }
+        float partial = (float) event.getPartialTick();
+        Vec3 eye = new Vec3(Mth.lerp(partial, rider.xo, rider.getX()), Mth.lerp(partial, rider.yo, rider.getY()) + rider.getEyeHeight(), Mth.lerp(partial, rider.zo, rider.getZ()));
+        Vec3 back = new Vec3(camera.getLookVector()).scale(-1.0);
+        float want = (CAMERA_BASE + CAMERA_PER_BLOCK * (float) v.profile().body().length()) * rider.getScale();
+        double zoom = want;
+        Level level = rider.level();
+        for (int i = 0; i < 8; i++) {
+            Vec3 from = eye.add((i & 1) * 0.2 - 0.1, ((i >> 1) & 1) * 0.2 - 0.1, ((i >> 2) & 1) * 0.2 - 0.1);
+            Vec3 to = from.add(back.scale(want));
+            BlockHitResult hit = BlockGetter.traverseBlocks(from, to, null, (ctx, pos) -> {
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir() || state.is(BlockTags.LEAVES)) {
+                    return null;
+                }
+                return state.getShape(level, pos).clip(from, to, pos);
+            }, ctx -> null);
+            if (hit != null) {
+                zoom = Math.min(zoom, hit.getLocation().distanceTo(eye));
+            }
+        }
+        camera.setPosition(eye.add(back.scale(zoom)));
+    }
+
     static void register(net.neoforged.bus.api.IEventBus bus) {
         bus.addListener(EventPriority.LOWEST, false, RenderLivingEvent.Pre.class, RiderPose::onPre);
         bus.addListener(EventPriority.HIGHEST, false, RenderLivingEvent.Post.class, RiderPose::onPost);
         bus.addListener(RiderPose::onCameraDistance);
+        bus.addListener(RiderPose::onFov);
     }
 }

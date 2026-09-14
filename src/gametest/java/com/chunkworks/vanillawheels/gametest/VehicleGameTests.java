@@ -269,9 +269,12 @@ public final class VehicleGameTests {
         helper.assertValueEqual(VanillaWheels.vehicleOf(held).orElse(null), BOX_CAR, "its vehicle");
         helper.runAtTickTime(5, () -> {
             List<ItemEntity> spilled = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0));
+            // Seen to fail once in a while under a full build's load with no apples found at all; the
+            // wider look is for the next time, to say where they went.
+            String wider = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(64.0)).stream().map(e -> e.getItem() + "@" + e.position()).toList().toString();
             int apples = spilled.stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
             int sticks = spilled.stream().filter(e -> e.getItem().is(Items.STICK)).mapToInt(e -> e.getItem().getCount()).sum();
-            helper.assertValueEqual(apples, 7, "the apples spilled");
+            helper.assertValueEqual(apples, 7, "the apples spilled (items within 64: " + wider + ")");
             helper.assertValueEqual(sticks, 3, "the sticks spilled");
             helper.succeed();
         });
@@ -354,6 +357,26 @@ public final class VehicleGameTests {
             helper.assertTrue(nose > wallX - 1.0, "and close to it, not a block short: nose " + nose + " wall " + wallX);
             helper.assertTrue(Math.abs(v.speed()) < 0.05, "stalled against it, not spinning its wheels: " + v.speed());
             helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void theServerSeatsARiderWithThePoseTheDriverShares(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 7.5, 7.5, true);
+        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        p.startRiding(v, true);
+        helper.runAtTickTime(5, () -> {
+            double level = v.getPassengerRidingPosition(p).y;
+            // The driver's client reports a nose-up, lifted pose; the server, which computes no pose for a
+            // driven vehicle, seats the rider with it from the next tick.
+            v.onPose(0.5f, (float) Math.toRadians(-20), 0.0f);
+            helper.runAtTickTime(8, () -> {
+                double lifted = v.getPassengerRidingPosition(p).y - level;
+                helper.assertTrue(lifted > 0.45, "the seat rose with the shared lift and the nose-up pose: " + lifted);
+                helper.assertTrue(Math.abs(v.suspension(1.0f).pitch() + Math.toRadians(20)) < 1e-4, "the server draws the shared pitch: " + v.suspension(1.0f).pitch());
+                helper.succeed();
+            });
         });
     }
 }

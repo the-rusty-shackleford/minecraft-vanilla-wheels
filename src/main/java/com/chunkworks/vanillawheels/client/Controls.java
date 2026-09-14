@@ -88,6 +88,11 @@ public final class Controls {
         }
     }
 
+    /** effects: tells the server the pose this client drew {@code vehicle} with */
+    public static void sharePose(Vehicle vehicle, float lift, float pitch, float roll) {
+        PacketDistributor.sendToServer(new Payloads.Pose(vehicle.getId(), lift, pitch, roll));
+    }
+
     /**
      * effects: the afterburner, on every client for every vehicle: flames out
      * of the tail every tick a boost burns, more and faster the harder it

@@ -39,7 +39,7 @@ public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "2";
+    private static final String VERSION = "3";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {
@@ -52,6 +52,26 @@ public final class Payloads {
                 ByteBufCodecs.BOOL, DriveState::drifting,
                 ByteBufCodecs.FLOAT, DriveState::burn,
                 DriveState::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /**
+     * The pose the driver's client drew a vehicle with this tick: its own, or a trailer's behind it.
+     * Everyone else -- the server, the passengers' clients, the onlookers -- draws and seats with
+     * these numbers rather than computing their own, so every side agrees where a rider sits.
+     */
+    public record Pose(int vehicle, float lift, float pitch, float roll) implements CustomPacketPayload {
+        public static final Type<Pose> TYPE = new Type<>(VanillaWheels.id("pose"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, Pose> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, Pose::vehicle,
+                ByteBufCodecs.FLOAT, Pose::lift,
+                ByteBufCodecs.FLOAT, Pose::pitch,
+                ByteBufCodecs.FLOAT, Pose::roll,
+                Pose::new);
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -91,6 +111,21 @@ public final class Payloads {
                 driven(context, payload.vehicle()).ifPresent(v -> v.setHorn(payload.held())));
         registrar.playToServer(Lights.TYPE, Lights.STREAM_CODEC, (payload, context) ->
                 driven(context, payload.vehicle()).ifPresent(Vehicle::cycleLights));
+        registrar.playToServer(Pose.TYPE, Pose.STREAM_CODEC, (payload, context) ->
+                towedOrDriven(context, payload.vehicle()).ifPresent(v -> v.onPose(payload.lift(), payload.pitch(), payload.roll())));
+    }
+
+    /** effects: returns the vehicle {@code id} names if the sending player drives it or the head of its tow chain */
+    private static java.util.Optional<Vehicle> towedOrDriven(IPayloadContext context, int id) {
+        Player player = context.player();
+        if (!(player.level().getEntity(id) instanceof Vehicle vehicle)) {
+            return java.util.Optional.empty();
+        }
+        Vehicle head = vehicle;
+        for (int i = 0; i < 8 && head.tower() != null; i++) {
+            head = head.tower();
+        }
+        return head.getControllingPassenger() == player ? java.util.Optional.of(vehicle) : java.util.Optional.empty();
     }
 
     /** effects: returns the vehicle {@code id} names if the sending player is driving it; empty otherwise, so a stray packet does nothing */

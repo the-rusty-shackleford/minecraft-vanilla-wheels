@@ -161,7 +161,42 @@ def lamp_icon(lit):
     return px
 
 
-ICONS = {"wheel": wheel_icon, "engine": engine_icon, "wrench": wrench_icon, "mechanic_lift": lift_icon}
+def gas_can_icon(full):
+    """A red jerrycan: a body with a dark handle and cap; empty, the body is hollow and dull."""
+    px, put = _canvas()
+    red, dark, light = (200, 40, 40), (120, 20, 20), (235, 90, 80)
+    if not full:
+        red, dark, light = (150, 60, 55), (95, 35, 30), (175, 95, 90)
+    for y in range(5, 15):
+        for x in range(3, 13):
+            put(x, y, red)
+    for x in range(3, 13):
+        put(x, 5, light)
+        put(x, 14, dark)
+    for y in range(5, 15):
+        put(3, y, light)
+        put(12, y, dark)
+    # the raised X pressed into a jerrycan's side
+    for i in range(1, 8):
+        put(4 + i, 6 + i, dark if full else (120, 50, 45))
+        put(12 - i, 6 + i, dark if full else (120, 50, 45))
+    # the handle and the cap
+    for x in range(5, 11):
+        put(x, 3, RUBBER)
+    put(5, 4, RUBBER)
+    put(10, 4, RUBBER)
+    put(12, 3, RUBBER)
+    put(12, 4, RUBBER)
+    put(13, 4, RUBBER)
+    if not full:
+        for y in range(8, 12):
+            for x in range(6, 10):
+                put(x, y, (110, 45, 40))
+    return px
+
+
+ICONS = {"wheel": wheel_icon, "engine": engine_icon, "wrench": wrench_icon, "mechanic_lift": lift_icon,
+         "gas_can": lambda: gas_can_icon(True), "empty_gas_can": lambda: gas_can_icon(False)}
 GUI_ICONS = {"lamp_off": lambda: lamp_icon(False), "lamp_on": lambda: lamp_icon(True)}
 
 
@@ -495,8 +530,8 @@ BOX_TRAILER_PROFILE = {
     "mass": 0.8,
     "hitch": {"front": [0, 8, 34]},
     "cargo": {"adults": 2, "young": 4, "slots": [[-4, 8, 2], [4, 8, 2]]},
-    "doors": [{"part": {"group": "door_left"}, "hinge": [10, 15, -20.5], "axis": [0, 1, 0], "open": -1.9},
-              {"part": {"group": "door_right"}, "hinge": [-10, 15, -20.5], "axis": [0, 1, 0], "open": 1.9}],
+    "doors": [{"part": {"group": "door_left"}, "hinge": [10, 15, -20.5], "axis": [0, 1, 0], "open": -1.9, "from": [0.5, 8, -21], "to": [10, 22, -20]},
+              {"part": {"group": "door_right"}, "hinge": [-10, 15, -20.5], "axis": [0, 1, 0], "open": 1.9, "from": [-10, 8, -21], "to": [-0.5, 22, -20]}],
     # A factory colour, so the tow gametests can check that an undyed trailer wears it.
     "paint": {"part": {"material": "body"}, "default": "white", "factory": "#c8a060"},
 }

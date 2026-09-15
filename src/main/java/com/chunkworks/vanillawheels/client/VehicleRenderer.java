@@ -176,6 +176,10 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
             if (door.painted().quadCount() > 0) {
                 MeshDrawer.draw(door.painted(), poseStack.last(), solid, paintOf(vehicle, p), packedLight, overlay, MeshDrawer.Shading.LIT);
             }
+            if (door.lamps().quadCount() > 0) {
+                MeshDrawer.draw(door.lamps(), poseStack.last(), solid, MeshDrawer.WHITE, lit ? LightTexture.FULL_BRIGHT : packedLight, overlay,
+                        lit ? MeshDrawer.Shading.LAMP : MeshDrawer.Shading.LIT);
+            }
             poseStack.popPose();
         }
 

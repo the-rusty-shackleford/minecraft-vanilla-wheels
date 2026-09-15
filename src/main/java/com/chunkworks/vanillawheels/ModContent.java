@@ -99,6 +99,11 @@ public final class ModContent {
     public static final DeferredItem<Item> ENGINE = ITEMS.registerSimpleItem("engine");
     /** Takes a vehicle back into the hand. */
     public static final DeferredItem<Item> WRENCH = ITEMS.registerItem("wrench", WrenchItem::new, new Item.Properties().stacksTo(1));
+    /** A tank's worth of fuel: hold use at a vehicle to pour. Full when crafted. */
+    public static final DeferredItem<GasCanItem> GAS_CAN = ITEMS.registerItem("gas_can",
+            props -> new GasCanItem(props.component(FUEL.get(), GasCanItem.CAPACITY)), new Item.Properties().stacksTo(1));
+    /** The can poured out: coal fills it again. */
+    public static final DeferredItem<Item> EMPTY_GAS_CAN = ITEMS.registerSimpleItem("empty_gas_can", new Item.Properties().stacksTo(16));
 
     /** The Mechanic Lift's front-centre block, with the block entity; the item places the whole lift through it. */
     public static final DeferredBlock<LiftControllerBlock> LIFT_CONTROLLER = BLOCKS.registerBlock("mechanic_lift", LiftControllerBlock::new, liftProperties());
@@ -163,6 +168,8 @@ public final class ModContent {
             event.accept(ENGINE);
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(WRENCH);
+            event.accept(GAS_CAN);
+            event.accept(EMPTY_GAS_CAN);
         } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(LIFT_ITEM);
         }

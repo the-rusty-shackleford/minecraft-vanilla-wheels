@@ -54,11 +54,11 @@ public final class Controls {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (player == null || vehicle.getControllingPassenger() != player) {
-            return Input.coasting(vehicle.onGround(), vehicle.hasFuel());
+            return Input.coasting(vehicle.grounded(), vehicle.hasFuel());
         }
         int throttle = player.input.up ? 1 : player.input.down ? -1 : 0;
         int steer = player.input.right ? 1 : player.input.left ? -1 : 0;
-        return new Input(throttle, steer, Keys.driftDown(), vehicle.onGround(), vehicle.hasFuel());
+        return new Input(throttle, steer, Keys.driftDown(), vehicle.grounded(), vehicle.hasFuel());
     }
 
     /** effects: sends the server what changed, and shows the driver the effects */

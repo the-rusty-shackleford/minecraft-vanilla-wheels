@@ -83,7 +83,10 @@ walls a vehicle's move meets are blocks and other vehicles (never its own traile
 tower): a boat stops dead at anything pushable, and a car that did would stall at every
 cow and bystander. The living are run over instead (below).
 
-The driver's client drives (the boat rule), the server re-runs the same move and resets a
+A body within its climb of the ground is on it, for the wheel and for the step: at speed
+over rough ground the box is off the ground a few ticks at a time, and a riser met an inch
+in the air would be a wall and the wheel dead over every drop; a fall from higher is a
+fall. The driver's client drives (the boat rule), the server re-runs the same move and resets a
 client that disagrees by more than a quarter block, and every other client is told the
 speed, steer, drift and burn for its wheels, sounds and flames -- and the pose. The tilt
 and lift are computed where the driving is, the driver's client (the server for a
@@ -101,9 +104,13 @@ at speed had the server refuse every tick and snap the vehicle back.
 
 ## Fuel, storage, records, the wrench
 
-- **Fuel**: right-click with anything a furnace burns (coal, planks, a lava bucket) and it
-  goes in the tank, whole, if it fits; the action bar shows the level. The engine burns
-  one tick of fuel per tick of throttle; idling and coasting burn nothing. An empty tank
+- **Fuel**: the gas can. An empty can is eight iron ingots in a can's shape (a handle top
+  left over a square body); four coal or charcoal with it fill it, a tank's worth (24 000
+  ticks, twenty minutes of throttle). Hold right-click at a vehicle with a can and it
+  pours, two hundred ticks a tick, a full tank in six seconds, until the can is empty, the
+  tank is full, or you let go; the action bar shows the level, the bar under the can what
+  is left, and a poured-out can is an empty can again. Coal itself no longer fuels. The
+  engine burns one tick of fuel per tick of throttle; idling and coasting burn nothing. An empty tank
   refuses the throttle -- unless the driver is in creative, who needs nothing consumable
   and drives on an empty tank burning none, as creative spends no arrows; the gauge still
   reads the tank. `fuelRequired = false` in the config turns all of this off for everyone.
@@ -171,7 +178,8 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "radio": {"at": [0, 17, 21]},
   "hitch": {"rear": [0, 4, -34]},                     // a trailer: {"front": [0, 6, 42]}
   "cargo": {"adults": 4, "young": 8, "slots": [[-8, 3, 5], [8, 3, 5], [-8, 3, -12], [8, 3, -12]]},   // a trailer
-  "doors": [{"part": {"group": "left_door"}, "hinge": [-15, 20, -40], "axis": [0, 1, 0], "open": -1.9}],   // radians
+  "doors": [{"part": {"group": "left_door"}, "hinge": [-15, 20, -40], "axis": [0, 1, 0], "open": -1.9,   // radians
+             "from": [-15, 6, -41], "to": [0, 34, -39]}],   // the door's box shut (optional): a crouching click anywhere on it, shut or swung, toggles; without it, within a block and a half of the hinge
   "paint": {"part": {"group": "body"}, "default": "light_blue", "factory": "#58acff"},   // factory: the exact colour an undyed vehicle wears (optional); a door's painted part takes the dye too
   "glass": {"group": "windshield"},
   "cockpit": {"group": ["cage", "windshield_frame", "mirrors"]},   // not drawn from a rider's own eyes (optional)
@@ -228,8 +236,8 @@ A trailer with `cargo` carries animals: crouch and right-click a door to open it
 right-click the trailer holding a lead and every animal on your leads within ten blocks
 boards, nearest to you first, while there is room -- an adult takes a whole share, a
 young one a half, so room for four adults is room for eight calves or two cows and four
-calves -- and each lead comes back to you. Crouch and right-click a door, empty-handed, to shut or open it, load
-or no load. Crouch and right-click the trailer holding a lead with the doors open and
+calves -- and each lead comes back to you. Crouch and right-click a door, empty-handed,
+anywhere on it, to shut or open it, load or no load. Crouch and right-click the trailer holding a lead with the doors open and
 animals aboard to let them out behind. Animals never board through shut doors. `doors`
 swing about their hinges when open. Loaded animals lean with the floor as riders do.
 
@@ -293,7 +301,9 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 PATH="$JAVA_HOME/bin:$PATH"
 The gametests drive the box car on a runway: it reaches speed and coasts to a stop,
 climbs a two-block step and settles level on top, slides along a wall met at a slant
 without stopping, hurts and shoves a cow at speed and
-nothing at a walk, takes coal and refuses a coal block and a throttle with an empty tank,
+nothing at a walk, pours from a gas can held at it until the can is an empty can, fuels
+nothing from coal and refuses a throttle with an empty tank, crafts the empty can from
+iron and fills it with four coals,
 keeps its chest across a wrench and a placement, drives a creative driver on an empty tank
 and burns for a survival one, takes and ejects a disc, cycles its lamps
 and lights them by itself at night, and its profile round-trips through the codec; a

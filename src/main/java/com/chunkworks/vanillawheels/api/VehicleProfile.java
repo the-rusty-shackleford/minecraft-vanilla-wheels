@@ -426,17 +426,31 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         }
     }
 
-    /** A part that swings open: about {@code axis} through {@code hinge}, by {@code open} radians. */
-    public record Door(PartSelector part, Vec hinge, Vec axis, double open) {
+    /**
+     * A part that swings open: about {@code axis} through {@code hinge}, by {@code open} radians.
+     * {@code from} and {@code to}, when given, bound the door shut (units, the mesh's frame): a
+     * crouching click anywhere on the door, shut or swung, toggles it; without them, only within a
+     * block and a half of the hinge.
+     */
+    public record Door(PartSelector part, Vec hinge, Vec axis, double open, Optional<Vec> from, Optional<Vec> to) {
         public static final Codec<Door> CODEC = RecordCodecBuilder.create(i -> i.group(
                 PartSelector.CODEC.fieldOf("part").forGetter(Door::part),
                 VEC.fieldOf("hinge").forGetter(Door::hinge),
                 VEC.optionalFieldOf("axis", Vec.Y).forGetter(Door::axis),
-                Codec.DOUBLE.fieldOf("open").forGetter(Door::open)
+                Codec.DOUBLE.fieldOf("open").forGetter(Door::open),
+                VEC.optionalFieldOf("from").forGetter(Door::from),
+                VEC.optionalFieldOf("to").forGetter(Door::to)
         ).apply(i, Door::new));
 
         public Door {
             axis = axis.normalized();
+            if (from.isPresent() != to.isPresent()) {
+                throw new IllegalArgumentException("a door's box has both from and to, or neither");
+            }
+        }
+
+        public Door(PartSelector part, Vec hinge, Vec axis, double open) {
+            this(part, hinge, axis, open, Optional.empty(), Optional.empty());
         }
     }
 

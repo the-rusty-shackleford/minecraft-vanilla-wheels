@@ -75,6 +75,9 @@ public final class VehicleItemRenderer extends BlockEntityWithoutLevelRenderer {
         }
         for (Appearance.Hinge door : a.doors) {
             MeshDrawer.draw(door.mesh(), poseStack.last(), solid, MeshDrawer.WHITE, light, OverlayTexture.NO_OVERLAY, MeshDrawer.Shading.LIT);
+            if (door.lamps().quadCount() > 0) {
+                MeshDrawer.draw(door.lamps(), poseStack.last(), solid, MeshDrawer.WHITE, light, OverlayTexture.NO_OVERLAY, MeshDrawer.Shading.LIT);
+            }
         }
         if (!chassis) {
             for (Appearance.WheelSlot slot : a.wheels) {

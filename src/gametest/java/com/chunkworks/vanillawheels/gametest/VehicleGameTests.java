@@ -17,6 +17,7 @@
  */
 package com.chunkworks.vanillawheels.gametest;
 
+import com.chunkworks.vanillawheels.GasCanItem;
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.VanillaWheelsMod;
 import com.chunkworks.vanillawheels.Vehicle;
@@ -49,7 +50,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * a profile makes a sized, seated vehicle; the server drives it by a
  * scripted input, forward to a distance and to a stop; it climbs a
  * two-block step and ends level on top; it runs a cow over at speed and
- * not at a walk; a coal fills the tank and an empty tank refuses the
+ * not at a walk; a gas can pours while held and coal no longer fuels, and an empty tank refuses the
  * throttle; the chest survives a wrench and a placing; a disc goes in and
  * out; the headlights cycle and light up at night; the profile round-trips
  * through its codec.
@@ -83,12 +84,7 @@ public final class VehicleGameTests {
         Vehicle v = Vehicle.create(helper.getLevel(), BOX_CAR, at, -90.0f);
         helper.assertTrue(v != null, "the box car profile is registered");
         if (fuel) {
-            ItemStack coals = new ItemStack(Items.COAL, 5);
-            Player p = helper.makeMockPlayer(GameType.SURVIVAL);
-            p.setItemInHand(InteractionHand.MAIN_HAND, coals);
-            for (int i = 0; i < 5; i++) {
-                v.interact(p, InteractionHand.MAIN_HAND);
-            }
+            v.setFuel(5 * 1600);   // five coals' worth, as the old refuel click gave
         }
         helper.getLevel().addFreshEntity(v);
         return v;
@@ -232,28 +228,71 @@ public final class VehicleGameTests {
         });
     }
 
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public void anEmptyCanCraftsFromIronAndFillsWithFourCoals(GameTestHelper helper) {
+        net.minecraft.core.NonNullList<ItemStack> grid = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
+        for (int i : new int[] {0, 1, 3, 4, 5, 6, 7, 8}) {   // the handle top left, the body under it
+            grid.set(i, new ItemStack(Items.IRON_INGOT));
+        }
+        var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, grid);
+        var recipe = helper.getLevel().getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel());
+        helper.assertTrue(recipe.isPresent(), "eight iron ingots in a can's shape craft something");
+        ItemStack empty = recipe.get().value().assemble(input, helper.getLevel().registryAccess());
+        helper.assertTrue(empty.is(ModContent.EMPTY_GAS_CAN.get()), "an empty gas can: " + empty);
+        grid = net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
+        grid.set(0, empty);
+        grid.set(1, new ItemStack(Items.COAL));
+        grid.set(2, new ItemStack(Items.CHARCOAL));
+        grid.set(3, new ItemStack(Items.COAL));
+        grid.set(4, new ItemStack(Items.COAL));
+        input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, grid);
+        recipe = helper.getLevel().getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel());
+        helper.assertTrue(recipe.isPresent(), "an empty can and four coals craft something");
+        ItemStack full = recipe.get().value().assemble(input, helper.getLevel().registryAccess());
+        helper.assertTrue(full.is(ModContent.GAS_CAN.get()), "a gas can: " + full);
+        helper.assertValueEqual(GasCanItem.fuel(full), GasCanItem.CAPACITY, "full");
+        helper.succeed();
+    }
+
     @GameTest(template = "runway", timeoutTicks = 100)
-    public void aCoalFillsTheTankAndAnEmptyTankRefusesTheThrottle(GameTestHelper helper) {
+    public void aGasCanPoursWhileHeldAndCoalNoLongerFuels(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 4.5, 7.5, false);
         helper.assertTrue(!v.tank().hasFuel(), "born empty");
         v.setScriptedInput(GAS);
         helper.runAtTickTime(20, () -> {
             helper.assertValueEqual(v.speed(), 0.0f, "no fuel, no motion");
-            Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+            // Coal is only coal now: a click with it does not fuel (it seats, as any item does).
+            Player p = riderAt(helper, v);
             p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL, 2));
             v.interact(p, InteractionHand.MAIN_HAND);
-            helper.assertValueEqual(v.tank().ticks(), 1600, "one coal's burn in the tank");
-            helper.assertValueEqual(p.getItemInHand(InteractionHand.MAIN_HAND).getCount(), 1, "one coal spent");
-            helper.assertTrue(Math.abs(v.fuelFraction() - 1600.0 / 24000.0) < 1e-6, "the gauge reads it: " + v.fuelFraction());
-            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LAVA_BUCKET));
-            v.interact(p, InteractionHand.MAIN_HAND);
-            helper.assertValueEqual(v.tank().ticks(), 1600 + 20000, "a lava bucket fits");
-            helper.assertTrue(p.getItemInHand(InteractionHand.MAIN_HAND).is(Items.BUCKET), "and leaves its bucket");
-            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.COAL_BLOCK));
-            v.interact(p, InteractionHand.MAIN_HAND);
-            helper.assertValueEqual(v.tank().ticks(), 21600, "a coal block (16000) does not fit and is refused");
-            helper.assertValueEqual(p.getItemInHand(InteractionHand.MAIN_HAND).getCount(), 1, "the block stays in the hand");
+            helper.assertValueEqual(v.tank().ticks(), 0, "coal in hand fuels nothing");
+            helper.assertValueEqual(p.getItemInHand(InteractionHand.MAIN_HAND).getCount(), 2, "and none is spent");
+            p.stopRiding();
+            // A gas can, full when made, held at the car from a block off its nose: the click passes
+            // to the can, the can starts pouring, and pours a tank's worth over the ticks it is held.
+            ItemStack can = new ItemStack(ModContent.GAS_CAN.get());
+            helper.assertValueEqual(GasCanItem.fuel(can), GasCanItem.CAPACITY, "a new can is full");
+            p.setItemInHand(InteractionHand.MAIN_HAND, can);
+            Vec3 nose = v.position().add(v.rotate(new com.chunkworks.vanillawheels.domain.Vec(0, 0.5, v.profile().body().length() / 2.0 + 1.0)));
+            p.setPos(nose.x, nose.y - p.getEyeHeight() + 0.5, nose.z);
+            p.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, v.position().add(0, 0.5, 0));
+            helper.assertTrue(GasCanItem.aimedAt(p) == v, "the can is aimed at the car: eye " + p.getEyePosition() + " view " + p.getViewVector(1.0f) + " car " + v.getBoundingBox() + " at " + v.position());
+            helper.assertTrue(!v.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "the car passes the can's click on");
+            helper.assertTrue(can.getItem().use(helper.getLevel(), p, InteractionHand.MAIN_HAND).getResult().consumesAction(), "the can starts pouring");
+            helper.assertTrue(p.isUsingItem(), "held");
+            for (int i = 0; i < 20; i++) {
+                can.getItem().onUseTick(helper.getLevel(), p, can, 72000 - i);
+            }
+            helper.assertValueEqual(v.tank().ticks(), 20 * GasCanItem.POUR_PER_TICK, "twenty ticks held pour twenty pours");
+            helper.assertValueEqual(GasCanItem.fuel(can), GasCanItem.CAPACITY - 20 * GasCanItem.POUR_PER_TICK, "out of the can");
+            helper.assertTrue(Math.abs(v.fuelFraction() - 20.0 * GasCanItem.POUR_PER_TICK / 24000.0) < 1e-6, "the gauge reads it: " + v.fuelFraction());
+            for (int i = 20; i < 200 && p.isUsingItem(); i++) {
+                can.getItem().onUseTick(helper.getLevel(), p, can, 72000 - i);
+            }
+            helper.assertValueEqual(v.tank().ticks(), 24000, "the tank is full");
+            helper.assertTrue(p.getItemInHand(InteractionHand.MAIN_HAND).is(ModContent.EMPTY_GAS_CAN.get()), "the can, poured out, is an empty can: " + p.getItemInHand(InteractionHand.MAIN_HAND));
+            helper.assertTrue(!p.isUsingItem(), "and the pour has stopped");
         });
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(v.speed() > 0.2, "fuelled, it drives: " + v.speed());

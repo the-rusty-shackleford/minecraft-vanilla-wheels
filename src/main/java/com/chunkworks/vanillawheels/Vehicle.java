@@ -24,6 +24,7 @@ import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.RayBox;
+import com.chunkworks.vanillawheels.domain.Rotation;
 import com.chunkworks.vanillawheels.domain.Suspension;
 import com.chunkworks.vanillawheels.domain.Terrain;
 import com.chunkworks.vanillawheels.domain.Cargo;
@@ -1185,8 +1186,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         wasAtTheWheel = atTheWheel;
         if (atTheWheel) {
             Input in = level().isClientSide() ? Controls.input(this)
-                    : scripted != null ? new Input(scripted.throttle(), scripted.steer(), scripted.drift(), onGround(), hasFuel())
-                    : Input.coasting(onGround(), hasFuel());
+                    : scripted != null ? new Input(scripted.throttle(), scripted.steer(), scripted.drift(), grounded(), hasFuel())
+                    : Input.coasting(grounded(), hasFuel());
             if (!level().isClientSide()) {
                 throttle = in.throttle();
             }
@@ -1480,15 +1481,40 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * Without this, a ramp of half steps at speed has the server refuse the
      * client's move every tick and snap the vehicle back.
      */
+    /**
+     * effects: returns whether this stands on the ground or hangs within its climb of it: a
+     * bump's hop or a riser's drop at speed, not a fall. At speed over rough ground the box is
+     * off the ground a few ticks at a time, and the game neither steps a body up while it is
+     * airborne nor did the drive steer one: a riser met an inch in the air was a wall, and the
+     * wheel went dead over every drop (the terrain playtest: two to four stalls at the diagonal
+     * ridges, a third of the weave's steering ticks with no turn). The climb is the distance:
+     * what the wheels would reach, and a drop off a riser is at most that.
+     */
+    public boolean grounded() {
+        return onGround() || !level().noCollision(this, getBoundingBox().move(0.0, -Math.max(0.5, maxUpStep()), 0.0));
+    }
+
     @Override
     public void move(MoverType type, Vec3 delta) {
-        if (type == MoverType.PLAYER && !level().isClientSide() && !onGround()
-                && !level().noCollision(this, getBoundingBox().move(0.0, -0.05, 0.0))) {
+        // Stood on the ground for the move when it is near enough: the game then steps it up a
+        // riser as it would a body on the ground, and takes the ground back off after the move
+        // if nothing is under it. The server's re-run of a driver's move needs this too (see
+        // D-0007): the reported rise leaves its copy airborne after every step.
+        if (!onGround() && grounded()) {
             setOnGround(true);
         }
         Vec3 clamped = footprintClamp(delta);
         double x0 = getX(), z0 = getZ();
+        // A driver's reported move that rises from the ground by no more than the climb is a step,
+        // and the game flags a body that stepped as on the ground -- it was moving down when it
+        // stepped -- even when the step put it over the riser's edge with nothing yet under it. The
+        // server's re-run carries the rise as an upward move and would leave its copy airborne
+        // there; then the driver's next step is a wall to it. It takes the driver's flag.
+        boolean stepped = type == MoverType.PLAYER && !level().isClientSide() && onGround() && delta.y > 1.0E-4 && delta.y <= maxUpStep() + 1.0E-3;
         super.move(type, clamped);
+        if (stepped) {
+            setOnGround(true);
+        }
         double asked = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         double got = Math.sqrt((getX() - x0) * (getX() - x0) + (getZ() - z0) * (getZ() - z0));
         moveKept = asked < 1.0E-6 ? 1.0 : Mth.clamp(got / asked, 0.0, 1.0);
@@ -1835,7 +1861,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             }
             // A door, empty-handed: toggles it, and only that. Unloading is its own gesture (a lead in
             // hand, below): when the door click also unloaded, open doors could never be shut on a load.
-            if (held.isEmpty() && nearADoor(p, hit)) {
+            if (held.isEmpty() && nearADoor(p, hit, player.getEyePosition())) {
                 if (!level().isClientSide()) {
                     toggleDoors();
                 }
@@ -1900,26 +1926,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             }
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
-        if (p.fuel().isPresent() && !held.isEmpty()) {
-            int burn = held.getBurnTime(null);
-            if (burn > 0) {
-                if (!level().isClientSide()) {
-                    Tank tank = tank();
-                    if (tank.accepts(burn)) {
-                        entityData.set(DATA_FUEL, tank.fill(burn).ticks());
-                        ItemStack remainder = held.getCraftingRemainingItem();
-                        held.consume(1, player);
-                        if (!remainder.isEmpty()) {
-                            player.getInventory().placeItemBackInInventory(remainder);
-                        }
-                        level().playSound(null, getX(), getY(), getZ(), ModContent.FUEL_POUR.get(), SoundSource.PLAYERS, 0.8f, 1.0f);
-                        player.displayClientMessage(Component.translatable("vanillawheels.fuel", Math.round(tank().fraction() * 100)), true);
-                    } else {
-                        player.displayClientMessage(Component.translatable("vanillawheels.tank_full"), true);
-                    }
-                }
-                return InteractionResult.sidedSuccess(level().isClientSide());
-            }
+        // A gas can in hand: the click is the can's, not a seat's -- passed on, the game starts the
+        // can's use and it pours while held (GasCanItem). Coal in hand is only coal now.
+        if (held.is(ModContent.GAS_CAN.get()) || held.is(ModContent.EMPTY_GAS_CAN.get())) {
+            return InteractionResult.PASS;
         }
         if (!level().isClientSide()) {
             if (canAddPassenger(player)) {
@@ -1931,10 +1941,37 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return canAddPassenger(player) ? InteractionResult.SUCCESS : InteractionResult.PASS;
     }
 
-    /** effects: returns whether {@code hit} is within a block and a half of any door's hinge */
-    private boolean nearADoor(VehicleProfile p, Vec3 hit) {
-        for (VehicleProfile.Door d : p.doors()) {
-            if (inRegion(p, d.hinge(), 1.5, hit)) {
+    /**
+     * effects: returns whether the click at {@code hit} (relative to the body, the world's frame),
+     * seen from {@code eye}, is on a door: within a block and a half of its hinge, or, for a door
+     * with a box, anywhere on the door where it stands now, shut or swung -- the box's corners
+     * turned about the hinge by the swing, bounded, and met by the click's line within
+     * {@link #CHEST_REACH} of the hit, since the hit lands on the hull and a swung door stands
+     * off it (Rusty: "anywhere on the door, not just the hinges")
+     */
+    private boolean nearADoor(VehicleProfile p, Vec3 hit, Vec3 eye) {
+        Vec3 ray = hit.add(position()).subtract(eye);
+        Vec3 dir = ray.lengthSqr() < 1.0e-6 ? new Vec3(0.0, -1.0, 0.0) : ray.normalize();
+        float body = getYRot() * Mth.DEG_TO_RAD;
+        Vec3 o = hit.yRot(body), d = dir.yRot(body);   // into the body's frame
+        for (VehicleProfile.Door door : p.doors()) {
+            if (inRegion(p, door.hinge(), 1.5, hit)) {
+                return true;
+            }
+            if (door.from().isEmpty()) {
+                continue;
+            }
+            Vec from = door.from().get(), to = door.to().get();
+            Rotation swing = new Rotation(door.hinge(), door.axis(), doorsOpen() ? door.open() : 0.0).mirrored(p.toLocal());
+            Vec lo = null, hi = null;
+            for (int c = 0; c < 8; c++) {
+                Vec corner = new Vec((c & 1) == 0 ? from.x() : to.x(), (c & 2) == 0 ? from.y() : to.y(), (c & 4) == 0 ? from.z() : to.z());
+                Vec turned = swing.apply(p.toLocal().apply(corner)).times(p.scale());
+                lo = lo == null ? turned : new Vec(Math.min(lo.x(), turned.x()), Math.min(lo.y(), turned.y()), Math.min(lo.z(), turned.z()));
+                hi = hi == null ? turned : new Vec(Math.max(hi.x(), turned.x()), Math.max(hi.y(), turned.y()), Math.max(hi.z(), turned.z()));
+            }
+            double t = RayBox.enter(new Vec(o.x, o.y, o.z), new Vec(d.x, d.y, d.z), lo.minus(new Vec(0.1, 0.1, 0.1)), hi.plus(new Vec(0.1, 0.1, 0.1)));
+            if (t >= 0.0 && t <= CHEST_REACH) {
                 return true;
             }
         }

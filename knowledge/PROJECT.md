@@ -39,7 +39,7 @@ renderer and screen).
 ## How it is verified
 
 `./gradlew check`: 69 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-six gametests on a headless server driving a scripted box car, towing
+fixtures); twenty-eight gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -121,3 +121,13 @@ Creative needs nothing (Rusty, 2026-09-14, a rule for every mod): a driver with 
 infinite materials drives on an empty tank and burns none (`Vehicle.fuelRequired`); the
 Ranged Weapons Mod already shoots without rounds in creative and Dynamite's `consume`
 spends nothing there, so the car was the one holdout.
+
+2026-09-14, Rusty's four notes: fuel is the gas can (`GasCanItem`: an empty can of eight
+iron, four coals fill it to a tank's worth, hold right-click at a vehicle to pour, the empty
+can comes back; coal alone fuels nothing), a door's optional box (`Door.from/to`) so a
+crouching click anywhere on the door toggles it (the trailer's, the Trailblazer's, the
+pickup's tailgate carry one), a door's own lens part glowing with the tower's lights (the
+trailer's rear reflectors ride on its doors), and the harnesses launch silent. Protocol
+additions, so 1.6.0. And the road's texture (D-0008 addendum): a body within its climb of
+the ground is grounded for the wheel and the step, and the server keeps the driver's
+ground flag on a reported step; the rugged playtest lane runs stall-free at top speed.

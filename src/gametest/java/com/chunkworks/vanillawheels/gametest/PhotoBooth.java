@@ -105,6 +105,7 @@ public final class PhotoBooth {
     private static final double Z = 0.5;
     private static final double AHEAD = 6.0;
 
+    private static boolean muted = false;
     private static Phase phase = Phase.TITLE;
     private static int tick = 0;
     private static List<Step> steps;
@@ -119,6 +120,11 @@ public final class PhotoBooth {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
+        if (!muted) {
+            // Silent from the first tick, before the title music: Rusty listens to music while these run.
+            mc.options.getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.MASTER).set(0.0);
+            muted = true;
+        }
         switch (phase) {
             case TITLE -> {
                 if (mc.screen instanceof TitleScreen && mc.getOverlay() == null) {

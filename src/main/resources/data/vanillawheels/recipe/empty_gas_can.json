@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "II ",
+    "III",
+    "III"
+  ],
+  "key": {
+    "I": {
+      "tag": "c:ingots/iron"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "vanillawheels:empty_gas_can"
+  }
+}

@@ -1388,7 +1388,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** The server's per-tick duties: fuel, lights, the horn, running things over. */
     private void serverTick(VehicleProfile p) {
-        if (throttle != 0 && (getControllingPassenger() != null || scripted != null) && WheelsConfig.FUEL_REQUIRED.get()) {
+        if (throttle != 0 && (getControllingPassenger() != null || scripted != null) && fuelRequired()) {
             Tank tank = tank().burn(1);
             entityData.set(DATA_FUEL, tank.ticks());
         }
@@ -1773,9 +1773,19 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         entityData.set(DATA_FUEL, Math.max(0, Math.min(tank().capacity(), ticks)));
     }
 
-    /** effects: returns whether the engine may run: fuel in the tank, or fuel not required */
+    /**
+     * effects: returns whether fuel gates the engine: the config requires it and the driver is not
+     * in creative. In creative nothing consumable is required (Rusty's rule for every mod, as the
+     * game's own creative spends no arrows): the engine runs on an empty tank and burns nothing.
+     * The game's predicate, so a spectator or a creative-like mode counts as the game says.
+     */
+    public boolean fuelRequired() {
+        return WheelsConfig.FUEL_REQUIRED.get() && !(getControllingPassenger() instanceof Player driver && driver.hasInfiniteMaterials());
+    }
+
+    /** effects: returns whether the engine may run: fuel in the tank, or fuel not required ({@link #fuelRequired}) */
     public boolean hasFuel() {
-        return !WheelsConfig.FUEL_REQUIRED.get() || tank().hasFuel();
+        return !fuelRequired() || tank().hasFuel();
     }
 
     /** effects: returns how full the tank is for the gauge, 1 when fuel is not required */

@@ -104,7 +104,9 @@ at speed had the server refuse every tick and snap the vehicle back.
 - **Fuel**: right-click with anything a furnace burns (coal, planks, a lava bucket) and it
   goes in the tank, whole, if it fits; the action bar shows the level. The engine burns
   one tick of fuel per tick of throttle; idling and coasting burn nothing. An empty tank
-  refuses the throttle. `fuelRequired = false` in the config turns all of this off.
+  refuses the throttle -- unless the driver is in creative, who needs nothing consumable
+  and drives on an empty tank burning none, as creative spends no arrows; the gauge still
+  reads the tank. `fuelRequired = false` in the config turns all of this off for everyone.
 - **Chests**: a profile's `storage.chests` are the game's own double chests, drawn where
   and at the size the profile says, each its own inventory of its own rows. Right-click a
   chest to open it, crouching or not, as a chest block -- aim at it from anywhere: the
@@ -292,7 +294,8 @@ The gametests drive the box car on a runway: it reaches speed and coasts to a st
 climbs a two-block step and settles level on top, slides along a wall met at a slant
 without stopping, hurts and shoves a cow at speed and
 nothing at a walk, takes coal and refuses a coal block and a throttle with an empty tank,
-keeps its chest across a wrench and a placement, takes and ejects a disc, cycles its lamps
+keeps its chest across a wrench and a placement, drives a creative driver on an empty tank
+and burns for a survival one, takes and ejects a disc, cycles its lamps
 and lights them by itself at night, and its profile round-trips through the codec; a
 lift is placed through its item facing each way and refused over a blocked cell, a hole
 and a cow, broken from any block for one drop, worked through its real menu by a mock

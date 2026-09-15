@@ -39,7 +39,7 @@ renderer and screen).
 ## How it is verified
 
 `./gradlew check`: 69 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-five gametests on a headless server driving a scripted box car, towing
+fixtures); twenty-six gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -116,3 +116,8 @@ across a meadow), a chest opens along the click's line from outside (`RayBox`), 
 footprint's wall rule walks the ground out to each point (hillsides of one-block risers
 climb; two Trailblazer gametests), the clamp slides along a slanted wall and the stall is
 proportional (`Drive.slowed`).
+
+Creative needs nothing (Rusty, 2026-09-14, a rule for every mod): a driver with the game's
+infinite materials drives on an empty tank and burns none (`Vehicle.fuelRequired`); the
+Ranged Weapons Mod already shoots without rounds in creative and Dynamite's `consume`
+spends nothing there, so the car was the one holdout.

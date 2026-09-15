@@ -102,7 +102,12 @@ public final class VehicleGameTests {
      * apples whenever the grid fell on the origin's side of its car.
      */
     private static Player riderAt(GameTestHelper helper, Vehicle v) {
-        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        return riderAt(helper, v, GameType.SURVIVAL);
+    }
+
+    private static Player riderAt(GameTestHelper helper, Vehicle v, GameType mode) {
+        Player p = helper.makeMockPlayer(mode);
+        mode.updatePlayerAbilities(p.getAbilities());   // a mock player's mode sets its answers, not its abilities; the game sets both
         p.setPos(v.getX(), v.getY(), v.getZ());
         return p;
     }
@@ -252,6 +257,33 @@ public final class VehicleGameTests {
         });
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(v.speed() > 0.2, "fuelled, it drives: " + v.speed());
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void aCreativeDriverNeedsNoFuelAndBurnsNone(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 7.5, 7.5, false);
+        helper.assertTrue(!v.tank().hasFuel(), "born empty");
+        Player creative = riderAt(helper, v, GameType.CREATIVE);
+        helper.assertTrue(creative.startRiding(v, true), "a creative driver boards");
+        helper.assertTrue(creative.hasInfiniteMaterials(), "and has the game's infinite materials");
+        helper.assertTrue(!v.fuelRequired(), "fuel is not required of them");
+        helper.assertTrue(v.hasFuel(), "the engine may run on the empty tank");
+        // Their client reports the throttle down; the server burns nothing for it.
+        v.setFuel(100);
+        v.onDriveState(0.5f, 0.0f, 1, false, 0.0f);
+        helper.runAtTickTime(10, () -> {
+            helper.assertValueEqual(v.tank().ticks(), 100, "nothing burned under a creative driver");
+            creative.stopRiding();
+            Player survival = riderAt(helper, v);
+            helper.assertTrue(survival.startRiding(v, true), "a survival driver boards");
+            helper.assertTrue(v.fuelRequired(), "fuel is required of them");
+            v.onDriveState(0.5f, 0.0f, 1, false, 0.0f);
+        });
+        helper.runAtTickTime(20, () -> {
+            helper.assertTrue(v.tank().ticks() < 100, "the survival driver's throttle burns: " + v.tank().ticks());
             helper.succeed();
         });
     }

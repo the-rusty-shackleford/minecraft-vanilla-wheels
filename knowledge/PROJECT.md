@@ -38,8 +38,8 @@ renderer and screen).
 
 ## How it is verified
 
-`./gradlew check`: 69 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-eight gametests on a headless server driving a scripted box car, towing
+`./gradlew check`: 77 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+fixtures); twenty-seven gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -131,3 +131,11 @@ trailer's rear reflectors ride on its doors), and the harnesses launch silent. P
 additions, so 1.6.0. And the road's texture (D-0008 addendum): a body within its climb of
 the ground is grounded for the wheel and the step, and the server keeps the driver's
 ground flag on a reported step; the rugged playtest lane runs stall-free at top speed.
+
+2026-09-16 verification of the held 1.6.0 checkout: `build -PskipBooth` passed
+77 JUnit and 27 real-server tests, including speed-scaled damage, fuel pouring,
+creative fuel exemption, terrain and towing. The local Maven jar’s entries match the
+current built jar exactly. Trailblazer’s D-0004 records the repaired real-client course:
+forty boost ticks, no grounded steering pauses, no stuck reports or server move
+rejections under Iris/Complementary. Production physics and tuning are unchanged;
+subjective adjustments await review of the complete baseline. Release remains held.

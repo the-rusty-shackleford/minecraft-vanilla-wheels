@@ -327,6 +327,14 @@ check`.
 Sounds are cut from CC0 recordings by the art script; `devtools/art/sounds/SOURCES.md`
 credits them.
 
+### Held-version verification (2026-09-16)
+
+The local 1.6.0 build passed 77 JUnit and 27 real-server tests. The complete Trailblazer
+comparison under Iris/Complementary recorded forty ticks of drift boost, no grounded
+steering pauses, no stuck reports and no server move rejections. Its widened rugged
+lane and completion checks live in the vehicle’s test harness (Trailblazer D-0004).
+The driving tune and the client/server authority split remain unchanged; release is held.
+
 ## Licence
 
 AGPL-3.0-or-later. Copyright 2026 Rusty Shackleford and nfx.

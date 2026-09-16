@@ -20,3 +20,4 @@ tags: [index]
 | D-0006 | A vehicle is authored in Blockbench: the `.bbmodel` is read as it is; the dye is lifted; the glass clears for the rider |
 | D-0007 | The playtest against Automobility: only vehicles are walls; the server's re-run stands on the ground; the boost is a timed surge; riders lean and turn with the body |
 | D-0008 | nfx's patch layer ported into source: the terrain pose (plane fit, springs), the tow tick order, the trailer gestures; ceilings are never ground; the lift raises the vehicle |
+| D-0009 | Fuel is the gas can; creative driving requires and spends no fuel |

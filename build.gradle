@@ -157,7 +157,7 @@ dependencies {
     jarJar(implementation("com.chunkworks.metalsandmaterials:metalsandmaterials")) {
         version {
             strictly "[1.0,2.0)"
-            prefer "1.0.0"
+            prefer "1.0.1"
         }
     }
 
@@ -238,8 +238,8 @@ tasks.named('runPhotoBooth') { task ->
         if (!failures.isEmpty()) {
             throw new GradleException("booth: ${failures.size()} failed check(s):\n" + failures.join('\n'))
         }
-        if (!(text =~ /booth: PASS/)) {
-            throw new GradleException("booth: no verdict in ${logFile} -- the booth never ran")
+        if (!text.contains('booth: PASS all checks ran')) {
+            throw new GradleException("booth: missing completion marker in ${logFile}")
         }
         task.logger.lifecycle("booth: " + (text =~ /booth: PASS.*/)[0])
     }

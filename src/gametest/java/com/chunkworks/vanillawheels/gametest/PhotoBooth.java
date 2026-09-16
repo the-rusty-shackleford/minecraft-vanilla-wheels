@@ -113,6 +113,7 @@ public final class PhotoBooth {
     private static BlockPos liftPos = BlockPos.ZERO;
     private static UUID trailerId;
     private static double groundDark = -1.0;
+    private static int stockBlue = 0;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -202,7 +203,8 @@ public final class PhotoBooth {
         int t = HOLD;
         s.add(new Step(t, () -> {
             int blue = count(mc, PhotoBooth::lightBlue);
-            int red = count(mc, PhotoBooth::red);
+            stockBlue = blue;
+            int red = count(mc, PhotoBooth::redPaint);
             shoot(mc, "booth-side-stock");
             verdict("the stock box car's side shows its light-blue paint", () -> blue > 1500 ? null : "light-blue pixels " + blue);
             verdict("and nothing red", () -> red < 150 ? null : "red pixels " + red);
@@ -210,10 +212,10 @@ public final class PhotoBooth {
         s.add(new Step(t += 2, () -> withCar(mc, v -> v.setPaint(DyeColor.RED))));
         s.add(new Step(t += SETTLE / 2, () -> {
             int blue = count(mc, PhotoBooth::lightBlue);
-            int red = count(mc, PhotoBooth::red);
+            int red = count(mc, PhotoBooth::redPaint);
             shoot(mc, "booth-side-red");
             verdict("painted red, the side is red", () -> red > 1500 ? null : "red pixels " + red);
-            verdict("and the blue is gone", () -> blue < 150 ? null : "light-blue pixels " + blue);
+            verdict("the blue body paint is gone", () -> stockBlue > 1500 && blue < stockBlue * 0.15 ? null : "light-blue pixels " + blue + " from " + stockBlue);
         }));
         // Into the driver's seat, looking down at the dash.
         s.add(new Step(t += 2, () -> withCar(mc, v -> {
@@ -236,6 +238,21 @@ public final class PhotoBooth {
             shoot(mc, "booth-dash");
             verdict("the driver is aboard", () -> mc.player != null && mc.player.getVehicle() instanceof Vehicle ? null : "vehicle " + (mc.player == null ? null : mc.player.getVehicle()));
             verdict("from the driver's seat the dash needles are in view", () -> needles > 40 ? null : "needle pixels " + needles);
+            verdict("engine startup eases in on the real mounted vehicle", () -> {
+                if (!(mc.player != null && mc.player.getVehicle() instanceof Vehicle v)) return "not mounted";
+                var sound = new com.chunkworks.vanillawheels.client.EngineSound(v);
+                sound.resolve(mc.getSoundManager());
+                sound.tick();
+                if (sound.getVolume() <= 0 || sound.getVolume() > 0.051f) return "first tick volume " + sound.getVolume();
+                float previousGain = sound.getVolume(), previousPitch = sound.getPitch();
+                for (int i = 0; i < 40; i++) {
+                    sound.tick();
+                    if (Math.abs(sound.getVolume() - previousGain) > 0.051f || Math.abs(sound.getPitch() - previousPitch) > 0.061f)
+                        return "an abrupt gain or pitch change";
+                    previousGain = sound.getVolume(); previousPitch = sound.getPitch();
+                }
+                return previousGain > 0 && previousGain <= 0.801f ? null : "settled volume " + previousGain;
+            });
         }));
         // Third person from the seat, looking a little up so the camera's rays sweep the meadow
         // behind the car, as a hillside's does on a descent: the camera keeps its full distance,
@@ -388,6 +405,15 @@ public final class PhotoBooth {
             shoot(mc, "booth-lift-menu");
             verdict("the lift's screen opens", () -> mc.screen instanceof LiftScreen ? null : "screen " + mc.screen);
         }));
+        s.add(new Step(t += 2, () -> {
+            int gx = (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 34;
+            int gy = (mc.getWindow().getGuiScaledHeight() - 184) / 2 + 32;
+            pointAt(mc, gx, gy);
+        }));
+        s.add(new Step(t += 12, () -> {
+            shoot(mc, "booth-lift-slot-help");
+            LOG.info("booth: pointer {}, {}", mc.mouseHandler.xpos(), mc.mouseHandler.ypos());
+        }));
         // Build the box car from its parts, through the menu's own button, and photograph the deck up mid-job.
         s.add(new Step(t += 2, () -> onServer(mc, sp -> {
             if (sp.containerMenu instanceof LiftMenu menu) {
@@ -425,10 +451,13 @@ public final class PhotoBooth {
             }
         })));
         s.add(new Step(t += LiftMotion.JOB + 10, () -> {
-            int red = count(mc, PhotoBooth::red);
+            int red = count(mc, PhotoBooth::redPaint);
             int blue = count(mc, PhotoBooth::lightBlue);
             shoot(mc, "booth-lift-painted");
-            verdict("the lift painted the car red", () -> red > 300 && blue < 150 ? null : "red " + red + ", light-blue " + blue);
+            boolean painted = mc.level != null && mc.level.getEntitiesOfClass(Vehicle.class,
+                    new net.minecraft.world.phys.AABB(liftPos).inflate(8)).stream().anyMatch(v -> v.paint() == DyeColor.RED);
+            // The blue windshield and steel deck remain blue after a red repaint.
+            verdict("the lift painted the car red", () -> painted && red > 300 ? null : "red " + red + ", paint state " + painted);
         }));
         // The trailer: hitched behind a car off to the east, doors open, two cows aboard, seen from the side.
         s.add(new Step(t += 2, () -> onServer(mc, sp -> {
@@ -521,6 +550,12 @@ public final class PhotoBooth {
         return r > 80 && g < 110 && r > g + 40 && r > b + 40;
     }
 
+    /** effects: identifies red paint by hue even in shader shade, excluding yellow hazard stripes. */
+    private static boolean redPaint(int rgb) {
+        int r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
+        return r > 32 && r > g * 1.2 && r > b * 1.1 && b >= g * 0.85;
+    }
+
     /** The needle swatch (220, 40, 40), lit by the cab's daylight. */
     private static boolean needleRed(int rgb) {
         return red(rgb);
@@ -529,12 +564,12 @@ public final class PhotoBooth {
     /** The lamp swatch (250, 240, 170) at full brightness: a warm near-white, which nothing else in a night frame is. */
     private static boolean lampGlow(int rgb) {
         int r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
-        return r > 200 && g > 190 && b > 120 && b < r - 30;
+        return r > 150 && g > 150 && b > 100 && b < r - 30;
     }
 
     /**
      * effects: returns how many pixels of the frame's middle satisfy
-     * {@code test} (rgb, no alpha): rows 36..70 % and columns 20..80 %,
+     * {@code test} (rgb, no alpha): rows 36..85 % and columns 20..80 %,
      * which is below the sky and above the hotbar and the hand, and where
      * every shot puts the car
      */
@@ -543,7 +578,7 @@ public final class PhotoBooth {
             int n = 0;
             int w = image.getWidth();
             int h = image.getHeight();
-            for (int y = (int) (h * 0.36); y < (int) (h * 0.70); y++) {
+            for (int y = (int) (h * 0.36); y < (int) (h * 0.85); y++) {
                 for (int x = (int) (w * 0.2); x < (int) (w * 0.8); x++) {
                     int abgr = image.getPixelRGBA(x, y);
                     int rgb = (abgr & 0xFF) << 16 | (abgr >> 8 & 0xFF) << 8 | (abgr >> 16 & 0xFF);
@@ -602,6 +637,22 @@ public final class PhotoBooth {
                 LOG.error("booth: FAIL the car is in the level -- gone");
             }
         });
+    }
+
+    /** effects: delivers a pointer move through Minecraft's real mouse callback in GUI coordinates. */
+    private static void pointAt(Minecraft mc, int x, int y) {
+        // Native cursor warping did not deliver callbacks in the nested booth.
+        // This invokes exactly the callback installed by MouseHandler, preserving
+        // normal screen hit testing and tooltip rendering instead of drawing a fake tooltip.
+        try {
+            var move = net.minecraft.client.MouseHandler.class.getDeclaredMethod("onMove", long.class, double.class, double.class);
+            move.setAccessible(true);
+            move.invoke(mc.mouseHandler, mc.getWindow().getWindow(),
+                    (double) x * mc.getWindow().getScreenWidth() / mc.getWindow().getGuiScaledWidth(),
+                    (double) y * mc.getWindow().getScreenHeight() / mc.getWindow().getGuiScaledHeight());
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot deliver booth pointer input", e);
+        }
     }
 
     private static void shoot(Minecraft mc, String name) {

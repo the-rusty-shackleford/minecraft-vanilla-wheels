@@ -25,3 +25,12 @@ previews); `build.py` cuts, loops and normalizes them into
 | `thud` | the body fall's impact and settle |
 | `wrench` | the wrench impact, whole |
 | `fuel` | the coal into the forge, whole |
+
+## Gas-can pour (2026-09-16)
+
+`700151-liquid-pour.ogg`: “pour 0” by piotrkier, a real liquid poured into a bottle.
+[Source and CC0 dedication](https://freesound.org/people/piotrkier/sounds/700151/),
+verified 2026-09-16 over HTTPS. The committed HQ preview is cut to 0.30–0.68 seconds,
+faded at both ends and normalized to a 0.65 peak. Its 0.38-second length fits the
+held-use cue's eight-tick cadence without accumulating overlapping copies. This
+replaces the former coal-shovelling cut; its original source remains preserved.

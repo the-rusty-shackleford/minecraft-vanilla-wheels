@@ -64,7 +64,7 @@ public final class SkidSound extends AbstractTickableSoundInstance {
         y = vehicle.getY();
         z = vehicle.getZ();
         float fraction = Math.min(1.0f, Math.abs(vehicle.speed()) / (float) vehicle.tuning().maxSpeed());
-        float want = vehicle.drifting() && vehicle.onGround() ? Mth.lerp(fraction, 0.25f, 0.7f) : 0.0f;
+        float want = vehicle.drifting() && vehicle.onGround() ? Mth.lerp(fraction, 0.20f, 0.56f) : 0.0f;
         volume = want > volume ? Math.min(want, volume + 0.12f) : Math.max(want, volume - 0.08f);
         pitch = Mth.lerp(fraction, 0.9f, 1.15f);
     }

@@ -269,6 +269,13 @@ the deck, riders and all. Closing the menu hands the parts back.
 `vanillawheels:vehicle` component (paint, fuel and the disc in their own); one of each per
 registered profile appears in the Tools tab, the lift in Functional Blocks.
 
+The menu's empty slots carry faint symbols for chassis, wheels, engine and dye; hover
+for each slot's purpose. Build and Paint also explain their requirements on hover.
+Engine and gas-can icons use bevelled pixel shading. Engine gain and pitch ease into
+changes, with a quieter sustained engine/skid mix. Refuelling plays a short recorded
+liquid pour sized to the eight-tick repeat cadence; the credited source and cut live
+in `devtools/art/sounds/SOURCES.md`. These changes leave driving physics unchanged.
+
 ## Configuration
 
 `config/vanillawheels-common.toml`: `runOver`, `damageScale`, `fuelRequired`,

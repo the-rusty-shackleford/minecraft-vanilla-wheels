@@ -21,6 +21,8 @@ import subprocess
 import sys
 import zlib
 from pathlib import Path
+from slot_hints import icons as slot_hint_icons
+from material_bevel import bevel
 
 ROOT = Path(__file__).resolve().parents[2]
 MODID = "vanillawheels"
@@ -488,8 +490,8 @@ def write_ogg(path: Path, samples) -> None:
 
 # The shipped sounds: which recording, which seconds of it. Times are in
 # seconds, chosen from 100 ms RMS envelopes of the recordings. In-game
-# volumes: the horn 1.2, the engine 0.35..0.9 by speed, the skid 0.25..0.7 by speed, the
-# thud 0.9, the wrench 1.0, the fuel 0.8.
+# volumes: the horn 1.2, the engine 0.28..0.72 by speed, the skid 0.20..0.56 by speed, the
+# thud 0.9, the wrench 1.0, the fuel 0.6.
 SOUNDS = {
     # A pickup's horn, leaned on: 0.85 s from the middle of the first blast,
     # faded at both ends. The game re-triggers it every 15 ticks while the
@@ -503,15 +505,15 @@ SOUNDS = {
     # from where the squeal holds steadiest (within a decibel, 84% of its
     # energy in the squeal band), looped with a 150 ms crossfade. The game
     # loops it under every vehicle, silent on rails, swelling while the
-    # tail is out by speed (0.25..0.7) and pitched 0.9..1.15 by speed.
+    # tail is out by speed (0.20..0.56) and pitched 0.9..1.15 by speed.
     "skid": lambda: loop("71739-chrysler-lhs-tire-squeal-04", 11.3, 13.45, 0.15, 0.8),
     # A heavy body landing on dirt: the impact and its settle.
     "thud": lambda: assemble([take("504626-body-fall-heavy-dirt", 0.38, 1.5, fade_out=0.15)], 0.95),
     # A wrench struck against metal, once.
     "wrench": lambda: assemble([take("835173-wrench-impact", 0.0, fade_out=0.05)], 0.9),
-    # Coal shovelled into a forge: what filling a tank sounds like when the
-    # fuel is what the furnace burns.
-    "fuel": lambda: assemble([take("386145-forge-adding-coal", 0.0, fade_out=0.1)], 0.85),
+    # A short real liquid pour, matching the gas can rather than the retired
+    # loose-coal refuelling interaction. Fit under the eight-tick repeat cadence.
+    "fuel": lambda: assemble([take("700151-liquid-pour", 0.3, 0.68, fade_in=0.02, fade_out=0.06)], 0.65),
 }
 
 
@@ -546,13 +548,15 @@ def main(argv) -> None:
     want = set(argv[1:]) or {"icons", "boxcar", "sounds"}
     if "icons" in want:
         for name, draw in ICONS.items():
-            write_png(ASSETS / f"textures/item/{name}.png", 16, 16, draw())
+            write_png(ASSETS / f"textures/item/{name}.png", 16, 16, bevel(draw()) if name in {"engine", "gas_can", "empty_gas_can"} else draw())
         for name, draw in GUI_ICONS.items():
             write_png(ASSETS / f"textures/gui/{name}.png", 16, 16, draw())
         write_png(ASSETS / "textures/block/mechanic_lift.png", 16, 16, lift_plate())
         write_png(ASSETS / "textures/block/mechanic_lift_deck.png", 16, 16, lift_deck())
         write_png(ASSETS / "textures/block/mechanic_lift_stripe.png", 16, 16, lift_stripe())
         write_png(ASSETS / "textures/gui/mechanic_lift.png", 256, 256, lift_gui())
+        for name, pixels in slot_hint_icons().items():
+            write_png(ASSETS / f"textures/gui/slot_{name}.png", 16, 16, pixels)
         print("wrote the icons and the lift's textures")
     if "boxcar" in want:
         frame, wheel = box_car()

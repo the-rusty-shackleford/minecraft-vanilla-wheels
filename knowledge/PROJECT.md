@@ -139,3 +139,8 @@ current built jar exactly. Trailblazer’s D-0004 records the repaired real-clie
 forty boost ticks, no grounded steering pauses, no stuck reports or server move
 rejections under Iris/Complementary. Production physics and tuning are unchanged;
 subjective adjustments await review of the complete baseline. Release remains held.
+
+2026-09-16 presentation polish: D-0010 adds empty-slot guidance, tooltips, bevelled engine/can icons, smoothed quieter
+engine/skid output and a liquid fuel-pour cue. The shader booth now samples the actual
+visible lamps/stripe and separates painted body from blue glass/deck pixels. The
+preferred bundled steel is 1.0.1. Driving physics and release authorization are unchanged.

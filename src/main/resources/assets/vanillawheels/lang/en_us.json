@@ -36,10 +36,16 @@
   "vanillawheels.lift.status.paint_ready": "Ready to paint the vehicle",
   "vanillawheels.lift.status.no_dye": "Add a dye to paint it",
   "vanillawheels.lift.status.occupied": "Clear the deck to build",
-  "vanillawheels.lift.status.parts": "Chassis + wheels + engine",
+  "vanillawheels.lift.status.parts": "Add the required vehicle parts",
   "vanillawheels.doors_shut": "Open the doors first",
   "vanillawheels.trailer_full": "No room for another",
   "vanillawheels.lights.off": "Lights off",
   "vanillawheels.lights.on": "Lights on",
-  "vanillawheels.lights.auto": "Lights auto"
+  "vanillawheels.lights.auto": "Lights auto",
+  "vanillawheels.lift.slot.chassis": "Chassis — chooses the vehicle to build",
+  "vanillawheels.lift.slot.wheels": "Wheels — one for each wheel on the vehicle",
+  "vanillawheels.lift.slot.engine": "Engine — needed only by powered vehicles",
+  "vanillawheels.lift.slot.dye": "Dye — repaints the vehicle on the deck",
+  "vanillawheels.lift.build.help": "Build from the chassis and its required parts. The deck must be clear.",
+  "vanillawheels.lift.paint.help": "Paint the vehicle on the deck with the dye in the last slot."
 }

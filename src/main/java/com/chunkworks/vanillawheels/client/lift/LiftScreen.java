@@ -23,6 +23,7 @@ import com.chunkworks.vanillawheels.domain.LiftStatus;
 import com.chunkworks.vanillawheels.lift.LiftMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -35,6 +36,10 @@ import net.minecraft.world.entity.player.Inventory;
  */
 public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
     private static final ResourceLocation BACKGROUND = VanillaWheels.id("textures/gui/mechanic_lift.png");
+    private static final String[] SLOT_NAMES = {"chassis", "wheels", "engine", "dye"};
+    private static final ResourceLocation[] SLOT_HINTS = java.util.Arrays.stream(SLOT_NAMES)
+            .map(name -> VanillaWheels.id("textures/gui/slot_" + name + ".png"))
+            .toArray(ResourceLocation[]::new);
     private Button build;
     private Button paint;
 
@@ -49,9 +54,11 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
     protected void init() {
         super.init();
         build = addRenderableWidget(Button.builder(Component.translatable("vanillawheels.lift.build"), b -> press(LiftMenu.BUILD_BUTTON))
-                .bounds(leftPos + 26, topPos + 46, 60, 20).build());
+                .bounds(leftPos + 26, topPos + 46, 60, 20)
+                .tooltip(Tooltip.create(Component.translatable("vanillawheels.lift.build.help"))).build());
         paint = addRenderableWidget(Button.builder(Component.translatable("vanillawheels.lift.paint"), b -> press(LiftMenu.PAINT_BUTTON))
-                .bounds(leftPos + 98, topPos + 46, 60, 20).build());
+                .bounds(leftPos + 98, topPos + 46, 60, 20)
+                .tooltip(Tooltip.create(Component.translatable("vanillawheels.lift.paint.help"))).build());
     }
 
     private void press(int button) {
@@ -66,11 +73,21 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
         paint.active = menu.paintStatus() == LiftStatus.Paint.READY;
         super.render(g, mouseX, mouseY, partialTick);
         renderTooltip(g, mouseX, mouseY);
+        if (hoveredSlot != null && hoveredSlot.index < SLOT_NAMES.length && !hoveredSlot.hasItem()) {
+            g.renderTooltip(font, font.split(Component.translatable(
+                    "vanillawheels.lift.slot." + SLOT_NAMES[hoveredSlot.index]), Math.min(220, width - 16)), mouseX, mouseY);
+        }
     }
 
     @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
         g.blit(BACKGROUND, leftPos, topPos, 0, 0, imageWidth, imageHeight);
+        for (int i = 0; i < SLOT_HINTS.length; i++) {
+            var slot = menu.getSlot(i);
+            if (!slot.hasItem()) {
+                g.blit(SLOT_HINTS[i], leftPos + slot.x, topPos + slot.y, 0, 0, 16, 16, 16, 16);
+            }
+        }
         int ticks = menu.jobTicks();
         if (ticks > 0) {
             int width = (int) Math.round(140.0 * (LiftMotion.JOB - ticks) / LiftMotion.JOB);

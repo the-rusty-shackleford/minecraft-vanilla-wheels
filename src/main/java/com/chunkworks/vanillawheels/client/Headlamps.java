@@ -40,17 +40,17 @@ final class Headlamps {
 
     /** effects: tells Luminance how a vehicle lights the road */
     static void register() {
-        Luminance.forEntity(ModContent.VEHICLE_ENTITY.get(), Headlamps::beams);
+        Luminance.forEntityInterpolated(ModContent.VEHICLE_ENTITY.get(), Headlamps::beams);
     }
 
-    private static Collection<? extends Source> beams(Vehicle vehicle) {
+    private static Collection<? extends Source> beams(Vehicle vehicle, float partialTick) {
         VehicleProfile p = vehicle.profile();
         if (p == null || !vehicle.lit() || p.headlights().isEmpty()) {
             return List.of();
         }
         VehicleProfile.Headlights lights = p.headlights().get();
         List<Source> out = new ArrayList<>(lights.at().size());
-        double heading = Math.toRadians(vehicle.getYRot());
+        double heading = Math.toRadians(net.minecraft.util.Mth.rotLerp(partialTick, vehicle.yRotO, vehicle.getYRot()));
         double fx = -Math.sin(heading);
         double fz = Math.cos(heading);
         // An unpowered vehicle (a trailer) has no headlamps to aim: its lamps are markers, a point
@@ -59,10 +59,11 @@ final class Headlamps {
         boolean markers = !p.isPowered();
         int level = Math.max(1, Math.min(Source.MAX_LUMINANCE, 2 * lights.range()));
         for (Vec at : lights.at()) {
-            Vec3 lamp = vehicle.rotate(p.localBlocks(at));
-            double x0 = vehicle.getX() + lamp.x;
-            double y0 = vehicle.getY() + lamp.y;
-            double z0 = vehicle.getZ() + lamp.z;
+            Vec local = p.localBlocks(at);
+            Vec3 lamp = new Vec3(local.x(), local.y(), local.z()).yRot((float) -heading);
+            double x0 = net.minecraft.util.Mth.lerp(partialTick, vehicle.xOld, vehicle.getX()) + lamp.x;
+            double y0 = net.minecraft.util.Mth.lerp(partialTick, vehicle.yOld, vehicle.getY()) + lamp.y;
+            double z0 = net.minecraft.util.Mth.lerp(partialTick, vehicle.zOld, vehicle.getZ()) + lamp.z;
             if (markers) {
                 out.add(new com.chunkworks.luminance.domain.Point(x0, y0, z0, level));
             } else {

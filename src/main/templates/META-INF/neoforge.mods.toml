@@ -36,7 +36,7 @@ Vehicle mods nest this jar inside their own; the loader keeps one copy.
 [[dependencies.${mod_id}]]
     modId="luminance"
     type="optional"
-    versionRange="[1.0,2.0)"
+    versionRange="[1.1,2.0)"
     ordering="AFTER"
     side="CLIENT"
 

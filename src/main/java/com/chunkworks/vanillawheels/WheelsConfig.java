@@ -28,6 +28,9 @@ public final class WheelsConfig {
     public static final ModConfigSpec.BooleanValue RUN_OVER = BUILDER
             .comment("Whether a moving vehicle hurts and shoves what it runs into.")
             .define("runOver", true);
+    public static final ModConfigSpec.BooleanValue FRAGILE_BLOCKS = BUILDER
+            .comment("Whether driven vehicles may break tagged fragile blocks at speed. Checks player permissions and block-break events; at most 8 blocks per vehicle per tick.")
+            .define("fragileBlocks", true);
     public static final ModConfigSpec.DoubleValue DAMAGE_SCALE = BUILDER
             .comment("Multiplies the damage of running something over.")
             .defineInRange("damageScale", 1.0, 0.0, 10.0);

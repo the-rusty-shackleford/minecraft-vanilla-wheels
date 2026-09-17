@@ -120,6 +120,7 @@ public final class TowGameTests {
         helper.runAtTickTime(50, () -> {
             helper.assertTrue(trailer.tower() == car, "hitched: " + trailer.tower());
             helper.assertTrue(car.trailer() == trailer, "and the car knows it");
+            helper.assertFalse(car.canCollideWith(trailer) || trailer.canCollideWith(car), "a coupled pair cannot collide with itself");
             helper.assertTrue(trailer.getX() - trailerX0 > 5.0, "the trailer came along: " + (trailer.getX() - trailerX0));
             helper.assertTrue(yawGap(car, trailer) < 3.0, "straight behind: " + yawGap(car, trailer));
             helper.assertTrue(trailer.tongue().distanceTo(car.hitchPoint()) < 0.3, "the tongue is on the hitch: " + trailer.tongue().distanceTo(car.hitchPoint()));

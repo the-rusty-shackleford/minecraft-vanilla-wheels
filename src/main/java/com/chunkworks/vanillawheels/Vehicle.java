@@ -1207,7 +1207,18 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (moveKept < 0.999) {
                 // A wall: the speed the world refused is gone, not spent spinning the wheels against
                 // it -- all of it met square, a little scraped along at a slant.
-                drive = drive.slowed(moveKept);
+                if (!vehicleContact) {
+                    double lostX = getDeltaMovement().x == 0 ? step.next().velocityX() : 0;
+                    double lostZ = getDeltaMovement().z == 0 ? step.next().velocityZ() : 0;
+                    // Footprint collisions can clip without changing deltaMovement. The blocked
+                    // displacement supplies their normal; glancing contacts retain their tangent.
+                    if (Math.hypot(lostX, lostZ) < 1e-7) {
+                        lostX = blockedX; lostZ = blockedZ;
+                    }
+                    if (Math.hypot(lostX, lostZ) > 1e-7) {
+                        drive = drive.impacted(Impact.wall(new Impact.Velocity(step.next().velocityX(), step.next().velocityZ()), lostX, lostZ));
+                    } else drive = drive.slowed(moveKept);
+                }
             }
             wheelTravel += drive.speed();
             if (level().isClientSide()) {
@@ -1408,6 +1419,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         } else {
             hornTicks = 0;
         }
+        contactWith.removeIf((int id) -> !(level().getEntity(id) instanceof Vehicle other)
+                || !getBoundingBox().inflate(0.25).intersects(other.getBoundingBox()));
         runOver(p);
         catchTrailer(p);
         if (tickCount % 20 == 0) {
@@ -1432,7 +1445,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         double dirZ = Math.cos(heading) * Math.signum(speed);
         double slowest = speed;
         hitAt.int2IntEntrySet().removeIf(hit -> tickCount - hit.getIntValue() >= HIT_COOLDOWN);
-        for (LivingEntity victim : level().getEntitiesOfClass(LivingEntity.class, sweep, v -> !hasPassenger(v) && v.isAlive() && !(v instanceof Player pl && pl.isSpectator()))) {
+        for (LivingEntity victim : level().getEntitiesOfClass(LivingEntity.class, sweep, v -> !hasPassenger(v) && !(v.getRootVehicle() instanceof Vehicle ride && sameTrain(ride)) && v.isAlive() && !(v instanceof Player pl && pl.isSpectator()))) {
             if (hitAt.containsKey(victim.getId())) {
                 continue;
             }
@@ -1445,7 +1458,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         if (slowest != speed) {
             entityData.set(DATA_SPEED, (float) slowest);
-            drive = new Drive(slowest, drive.heading(), drive.motion(), drive.steer(), drive.driftCharge(), drive.drifting(), drive.driftSide(), drive.boostTicks(), drive.boostPower());
+            contactVelocity(new Impact.Velocity(-Math.sin(drive.motion()) * slowest, Math.cos(drive.motion()) * slowest));
         }
     }
 
@@ -1460,7 +1473,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** effects: takes the driver's state as their client reports it */
     public void onDriveState(float speed, float steer, int throttle, boolean drifting, float burn) {
-        this.throttle = throttle;
+        if (!Float.isFinite(speed) || !Float.isFinite(steer) || !Float.isFinite(burn)) return;
+        speed = Mth.clamp(speed, (float) (-tuning.maxSpeed() * Drive.BOOST_CAP), (float) (tuning.maxSpeed() * Drive.BOOST_CAP));
+        steer = Mth.clamp(steer, (float) -tuning.steer(), (float) tuning.steer());
+        burn = Mth.clamp(burn, 0, 1);
+        this.throttle = Mth.clamp(throttle, -1, 1);
         entityData.set(DATA_SPEED, speed);
         entityData.set(DATA_STEER, steer);
         entityData.set(DATA_DRIFTING, drifting);
@@ -1503,6 +1520,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (!onGround() && grounded()) {
             setOnGround(true);
         }
+        vehicleContact = false;
         Vec3 clamped = footprintClamp(delta);
         double x0 = getX(), z0 = getZ();
         // A driver's reported move that rises from the ground by no more than the climb is a step,
@@ -1518,6 +1536,16 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         double asked = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         double got = Math.sqrt((getX() - x0) * (getX() - x0) + (getZ() - z0) * (getZ() - z0));
         moveKept = asked < 1.0E-6 ? 1.0 : Mth.clamp(got / asked, 0.0, 1.0);
+        blockedX = delta.x - (getX() - x0);
+        blockedZ = delta.z - (getZ() - z0);
+        if (asked > 1e-6 && profile() != null) {
+            // An owner packet carries the distance collision already allowed, not the
+            // approach velocity. Use the validated drive report's speed for its impulse.
+            double approach = type == MoverType.PLAYER ? Math.max(asked, Math.abs(entityData.get(DATA_SPEED))) : asked;
+            Vec3 incoming = delta.scale(Math.min(approach, tuning.maxSpeed() * Drive.BOOST_CAP) / asked);
+            resolveContacts(incoming);
+            if (!level().isClientSide()) breakFragile(incoming);
+        }
     }
 
     /**
@@ -1525,10 +1553,101 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * the footprint's walls and the box's collisions together; 1 for a free move.
      */
     private double moveKept = 1.0;
+    private boolean vehicleContact;
+    private double blockedX, blockedZ;
+    private final it.unimi.dsi.fastutil.ints.IntOpenHashSet contactWith = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+    private long fragileTick = Long.MIN_VALUE;
+    private int fragileChecks, fragileBreaks;
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet fragileVisited = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+    private static final int MAX_FRAGILE_CHECKS = 128;
+    private static final int MAX_FRAGILE_BREAKS = 8;
+    private static final net.minecraft.tags.TagKey<net.minecraft.world.level.block.Block> FRAGILE =
+            net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, VanillaWheels.id("fragile"));
 
     /** effects: returns the share of the last move the world let through (see {@link #move}) */
     public double moveKept() {
         return moveKept;
+    }
+
+    /** effects: applies a finite contact velocity through the driving model, without moving the entity */
+    public void onContactVelocity(double x, double z) {
+        if (!Double.isFinite(x) || !Double.isFinite(z)) return;
+        double speed = Math.hypot(x, z), cap = tuning.maxSpeed() * Drive.BOOST_CAP;
+        double scale = speed > cap ? cap / speed : 1;
+        drive = drive.impacted(new Impact.Velocity(x * scale, z * scale));
+        syncDriveData();
+        if (!level().isClientSide() && !(getControllingPassenger() instanceof Player)) wasAtTheWheel = true;
+    }
+
+    private void contactVelocity(Impact.Velocity velocity) {
+        onContactVelocity(velocity.x(), velocity.z());
+        if (getControllingPassenger() instanceof net.minecraft.server.level.ServerPlayer driver) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(driver,
+                    new com.chunkworks.vanillawheels.net.Payloads.ContactVelocity(getId(), drive.velocityX(), drive.velocityZ()));
+        }
+    }
+
+    /** effects: returns whether another vehicle belongs to this tow train (bounded by the supported chain length) */
+    private boolean sameTrain(Vehicle other) {
+        Vehicle a = this, b = other;
+        for (int i = 0; i < 8 && a.tower() != null; i++) a = a.tower();
+        for (int i = 0; i < 8 && b.tower() != null; i++) b = b.tower();
+        return a == b;
+    }
+
+    private void resolveContacts(Vec3 incoming) {
+        AABB contactBox = getBoundingBox().inflate(0.06, 0, 0.06);
+        int checked = 0;
+        Impact.Velocity velocity = new Impact.Velocity(incoming.x, incoming.z);
+        for (Vehicle other : level().getEntitiesOfClass(Vehicle.class, contactBox, v -> v != this && !sameTrain(v))) {
+            vehicleContact = true;
+            if (++checked > 16) break;
+            if (level().isClientSide() || other.profile() == null || contactWith.contains(other.getId())) continue;
+            double nx = other.getX() - getX(), nz = other.getZ() - getZ();
+            if (Math.hypot(nx,nz) < 1e-7) continue;
+            Impact.Contact result = Impact.contact(velocity, profile().mass(),
+                    new Impact.Velocity(other.drive.velocityX(), other.drive.velocityZ()), other.profile().mass(), nx, nz);
+            contactWith.add(other.getId()); other.contactWith.add(getId());
+            velocity = result.first();
+            contactVelocity(velocity); other.contactVelocity(result.second());
+        }
+    }
+
+    /** Server-owned, bounded destruction after collision validation; the client waits for block updates. */
+    private void breakFragile(Vec3 incoming) {
+        if (!(level() instanceof ServerLevel server) || !WheelsConfig.FRAGILE_BLOCKS.get()
+                || !(getControllingPassenger() instanceof Player driver) || !driver.mayBuild()
+                || driver.isSpectator() || !Impact.breaksFragile(incoming.horizontalDistance(), profile().mass())) return;
+        long now = level().getGameTime();
+        if (fragileTick != now) { fragileTick = now; fragileChecks = fragileBreaks = 0; fragileVisited.clear(); }
+        // Scan just the leading strip of the oriented hull, never the ground beneath it.
+        // A stopped client retries against intact glass; only the server decides whether it breaks.
+        double speed = incoming.horizontalDistance();
+        double fx = incoming.x / speed, fz = incoming.z / speed;
+        double reach = profile().body().length() * .5 + Math.min(speed, 1);
+        double halfWidth = profile().body().width() * .5;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (double across = -halfWidth; across <= halfWidth + .01; across += .5) {
+            for (int y = Mth.floor(getY() + .1); y < Mth.ceil(getY() + profile().body().height()); y++) {
+                for (double ahead = Math.max(0, reach - 1.5); ahead <= reach + .01; ahead += .5) {
+                    if (fragileChecks >= MAX_FRAGILE_CHECKS || fragileBreaks >= MAX_FRAGILE_BREAKS) return;
+                    fragileChecks++;
+                    pos.set(Mth.floor(getX() + fx * ahead - fz * across), y, Mth.floor(getZ() + fz * ahead + fx * across));
+                    if (!fragileVisited.add(pos.asLong()) || !server.hasChunkAt(pos) || !server.mayInteract(driver, pos)) continue;
+                    var state = server.getBlockState(pos);
+                    if (!state.is(FRAGILE) || state.hasBlockEntity() || state.getDestroySpeed(server, pos) < 0) continue;
+                    var obstruction = server.clip(new net.minecraft.world.level.ClipContext(
+                            position().add(0, profile().body().height() * .5, 0), Vec3.atCenterOf(pos),
+                            net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                            net.minecraft.world.level.ClipContext.Fluid.NONE, this));
+                    if (obstruction.getType() != net.minecraft.world.phys.HitResult.Type.MISS
+                            && !obstruction.getBlockPos().equals(pos)) continue;
+                    var event = new net.neoforged.neoforge.event.level.BlockEvent.BreakEvent(server, pos.immutable(), state, driver);
+                    if (net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event).isCanceled()) continue;
+                    if (server.destroyBlock(pos, !driver.hasInfiniteMaterials(), driver)) fragileBreaks++;
+                }
+            }
+        }
     }
 
     /** The footprint's points are checked from this far over the climb up to the hull's top; a step the box climbs is no wall. */
@@ -1663,7 +1782,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      */
     @Override
     public boolean canCollideWith(Entity entity) {
-        return entity instanceof Vehicle v && v != this && v != trailer() && v != tower();
+        return entity instanceof Vehicle v && v != this && !sameTrain(v);
     }
 
     @Override

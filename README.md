@@ -68,8 +68,23 @@ it, which the box could never step onto -- is cut short at the wall's face, on b
 alike so the server's re-run agrees. A hillside of one-block risers is no wall however
 many the nose overhangs; a two-block riser is. A wall met at a slant is slid along, as the
 game slides a box, rather than stopping the body at a corner's graze. The speed the world
-refuses is gone, not spent spinning the wheels: all of it at a wall met square, a little
+refuses is gone, not spent spinning the wheels: most of it at a wall met square with a restrained rebound on hard impacts, a little
 scraped along one.
+
+Vehicle contacts exchange normal momentum according to mass and approach speed;
+glancing hits retain sideways motion and hard hits rebound modestly. A held contact
+applies once until the vehicles separate. Connected tow trains and their riders are
+excluded. Server contact responses enter the driver's normal movement model; they do
+not teleport the vehicle or relax vanilla movement checks.
+
+Driven impacts can break `vanillawheels:fragile`: glass blocks/panes, leaves, flowers,
+saplings and small plants by default. Stone and other solid structures remain barriers.
+The server requires a non-spectator driver with build permission, checks spawn protection
+and cancellable NeoForge break events, skips block entities/unbreakable blocks, and
+respects intervening walls. At most 128 candidate checks and eight destroyed blocks per
+vehicle per tick are allowed. Survival uses ordinary block drops (glass normally drops
+nothing); creative produces no drops. Disable this with `fragileBlocks=false` in
+`vanillawheels-common.toml`, or replace/extend the block tag in a datapack.
 
 A vehicle built to the world's scale is too small for a person, so a profile may set
 `rider_scale`: everyone aboard is sized to it through the game's own scale attribute
@@ -342,6 +357,20 @@ steering pauses, no stuck reports and no server move rejections. Its widened rug
 lane and completion checks live in the vehicle’s test harness (Trailblazer D-0004).
 The driving tune and the client/server authority split remain unchanged; release is held.
 
+## Release 1.7.0
+
+Vehicle contacts exchange bounded momentum, tagged fragile blocks break with permission/protection checks, and the original broad headlights follow interpolated movement. Network protocol 4 requires every player and the server to update.
+
 ## Licence
 
 AGPL-3.0-or-later. Copyright 2026 Rusty Shackleford and nfx.
+
+## Collision and moving lights in 1.7.0
+
+This release adds partitioned contact tests and real-server checks for momentum,
+repeat contact, fragile/solid blocks, clipped owner reports, permissions, protection hooks
+and drops. The Trailblazer `impacts` playtest drives a real local owner into a parked
+truck, glass and stone; Pickup and rugged driving are separate gates. Historic live
+Pickup movement corrections have not reproduced on these courses and are not claimed
+fixed. Multi-player synchronization remains a later group-test gate. Network protocol
+4 carries owner contact velocities and requires matching 1.7.0 builds on peers. See D-0011.

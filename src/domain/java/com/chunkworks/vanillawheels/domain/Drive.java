@@ -148,6 +148,19 @@ public record Drive(double speed, double heading, double motion, double steer, d
         return new Drive(speed * kept, heading, motion, steer, driftCharge, drifting, driftSide, boostTicks, boostPower);
     }
 
+    /**
+     * effects: returns a drive with this body heading and the collision's velocity;
+     * reverse remains reverse relative to the body, and an impact cancels drift/boost.
+     */
+    public Drive impacted(Impact.Velocity velocity) {
+        double magnitude = Math.hypot(velocity.x(), velocity.z());
+        if (magnitude < STOPPED) return halted();
+        double forward = -Math.sin(heading) * velocity.x() + Math.cos(heading) * velocity.z();
+        double sign = forward < 0 ? -1 : 1;
+        double direction = Math.atan2(-velocity.x() * sign, velocity.z() * sign);
+        return new Drive(magnitude * sign, heading, direction, steer, 0, false, 0, 0, 0);
+    }
+
     /** effects: returns whether a boost is running */
     public boolean boosting() {
         return boostTicks > 0;

@@ -1,0 +1,15 @@
+{
+  "replace": false,
+  "values": [
+    "#c:glass_blocks",
+    "#c:glass_panes",
+    "#minecraft:leaves",
+    "#minecraft:flowers",
+    "#minecraft:saplings",
+    "minecraft:short_grass",
+    "minecraft:tall_grass",
+    "minecraft:fern",
+    "minecraft:large_fern",
+    "minecraft:dead_bush"
+  ]
+}

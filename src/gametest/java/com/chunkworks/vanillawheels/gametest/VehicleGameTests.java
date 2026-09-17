@@ -525,4 +525,180 @@ public final class VehicleGameTests {
         helper.assertTrue(!v.interactAt(player, beside, InteractionHand.MAIN_HAND).consumesAction(), "between the chests the click passes to the body");
         helper.succeed();
     }
+
+    // Contact partitions: vehicle/rest, repeat contact, solid wall, fragile/solid blocks,
+    // speed below/above threshold, survival/creative/adventure and canceled protection event.
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void aMovingVehicleTransfersMomentumToAParkedOne(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle moving = car(helper, 10, 7.5, true);
+        Vehicle parked = car(helper, 12.5, 7.5, true);
+        double before = parked.getX();
+        helper.runAtTickTime(2, () -> {
+            moving.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(1, -.04, 0));
+            double first = parked.speed();
+            helper.assertTrue(first > .1, "the first contact carries momentum");
+            moving.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(.01, 0, 0));
+            helper.assertTrue(Math.abs(parked.speed() - first) < 1e-6, "held contact is not applied twice");
+        });
+        helper.runAtTickTime(8, () -> {
+            helper.assertTrue(parked.getX() > before + .1, "a real collision nudges the parked vehicle");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void aDrivenImpactBreaksFragileBlocksButNotStone(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 10, 7.5, true);
+        Player driver = riderAt(helper, v);
+        driver.startRiding(v);
+        BlockPos glass = new BlockPos(12, FLOOR + 1, 7);
+        BlockPos stone = new BlockPos(12, FLOOR, 8);
+        helper.setBlock(glass, Blocks.GLASS);
+        helper.setBlock(stone, Blocks.STONE);
+        helper.runAtTickTime(2, () -> {
+            v.move(net.minecraft.world.entity.MoverType.PLAYER, new Vec3(.6,0,0));
+            helper.assertTrue(helper.getBlockState(glass).isAir(), "glass in the driven hull path breaks");
+            helper.assertTrue(helper.getBlockState(stone).is(Blocks.STONE), "solid blocks remain barriers");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void aClippedOwnerMoveKeepsItsApproachEnergyForGlass(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 10, 7.5, true);
+        riderAt(helper, v).startRiding(v);
+        BlockPos glass = new BlockPos(12, FLOOR + 1, 7);
+        helper.setBlock(glass, Blocks.GLASS);
+        helper.runAtTickTime(2, () -> {
+            v.onDriveState(.6f, 0, 1, false, 0);
+            v.move(net.minecraft.world.entity.MoverType.PLAYER, new Vec3(.01, 0, 0));
+            helper.assertTrue(helper.getBlockState(glass).isAir(),
+                    "collision-shortened owner movement retains the reported approach energy");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void slowAndAdventureDriversCannotDestroyGlass(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle slow = car(helper, 10, 4.5, true);
+        Vehicle adventure = car(helper, 10, 10.5, true);
+        riderAt(helper, slow).startRiding(slow);
+        riderAt(helper, adventure, GameType.ADVENTURE).startRiding(adventure);
+        BlockPos a = new BlockPos(12,FLOOR+1,4), b = new BlockPos(12,FLOOR+1,10);
+        helper.setBlock(a, Blocks.GLASS); helper.setBlock(b, Blocks.GLASS);
+        helper.runAtTickTime(2, () -> {
+            slow.move(net.minecraft.world.entity.MoverType.PLAYER,new Vec3(.1,0,0));
+            adventure.move(net.minecraft.world.entity.MoverType.PLAYER,new Vec3(.6,0,0));
+            helper.assertTrue(helper.getBlockState(a).is(Blocks.GLASS), "slow contact leaves glass");
+            helper.assertTrue(helper.getBlockState(b).is(Blocks.GLASS), "adventure permissions leave glass");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void blockProtectionCanVetoVehicleDestruction(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 10,7.5,true);
+        riderAt(helper,v).startRiding(v);
+        BlockPos glass = new BlockPos(12,FLOOR+1,7);
+        helper.setBlock(glass,Blocks.GLASS);
+        int[] events = {0};
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+            if (event.getLevel() == helper.getLevel() && event.getPos().equals(helper.absolutePos(glass))) {
+                events[0]++;
+                event.setCanceled(true);
+            }
+        };
+        helper.runAtTickTime(2, () -> {
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(protect);
+            try {
+                v.move(net.minecraft.world.entity.MoverType.PLAYER,new Vec3(.6,0,0));
+                helper.assertTrue(events[0] == 1, "one break event per block per tick, including canceled blocks: " + events[0]);
+                helper.assertTrue(helper.getBlockState(glass).is(Blocks.GLASS), "cancellation preserves glass");
+                helper.succeed();
+            } finally { net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(protect); }
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void fragileDropsRespectSurvivalAndCreative(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle survival = car(helper,10,4.5,true), creative = car(helper,10,10.5,true);
+        riderAt(helper,survival).startRiding(survival);
+        riderAt(helper,creative,GameType.CREATIVE).startRiding(creative);
+        BlockPos a = new BlockPos(12,FLOOR,4), b = new BlockPos(12,FLOOR,10);
+        helper.setBlock(a,Blocks.DANDELION); helper.setBlock(b,Blocks.DANDELION);
+        helper.runAtTickTime(2, () -> {
+            survival.move(net.minecraft.world.entity.MoverType.PLAYER,new Vec3(.6,0,0));
+            creative.move(net.minecraft.world.entity.MoverType.PLAYER,new Vec3(.6,0,0));
+            helper.assertTrue(helper.getBlockState(a).isAir() && helper.getBlockState(b).isAir(), "both drivers clear the plants");
+            var nearSurvival = new net.minecraft.world.phys.AABB(helper.absolutePos(a)).inflate(1);
+            var nearCreative = new net.minecraft.world.phys.AABB(helper.absolutePos(b)).inflate(1);
+            helper.assertTrue(helper.getLevel().getEntitiesOfClass(ItemEntity.class,nearSurvival,
+                    item -> item.getItem().is(Items.DANDELION)).size() == 1,"survival has the ordinary block drop");
+            helper.assertTrue(helper.getLevel().getEntitiesOfClass(ItemEntity.class,nearCreative,
+                    item -> item.getItem().is(Items.DANDELION)).isEmpty(),"creative creates no drops");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void aSolidWallShieldsFragileBlocksBehindIt(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper,10,7.5,true);
+        riderAt(helper,v).startRiding(v);
+        BlockPos glass = new BlockPos(12,FLOOR+1,7);
+        helper.setBlock(glass,Blocks.GLASS);
+        for (int y = FLOOR; y < FLOOR+4; y++) helper.setBlock(new BlockPos(11,y,7),Blocks.STONE);
+        helper.runAtTickTime(2, () -> {
+            v.move(net.minecraft.world.entity.MoverType.PLAYER,new Vec3(.6,0,0));
+            helper.assertTrue(helper.getBlockState(glass).is(Blocks.GLASS),"a solid obstruction shields the glass behind it");
+            helper.succeed();
+        });
+    }
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void repeatedMovesShareOneFragileBudgetPerTick(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 10, 7.5, true);
+        riderAt(helper, v, GameType.CREATIVE).startRiding(v);
+        for (int x = 11; x <= 14; x++) for (int z = 5; z <= 9; z++)
+            for (int y = FLOOR; y <= FLOOR + 2; y++) helper.setBlock(new BlockPos(x,y,z), Blocks.OAK_LEAVES);
+        helper.runAtTickTime(2, () -> {
+            Vec3 start = v.position();
+            for (int i = 0; i < 20; i++) {
+                v.setPos(start);
+                v.move(net.minecraft.world.entity.MoverType.PLAYER, new Vec3(.6,0,0));
+            }
+            int destroyed = 0;
+            for (int x = 11; x <= 14; x++) for (int z = 5; z <= 9; z++)
+                for (int y = FLOOR; y <= FLOOR + 2; y++)
+                    if (helper.getBlockState(new BlockPos(x,y,z)).isAir()) destroyed++;
+            helper.assertTrue(destroyed > 0 && destroyed <= 8,
+                    "all owner packets in one tick share the destruction budget: " + destroyed);
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void crowdedContactsDoNotReuseTheApproachMomentum(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle moving = car(helper,10,7.5,true);
+        // Parked vehicles can overlap after spawning/loading. All headings and masses match,
+        // so signed speeds are x velocities and their sum measures total planar momentum.
+        Vehicle a = car(helper,12.5,7.5,true);
+        Vehicle b = car(helper,12.5,7.5,true);
+        Vehicle c = car(helper,12.5,7.5,true);
+        helper.runAtTickTime(2, () -> {
+            moving.move(net.minecraft.world.entity.MoverType.SELF,new Vec3(1,0,0));
+            double total = moving.speed()+a.speed()+b.speed()+c.speed();
+            helper.assertTrue(Math.abs(total-1.0) < .001,
+                    "successive contacts conserve the initial momentum: " + total);
+            helper.succeed();
+        });
+    }
+
 }

@@ -39,7 +39,7 @@ public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "3";
+    private static final String VERSION = "4";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {
@@ -79,6 +79,15 @@ public final class Payloads {
         }
     }
 
+    /** Server-owned contact velocity delivered to the driver for their next simulated move. */
+    public record ContactVelocity(int vehicle, double x, double z) implements CustomPacketPayload {
+        public static final Type<ContactVelocity> TYPE = new Type<>(VanillaWheels.id("contact_velocity"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ContactVelocity> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, ContactVelocity::vehicle, ByteBufCodecs.DOUBLE, ContactVelocity::x,
+                ByteBufCodecs.DOUBLE, ContactVelocity::z, ContactVelocity::new);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
     /** The horn key went down or up. */
     public record Horn(int vehicle, boolean held) implements CustomPacketPayload {
         public static final Type<Horn> TYPE = new Type<>(VanillaWheels.id("horn"));
@@ -105,6 +114,12 @@ public final class Payloads {
 
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
+        registrar.playToClient(ContactVelocity.TYPE, ContactVelocity.STREAM_CODEC, (payload, context) -> {
+            Entity entity = context.player().level().getEntity(payload.vehicle());
+            if (entity instanceof Vehicle v && v.getControllingPassenger() == context.player()) {
+                v.onContactVelocity(payload.x(), payload.z());
+            }
+        });
         registrar.playToServer(DriveState.TYPE, DriveState.STREAM_CODEC, (payload, context) ->
                 driven(context, payload.vehicle()).ifPresent(v -> v.onDriveState(payload.speed(), payload.steer(), payload.throttle(), payload.drifting(), payload.burn())));
         registrar.playToServer(Horn.TYPE, Horn.STREAM_CODEC, (payload, context) ->

@@ -148,8 +148,8 @@ dependencies {
     // and inert on the server. The loader deduplicates nested copies.
     jarJar(implementation("com.chunkworks.luminance:luminance")) {
         version {
-            strictly "[1.0,2.0)"
-            prefer "1.0.0"
+            strictly "[1.1,2.0)"
+            prefer "1.1.0"
         }
     }
     // Metals and Materials supplies the steel the part recipes take

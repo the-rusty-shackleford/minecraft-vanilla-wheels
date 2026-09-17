@@ -34,12 +34,12 @@ the client (renderer with the game's double chest and the rider's glass fade, me
 library with placeholder on a bad file, keys with a riding-only conflict context, the
 lights indicator by the hotbar, engine loop, radio, Luminance headlamps, the lift
 renderer and screen).
-`gametest`: the box car and box trailer, twenty-four gametests, the photo booth.
+`gametest`: the box car and box trailer, real-server gametests, the photo booth.
 
 ## How it is verified
 
-`./gradlew check`: 77 JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
-fixtures); twenty-seven gametests on a headless server driving a scripted box car, towing
+`./gradlew check`: JUnit tests on the pure layer (the Trailblazer bundle's OBJs are
+fixtures); real gametests on a headless server driving a scripted box car, towing
 the box trailer, loading cows, and working a lift through a mock player; the photo booth
 on a real client (paint, the dash from the driver's seat, the lamps at night with the
 beam through Luminance, the lift placed, its menu, raised with the built car, painted,
@@ -153,3 +153,23 @@ Version 1.6.0 was published on 2026-09-16 and deployed in pack 1.35.1
 after the clean release build and asset verification. The deployed server matched
 the published pack and ran at 20 TPS. This supersedes the earlier release holds
 and pending presentation/listening review recorded above.
+
+## Held follow-up — 2026-09-16
+
+D-0011 adds shared contacts and protected fragile destruction; the existing original
+headlamp Line appearance now follows interpolated vehicle position/yaw through Luminance.
+Production release is held. See README for current gates and remaining multiplayer work.
+
+## Release authorization — 2026-09-17
+
+Rusty approved the final vehicle cosmetics, then explicitly requested the release.
+Version 1.7.0 is the coordinated release version, superseding the prior hold.
+The release set is Luminance 1.1.0, Vanilla Wheels 1.7.0 (network protocol 4),
+Trailblazer 1.7.0, Farmer's Pickup 1.3.0 and Trailer 2.3.0, targeting pack 1.36.0.
+All peers must update together. Vehicle artwork changes leave the existing gameplay
+profiles, recipes, seats and interaction anchors unchanged; the separately approved
+collision and moving-light changes ship in the shared libraries.
+
+Independent driver/observer multiplayer, the historical live movement-warning route,
+and representative 4–8-player tracking/DH capacity remain open follow-ups. Local tests
+do not establish those results. Release authorization does not claim those checks passed.

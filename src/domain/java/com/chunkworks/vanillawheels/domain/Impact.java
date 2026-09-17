@@ -73,8 +73,61 @@ public final class Impact {
         return speed * (width >= LARGE_WIDTH ? KEEP_AFTER_LARGE : KEEP_AFTER_SMALL);
     }
 
+    /** A planar velocity. RI: finite components. AF: blocks travelled along x/z per tick. */
+    public record Velocity(double x, double z) {
+        public Velocity {
+            if (!Double.isFinite(x) || !Double.isFinite(z)) throw new IllegalArgumentException("finite velocity required");
+        }
+    }
+
+    /** The two velocities following contact; immutable and finite. */
+    public record Contact(Velocity first, Velocity second) {}
+
+    /**
+     * requires: normal points from first body to second; masses positive and finite
+     * effects: exchanges normal momentum with restrained, speed-dependent restitution;
+     * tangential velocity is preserved. Separating/stationary bodies receive no impulse.
+     * throws: IllegalArgumentException for invalid mass or zero/nonfinite normal
+     */
+    public static Contact contact(Velocity a, double massA, Velocity b, double massB, double nx, double nz) {
+        require(massA, massB);
+        double length = Math.hypot(nx, nz);
+        if (!Double.isFinite(length) || length < 1e-9) throw new IllegalArgumentException("nonzero normal required");
+        nx /= length; nz /= length;
+        double closing = (a.x - b.x) * nx + (a.z - b.z) * nz;
+        if (closing <= 0) return new Contact(a, b);
+        double restitution = closing < PACE ? 0 : Math.min(0.18, closing * 0.15);
+        double impulse = (1 + restitution) * closing / (1 / massA + 1 / massB);
+        return new Contact(new Velocity(a.x - impulse * nx / massA, a.z - impulse * nz / massA),
+                new Velocity(b.x + impulse * nx / massB, b.z + impulse * nz / massB));
+    }
+
+    /**
+     * requires: normal points into the wall and is nonzero and finite
+     * effects: retains tangent motion with slight friction; a hard impact rebounds at most 12%.
+     * Gentle contact stops along the normal; separating motion is unchanged.
+     * throws: IllegalArgumentException for an invalid normal
+     */
+    public static Velocity wall(Velocity v, double nx, double nz) {
+        double length = Math.hypot(nx, nz);
+        if (!Double.isFinite(length) || length < 1e-9) throw new IllegalArgumentException("nonzero normal required");
+        nx /= length; nz /= length;
+        double closing = v.x * nx + v.z * nz;
+        if (closing <= 0) return v;
+        double rebound = closing < PACE ? 0 : Math.min(0.12, closing * 0.12);
+        return new Velocity((v.x - closing * nx) * 0.98 - closing * rebound * nx,
+                (v.z - closing * nz) * 0.98 - closing * rebound * nz);
+    }
+
+    /** effects: returns whether kinetic energy exceeds the fragile-block threshold; throws: IllegalArgumentException for invalid numbers */
+    public static boolean breaksFragile(double speed, double mass) {
+        require(1, mass);
+        if (!Double.isFinite(speed)) throw new IllegalArgumentException("finite speed required");
+        return Math.abs(speed) >= 0.2 && mass * speed * speed >= 0.09;
+    }
+
     private static void require(double maxSpeed, double mass) {
-        if (maxSpeed <= 0 || mass <= 0) {
+        if (!Double.isFinite(maxSpeed) || !Double.isFinite(mass) || maxSpeed <= 0 || mass <= 0) {
             throw new IllegalArgumentException("maxSpeed and mass must be positive");
         }
     }

@@ -144,3 +144,11 @@ subjective adjustments await review of the complete baseline. Release remains he
 engine/skid output and a liquid fuel-pour cue. The shader booth now samples the actual
 visible lamps/stripe and separates painted body from blue glass/deck pixels. The
 preferred bundled steel is 1.0.1. Driving physics and release authorization are unchanged.
+
+
+## Release approval - 2026-09-16
+
+Rusty approved the final review, completing their earlier conditional release go.
+Version 1.6.0 is cleared for publication in pack 1.35.0 after the clean
+release build and asset verification. This supersedes the earlier release holds
+and pending presentation/listening review recorded above.

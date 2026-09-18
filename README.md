@@ -10,7 +10,7 @@ mod of its own.
 Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-luminance)
 (nested; the headlamps light the world through it) and
 [Metals and Materials](https://github.com/the-rusty-shackleford/minecraft-metals-and-materials)
-(steel, for the recipes).
+(required separately on client and server; steel for the recipes).
 
 ## Creative inventory
 
@@ -18,7 +18,7 @@ The **Vanilla Wheels** tab contains every installed vehicle and its chassis, fol
 by the Mechanic Lift, wrench, wheels, engine and full/empty gas cans. Trailblazer,
 Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
 The ordinary vanilla categories and Creative search remain available too.
-Version 1.7.1 adds this tab and bundles Metals and Materials 1.0.2. See the
+Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
 [full-pack tab check](devtools/verification/creative-tab.md).
 
 ## Driving
@@ -272,7 +272,8 @@ vehicle), one **wheel** per wheel position, and an **engine** if the profile has
 more, no less. Wheels are eight leather around a steel ingot; an engine is two redstone, a
 redstone torch, a diamond and five steel; the wrench two steel and two iron; the lift two
 pistons, three iron blocks, a redstone block and three smooth stone. Steel is Metals and
-Materials' (nested, so always present).
+Materials'. Install that required mod separately on both client and server;
+Mod Hub includes the shared version in our pack.
 
 The **Mechanic Lift** is one item that places a whole lift: a deck five blocks wide and
 six long with a one-block post on each corner, thirty-four blocks laid at once facing

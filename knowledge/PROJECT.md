@@ -221,3 +221,12 @@ selected an older nested copy despite the updated Vanilla Wheels bundle. The 1.3
 correction matches the directly installed materials jar used in full-pack testing.
 Final startup verified all four updated mod versions; world, operators and DH settings
 were preserved. This supersedes the historical release holds above.
+
+## Shared materials dependency — 2026-09-18, unreleased
+
+Version 1.7.2 implements [D-0013](decisions/D-0013.md): Metals and Materials
+is required and installed separately, with no embedded copy. Items, recipes,
+steel aliases and gameplay are unchanged. Unit/server checks, recursive jar/payload audits and complete-pack startup passed; release is held.
+
+Validation: see Metals and Materials `devtools/verification/separate-dependency.md`;
+all six packaging builds and the complete-pack client/server check passed.

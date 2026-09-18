@@ -12,6 +12,15 @@ Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-lumi
 [Metals and Materials](https://github.com/the-rusty-shackleford/minecraft-metals-and-materials)
 (steel, for the recipes).
 
+## Creative inventory
+
+The **Vanilla Wheels** tab contains every installed vehicle and its chassis, followed
+by the Mechanic Lift, wrench, wheels, engine and full/empty gas cans. Trailblazer,
+Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
+The ordinary vanilla categories and Creative search remain available too.
+This tab is a local, unreleased follow-up to 1.7.0. See the
+[full-pack tab check](devtools/verification/creative-tab.md).
+
 ## Driving
 
 Right-click a vehicle to board the nearest free seat, the driver's first. Movement keys

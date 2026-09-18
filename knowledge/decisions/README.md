@@ -23,3 +23,4 @@ tags: [index]
 | D-0009 | Fuel is the gas can; creative driving requires and spends no fuel |
 | D-0010 | Lift guidance, material bevels and a restrained continuous sound mix |
 | D-0011 | Shared contacts and bounded, protected fragile destruction through the existing driving model |
+| D-0012 | One Vanilla Wheels Creative tab groups every vehicle, chassis and shared part |

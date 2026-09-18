@@ -17,6 +17,7 @@
  */
 package com.chunkworks.vanillawheels;
 
+import net.minecraft.network.chat.Component;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
@@ -62,6 +63,7 @@ public final class ModContent {
 
     private static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE, VanillaWheelsMod.MOD_ID);
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(VanillaWheelsMod.MOD_ID);
+    private static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, VanillaWheelsMod.MOD_ID);
     private static final DeferredRegister<DataComponentType<?>> COMPONENTS = DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, VanillaWheelsMod.MOD_ID);
     private static final DeferredRegister<SoundEvent> SOUNDS = DeferredRegister.create(Registries.SOUND_EVENT, VanillaWheelsMod.MOD_ID);
     private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(VanillaWheelsMod.MOD_ID);
@@ -134,6 +136,7 @@ public final class ModContent {
 
     /** effects: registers everything on {@code modBus} */
     public static void register(IEventBus modBus) {
+        TABS.register(modBus);
         ENTITIES.register(modBus);
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
@@ -159,7 +162,7 @@ public final class ModContent {
 
     /**
      * effects: puts the parts in Ingredients, the wrench in Tools, the lift in Functional Blocks, and one vehicle
-     * item and one chassis per registered profile in Transportation, so a
+     * item and one chassis per registered profile in Tools & Utilities, so a
      * vehicle mod's creative presence is automatic
      */
     static void buildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
@@ -180,4 +183,23 @@ public final class ModContent {
             }
         }
     }
+
+    /** Every usable Vanilla Wheels item in its own Creative inventory tab. */
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> CREATIVE_TAB = TABS.register("main", () -> CreativeModeTab.builder()
+            .title(Component.translatable("itemGroup.vanillawheels"))
+            .icon(() -> WHEEL.get().getDefaultInstance())
+            .displayItems((parameters, output) -> {
+                var profiles = parameters.holders().lookupOrThrow(VanillaWheels.VEHICLES).listElements()
+                        .map(holder -> holder.key().location())
+                        .sorted(java.util.Comparator.comparing(ResourceLocation::toString)).toList();
+                profiles.forEach(id -> output.accept(vehicleStack(id)));
+                profiles.forEach(id -> output.accept(chassisStack(id)));
+                output.accept(LIFT_ITEM.get());
+                output.accept(WRENCH.get());
+                output.accept(WHEEL.get());
+                output.accept(ENGINE.get());
+                output.accept(GAS_CAN.get());
+                output.accept(EMPTY_GAS_CAN.get());
+            })
+            .build());
 }

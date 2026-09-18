@@ -187,3 +187,15 @@ players online; installed server hashes match, and Mod Hub reports pack parity.
 The initial empty-server sample was 20 TPS. Startup retained the same 36 pre-existing
 third-party error messages, with none added. This does not close the multiplayer,
 historical movement-warning or representative capacity follow-ups above.
+
+
+## Dedicated Creative tabs — 2026-09-18, unreleased
+
+Rusty requested a separate Creative inventory page for each item-adding mod, then
+explicitly chose to group all vehicles in Vanilla Wheels.
+D-0012 adds one Vanilla Wheels Creative tab for all installed vehicles, their chassis,
+and shared tools and parts. Trailblazer, Trailer and Farmer's Pickup share that page;
+vehicle packs remain data-only.
+No release or deployment is authorized by this follow-up.
+Validation: 36 real-server GameTests and native full-pack Creative tab navigation/
+item pickup passed; see [evidence](../devtools/verification/creative-tab.md).

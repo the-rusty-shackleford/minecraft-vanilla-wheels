@@ -206,3 +206,18 @@ Rusty explicitly requested deployment: "Deploy it! I wanna play with it".
 Version 1.7.1 is approved for publication and deployment in pack 1.39.1,
 superseding the Creative-tab release hold above. Existing gameplay and world data
 are preserved. Clean release builds and pack/hash verification gate deployment.
+
+## Published release — 2026-09-18
+
+Version 1.7.1 is published at
+[GitHub Releases](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.7.1)
+and deployed to the server and Prism client in **pack 1.39.2**.
+Clean release builds and real-server checks passed; the full-pack client verified
+Creative tabs and item pickup. The downloaded release jar exactly matched the build.
+The live server loaded the correct version and matched the published pack at 20 TPS.
+
+Metals and Materials 1.0.2 is explicitly included in the pack: the first 1.39.1 startup
+selected an older nested copy despite the updated Vanilla Wheels bundle. The 1.39.2
+correction matches the directly installed materials jar used in full-pack testing.
+Final startup verified all four updated mod versions; world, operators and DH settings
+were preserved. This supersedes the historical release holds above.

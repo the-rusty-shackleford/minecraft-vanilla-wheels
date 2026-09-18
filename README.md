@@ -18,7 +18,7 @@ The **Vanilla Wheels** tab contains every installed vehicle and its chassis, fol
 by the Mechanic Lift, wrench, wheels, engine and full/empty gas cans. Trailblazer,
 Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
 The ordinary vanilla categories and Creative search remain available too.
-This tab is a local, unreleased follow-up to 1.7.0. See the
+Version 1.7.1 adds this tab and bundles Metals and Materials 1.0.2. See the
 [full-pack tab check](devtools/verification/creative-tab.md).
 
 ## Driving

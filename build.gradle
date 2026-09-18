@@ -157,7 +157,7 @@ dependencies {
     jarJar(implementation("com.chunkworks.metalsandmaterials:metalsandmaterials")) {
         version {
             strictly "[1.0,2.0)"
-            prefer "1.0.1"
+            prefer "1.0.2"
         }
     }
 

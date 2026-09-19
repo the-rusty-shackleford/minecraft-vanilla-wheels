@@ -90,6 +90,23 @@ public final class ModContent {
     /** The disc in a picked-up vehicle's radio. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<ItemStack>> DISC = COMPONENTS.register("disc",
             () -> DataComponentType.<ItemStack>builder().persistent(ItemStack.OPTIONAL_CODEC).networkSynchronized(ItemStack.OPTIONAL_STREAM_CODEC).build());
+    /** Remaining durability, out of 10000; zero remains an item. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> CONDITION = COMPONENTS.register("condition",
+            () -> DataComponentType.<Integer>builder().persistent(Codec.intRange(0, 10000)).networkSynchronized(ByteBufCodecs.VAR_INT).build());
+    /** All chest slots, including positions and complete item components. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.List<net.minecraft.world.item.component.ItemContainerContents>>> CARGO = COMPONENTS.register("cargo",
+            () -> DataComponentType.<java.util.List<net.minecraft.world.item.component.ItemContainerContents>>builder().persistent(VehicleCargo.CODEC).networkSynchronized(VehicleCargo.STREAM_CODEC).build());
+    /** Server-owned vehicle identity and one-use packed-item incarnation. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> BINDING = uuidComponent("binding");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> PACKED_TOKEN = uuidComponent("packed_token");
+    /** The owner and current active fob token. Replacing a key invalidates older tokens. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> KEY_OWNER = uuidComponent("key_owner");
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> KEY_TOKEN = uuidComponent("key_token");
+
+    private static DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> uuidComponent(String name) {
+        return COMPONENTS.register(name, () -> DataComponentType.<java.util.UUID>builder()
+                .persistent(net.minecraft.core.UUIDUtil.CODEC).networkSynchronized(net.minecraft.core.UUIDUtil.STREAM_CODEC).build());
+    }
 
     /** A vehicle in the hand: placed like a boat. */
     public static final DeferredItem<VehicleItem> VEHICLE_ITEM = ITEMS.registerItem("vehicle", VehicleItem::new, new Item.Properties().stacksTo(1));
@@ -101,6 +118,7 @@ public final class ModContent {
     public static final DeferredItem<Item> ENGINE = ITEMS.registerSimpleItem("engine");
     /** Takes a vehicle back into the hand. */
     public static final DeferredItem<Item> WRENCH = ITEMS.registerItem("wrench", WrenchItem::new, new Item.Properties().stacksTo(1));
+    public static final DeferredItem<KeyFobItem> KEY_FOB = ITEMS.registerItem("key_fob", KeyFobItem::new, new Item.Properties().stacksTo(1));
     /** A tank's worth of fuel: hold use at a vehicle to pour. Full when crafted. */
     public static final DeferredItem<GasCanItem> GAS_CAN = ITEMS.registerItem("gas_can",
             props -> new GasCanItem(props.component(FUEL.get(), GasCanItem.CAPACITY)), new Item.Properties().stacksTo(1));
@@ -171,6 +189,7 @@ public final class ModContent {
             event.accept(ENGINE);
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(WRENCH);
+            event.accept(KEY_FOB);
             event.accept(GAS_CAN);
             event.accept(EMPTY_GAS_CAN);
         } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
@@ -196,6 +215,7 @@ public final class ModContent {
                 profiles.forEach(id -> output.accept(chassisStack(id)));
                 output.accept(LIFT_ITEM.get());
                 output.accept(WRENCH.get());
+                output.accept(KEY_FOB.get());
                 output.accept(WHEEL.get());
                 output.accept(ENGINE.get());
                 output.accept(GAS_CAN.get());

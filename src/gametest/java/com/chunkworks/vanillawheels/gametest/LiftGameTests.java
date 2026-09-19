@@ -259,6 +259,67 @@ public final class LiftGameTests {
 
     // --- the menu ------------------------------------------------------------
 
+    /** Partitions: empty/healthy/damaged/wreck; wrong/short/exact/excess material; idle/busy; survival/creative. */
+    @GameTest(template = "arena", timeoutTicks = 160)
+    public void repairsOnlyDamagedMountedVehiclesAtProportionalCostAndPreservesCargo(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "lift placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        LiftMenu menu = open(helper, sp, CONTROLLER);
+        menu.broadcastChanges();
+        helper.assertTrue(!menu.repairVisible() && !menu.getSlot(LiftMenu.REPAIR).isActive(), "no repair section on an empty deck");
+        Vehicle car = Vehicle.create(helper.getLevel(), BOX_CAR, lift.spawn(), 180);
+        helper.getLevel().addFreshEntity(car);
+        car.setFuel(1234); car.setItem(0, new ItemStack(Items.DIAMOND, 7));
+        menu.broadcastChanges();
+        helper.assertTrue(!menu.repairVisible(), "healthy vehicle hides repair section");
+        car.setCondition(7499); menu.broadcastChanges();
+        helper.assertTrue(menu.repairVisible(), "damage reveals repair section");
+        helper.assertValueEqual(menu.repairCost(), 6, "25.01 percent damage rounds 5.002 steel up to six");
+        menu.getSlot(LiftMenu.REPAIR).set(new ItemStack(Items.DIRT, 64)); menu.broadcastChanges();
+        helper.assertTrue(!menu.repairReady() && !menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "wrong material rejected");
+        ItemStack steel = menu.repairMaterial(); steel.setCount(5);
+        var repairItem = steel.getItem();
+        menu.getSlot(LiftMenu.REPAIR).set(steel); menu.broadcastChanges();
+        helper.assertTrue(!menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "insufficient material rejected");
+        helper.assertValueEqual(steel.getCount(), 5, "refused repair consumed nothing");
+        steel.setCount(8); menu.broadcastChanges();
+        helper.assertTrue(menu.repairReady() && menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "repair accepted");
+        helper.assertValueEqual(car.condition(), 10000, "fully repaired");
+        helper.assertTrue(menu.getSlot(LiftMenu.REPAIR).getItem().isEmpty(), "hidden repair slot holds nothing");
+        helper.assertValueEqual(sp.getInventory().items.stream().filter(s -> s.is(repairItem)).mapToInt(ItemStack::getCount).sum(), 2, "two spare ingots returned immediately");
+        helper.assertValueEqual(car.tank().ticks(), 1234, "repair does not refill fuel");
+        helper.assertValueEqual(car.getItem(0).getCount(), 7, "cargo is intact");
+        helper.assertTrue(!menu.repairVisible(), "healthy car hides repair section again");
+        car.setCondition(0); menu.getSlot(LiftMenu.REPAIR).set(menu.repairMaterial()); menu.broadcastChanges();
+        helper.assertTrue(!menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "busy lift refuses another job");
+        helper.runAtTickTime(LiftMotion.JOB + 2, () -> {
+            menu.broadcastChanges();
+            helper.assertValueEqual(menu.repairCost(), 20, "full wreck costs twenty steel");
+            ItemStack full = menu.repairMaterial(); full.setCount(20); menu.getSlot(LiftMenu.REPAIR).set(full);
+            helper.assertTrue(menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "wreck repaired through real menu");
+            helper.assertTrue(car.hasFuel(), "repaired engine works again");
+            helper.assertTrue(menu.getSlot(LiftMenu.REPAIR).getItem().isEmpty(), "full repair consumed twenty");
+            sp.closeContainer(); helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public void creativeRepairsRequireAndConsumeNoMaterials(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.CREATIVE);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "lift placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle car = Vehicle.create(helper.getLevel(), BOX_CAR, lift.spawn(), 180);
+        car.setCondition(0); helper.getLevel().addFreshEntity(car);
+        LiftMenu menu = open(helper, sp, CONTROLLER); menu.broadcastChanges();
+        helper.assertTrue(menu.getSlot(LiftMenu.REPAIR).getItem().isEmpty(), "no repair material supplied");
+        helper.assertTrue(menu.repairReady() && menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "creative repairs without material");
+        helper.assertValueEqual(car.condition(), 10000, "repaired");
+        sp.closeContainer(); helper.succeed();
+    }
+
     @GameTest(template = "arena", timeoutTicks = 100)
     public void theMenuOpensAtTheControllerFromAFarPostAndHandsThePartsBackOnClose(GameTestHelper helper) {
         layFloor(helper);

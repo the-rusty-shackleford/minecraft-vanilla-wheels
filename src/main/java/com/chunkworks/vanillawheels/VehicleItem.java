@@ -33,8 +33,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A vehicle in the hand, named for the vehicle its component says it is.
  * Used on the ground it becomes the vehicle, facing the way the player
- * faces, with the paint, fuel and disc the item carries; the item is
- * spent (unless the player is in creative).
+ * faces, with its cargo, condition, paint, fuel and disc. Packed property
+ * transfers once even in creative; fresh catalog templates remain reusable.
  */
 public final class VehicleItem extends Item {
     public VehicleItem(Properties properties) {
@@ -69,17 +69,35 @@ public final class VehicleItem extends Item {
         if (vehicle == null) {
             return InteractionResult.FAIL;
         }
-        vehicle.loadFromItem(stack);
+        RecoveryData recovery = RecoveryData.get(((ServerLevel) level).getServer());
+        if (!recovery.canPlace(stack) || !vehicle.loadFromItem(stack)) {
+            context.getPlayer().displayClientMessage(Component.translatable("vanillawheels.key.stale_vehicle"), true);
+            return InteractionResult.FAIL;
+        }
         AABB box = vehicle.getBoundingBox();
         if (!level.noCollision(vehicle, box.deflate(0.05))) {
             context.getPlayer().displayClientMessage(Component.translatable("vanillawheels.no_room"), true);
             return InteractionResult.FAIL;
         }
-        level.addFreshEntity(vehicle);
+        vehicle.placingFromItem(true);
+        if (!level.addFreshEntity(vehicle)) return InteractionResult.FAIL;
+        vehicle.placingFromItem(false);
+        recovery.deployed(vehicle, stack);
         level.playSound(null, at.x, at.y, at.z, ModContent.WRENCH_CLANK.get(), net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 0.9f);
-        if (!context.getPlayer().hasInfiniteMaterials()) {
+        if (!context.getPlayer().hasInfiniteMaterials() || stack.has(ModContent.PACKED_TOKEN.get())) {
             stack.shrink(1);
         }
         return InteractionResult.CONSUME;
+    }
+
+    @Override public boolean isBarVisible(ItemStack stack) { return stack.getOrDefault(ModContent.CONDITION.get(), 10000) < 10000; }
+    @Override public int getBarWidth(ItemStack stack) { return Math.round(13f * stack.getOrDefault(ModContent.CONDITION.get(), 10000) / 10000f); }
+    @Override public int getBarColor(ItemStack stack) { return stack.getOrDefault(ModContent.CONDITION.get(), 10000) == 0 ? 0xAA3333 : 0x55AA55; }
+    @Override public void appendHoverText(ItemStack stack, TooltipContext context, java.util.List<Component> tooltip, net.minecraft.world.item.TooltipFlag flag) {
+        int condition = stack.getOrDefault(ModContent.CONDITION.get(), 10000);
+        tooltip.add(Component.translatable("vanillawheels.condition", String.format(java.util.Locale.ROOT, "%.1f", condition / 100.0)));
+        if (condition == 0) tooltip.add(Component.translatable("vanillawheels.broken").withStyle(net.minecraft.ChatFormatting.RED));
+        long occupied = stack.getOrDefault(ModContent.CARGO.get(), java.util.List.<net.minecraft.world.item.component.ItemContainerContents>of()).stream().flatMap(net.minecraft.world.item.component.ItemContainerContents::nonEmptyStream).count();
+        if (occupied > 0) tooltip.add(Component.translatable("vanillawheels.cargo", occupied).withStyle(net.minecraft.ChatFormatting.GRAY));
     }
 }

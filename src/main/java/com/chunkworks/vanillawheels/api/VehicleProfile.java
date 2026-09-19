@@ -85,7 +85,7 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
 
     /** What the vehicle carries: tank, chest, gauges, lamps, horn, radio, hitch, cargo, doors. One flat object in the JSON. */
     public record Kit(Optional<Fuel> fuel, Optional<Storage> storage, List<Gauge> gauges, Optional<Headlights> headlights,
-                      Optional<ResourceLocation> horn, Optional<Radio> radio, Hitch hitch, Optional<Cargo> cargo, List<Door> doors) {
+                      Optional<ResourceLocation> horn, Optional<Radio> radio, Hitch hitch, Optional<Cargo> cargo, List<Door> doors, Repair repair) {
         public static final MapCodec<Kit> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Fuel.CODEC.optionalFieldOf("fuel").forGetter(Kit::fuel),
                 Storage.CODEC.optionalFieldOf("storage").forGetter(Kit::storage),
@@ -95,7 +95,8 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
                 Radio.CODEC.optionalFieldOf("radio").forGetter(Kit::radio),
                 Hitch.CODEC.optionalFieldOf("hitch", Hitch.NONE).forGetter(Kit::hitch),
                 Cargo.CODEC.optionalFieldOf("cargo").forGetter(Kit::cargo),
-                Door.CODEC.listOf().optionalFieldOf("doors", List.of()).forGetter(Kit::doors)
+                Door.CODEC.listOf().optionalFieldOf("doors", List.of()).forGetter(Kit::doors),
+                Repair.CODEC.optionalFieldOf("repair", Repair.DEFAULT).forGetter(Kit::repair)
         ).apply(i, Kit::new));
 
         public Kit {
@@ -125,6 +126,18 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     public Hitch hitch() { return kit.hitch(); }
     public Optional<Cargo> cargo() { return kit.cargo(); }
     public List<Door> doors() { return kit.doors(); }
+    public Repair repair() { return kit.repair(); }
+
+    /** A datapack-owned repair ingredient and the material count for a completely broken vehicle. */
+    public record Repair(net.minecraft.world.item.crafting.Ingredient ingredient, int fullCost) {
+        public static final Codec<Repair> CODEC = RecordCodecBuilder.create(i -> i.group(
+                net.minecraft.world.item.crafting.Ingredient.CODEC_NONEMPTY.fieldOf("ingredient").forGetter(Repair::ingredient),
+                Codec.intRange(1, 64).fieldOf("full_cost").forGetter(Repair::fullCost)
+        ).apply(i, Repair::new));
+        public static final Repair DEFAULT = new Repair(net.minecraft.world.item.crafting.Ingredient.of(
+                net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ITEM,
+                        ResourceLocation.fromNamespaceAndPath("c", "ingots/steel"))), 20);
+    }
 
     /** A vector in mesh units, written {@code [x, y, z]}. */
     public static final Codec<Vec> VEC = Codec.DOUBLE.listOf(3, 3).xmap(l -> new Vec(l.get(0), l.get(1), l.get(2)),

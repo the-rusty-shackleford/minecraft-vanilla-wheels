@@ -328,13 +328,14 @@ public final class VehicleGameTests {
     }
 
     @GameTest(template = "runway", timeoutTicks = 100)
-    public void theChestSpillsOnAWrenchAndTheItemKeepsPaintAndFuel(GameTestHelper helper) {
+    public void theWrenchPacksCargoPaintFuelAndDamageWithoutLooseDrops(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 4.5, 7.5, true);
         helper.assertValueEqual(v.getContainerSize(), 54, "two chests of three rows");
         v.setItem(0, new ItemStack(Items.APPLE, 7));
         v.setItem(26, new ItemStack(Items.STICK, 3));
         v.setPaint(net.minecraft.world.item.DyeColor.RED);
+        v.hurt(helper.getLevel().damageSources().generic(), 1);
         int fuel = v.tank().ticks();
         Player p = helper.makeMockPlayer(GameType.SURVIVAL);
         p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.WRENCH.get()));
@@ -342,7 +343,7 @@ public final class VehicleGameTests {
         v.interactAt(p, Vec3.ZERO, InteractionHand.MAIN_HAND);
         helper.assertTrue(v.isRemoved(), "the vehicle is gone");
         int atOnce = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0)).stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
-        helper.assertValueEqual(atOnce, 7, "the apples spilled at once");
+        helper.assertValueEqual(atOnce, 0, "no apples spilled");
         ItemStack held = null;
         for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
             if (p.getInventory().getItem(i).is(ModContent.VEHICLE_ITEM.get())) {
@@ -353,6 +354,10 @@ public final class VehicleGameTests {
         helper.assertValueEqual(held.get(ModContent.PAINT.get()), net.minecraft.world.item.DyeColor.RED, "its paint");
         helper.assertValueEqual(held.get(ModContent.FUEL.get()), fuel, "its fuel");
         helper.assertValueEqual(VanillaWheels.vehicleOf(held).orElse(null), BOX_CAR, "its vehicle");
+        helper.assertValueEqual(held.get(ModContent.CONDITION.get()), 8000, "persistent wear");
+        var packedCargo = com.chunkworks.vanillawheels.VehicleCargo.unpack(held.get(ModContent.CARGO.get()));
+        helper.assertValueEqual(packedCargo.get(0).getCount(), 7, "apples remain in slot zero");
+        helper.assertValueEqual(packedCargo.get(26).getCount(), 3, "sticks remain in slot 26");
         helper.runAtTickTime(5, () -> {
             // Five ticks on, they are still here.
             List<ItemEntity> spilled = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0));
@@ -360,8 +365,8 @@ public final class VehicleGameTests {
             int sticks = spilled.stream().filter(e -> e.getItem().is(Items.STICK)).mapToInt(e -> e.getItem().getCount()).sum();
             // Two takers once had them by now: a lift test's sixteen-block sweep (sweepLiftItems) and
             // another test's mock rider still at the world's origin on its first tick aboard (riderAt).
-            helper.assertValueEqual(apples, 7, "the apples are still here (sticks " + sticks + ")");
-            helper.assertValueEqual(sticks, 3, "the sticks spilled");
+            helper.assertValueEqual(apples, 0, "no later duplicate apples (sticks " + sticks + ")");
+            helper.assertValueEqual(sticks, 0, "no later duplicate sticks");
             helper.succeed();
         });
     }

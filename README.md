@@ -144,14 +144,62 @@ at speed had the server refuse every tick and snap the vehicle back.
   click's line is followed on from the hull into the bed, so a chest sunk in a bed opens
   from outside; right-click anywhere else on the body and you board. A rider presses the inventory key for the first chest, since
   crouching dismounts. A chest's lid is up, with the chest's sounds, while anyone has it
-  open. Contents ride with the vehicle and spill when it is wrenched or destroyed.
+  open. Contents stay inside the packed vehicle when it is wrenched or destroyed,
+  including item names, enchantments and other components.
 - **Records**: crouch and right-click a vehicle that has a radio while holding a music
   disc, and it plays for everyone in range the way a jukebox does, with the now-playing
   toast; crouch and right-click the radio empty-handed to eject it. The disc stays until
   ejected, as in a jukebox.
 - **Wrench**: crouch and right-click with the wrench to take the vehicle back into the
-  hand with its paint, fuel and disc; the chest spills. Right-click the ground with the
-  item to place it facing you.
+  inventory with its paint, fuel, disc, damage and all chest contents. A full inventory
+  leaves a packed drop, including in creative. Right-click the ground to place it.
+
+## Damage, repairs and recovery keys (1.8.0, local review)
+
+Vehicles have persistent condition. Breaking one drops a packed vehicle at zero
+condition with its cargo intact. Place this wreck on a Mechanic Lift; its engine
+cannot run until repaired. Older vehicles and items start at full condition.
+
+The lift shows a Repair section only while a damaged vehicle is mounted. Add the
+displayed material and press Repair. Cost scales with missing condition and rounds
+up to whole ingots; repair restores full condition without changing fuel or cargo.
+Full repairs cost 20 steel for Trailblazer, 18 iron for Farmer's Pickup and 12 steel
+for Trailer. Creative repairs require and consume no materials.
+
+Craft a Vehicle Key Fob from two iron ingots, redstone and an ender pearl. Use it on
+a motor vehicle to pair it. Each player has one active pairing; pairing another
+vehicle or replacing a lost fob invalidates the previous key. Use a blank fob in
+air to replace a lost key for your existing vehicle.
+
+Hold use with the paired fob to locate the vehicle and preview its cost. Continue
+holding for one second to bring it and its currently hitched trailer into inventory,
+preserving all cargo and damage. Release to cancel. Passengers, animals, open vehicle
+chests or insufficient inventory space prevent recall and charge nothing.
+
+| Distance | Fuel bill, as a fraction of a full tank |
+|---|---|
+| 250 blocks | 1% minimum |
+| 1,000 blocks | 5% |
+| 2,000 blocks | 20% |
+| 4,000 blocks | 80% |
+| 4,473+ blocks, or another dimension | 100% maximum |
+
+The curve is quadratic: `clamp(0.05 * (distance / 1000)^2, .01, 1)`.
+Fuel is deducted from the motor vehicle. If fuel is short, the tank empties and
+half the missing tank percentage becomes condition loss. A 20% bill with 5% fuel
+costs 7.5% condition. Recall still succeeds if this returns a broken vehicle.
+Creative recall costs neither fuel nor condition.
+
+A paired broken drop does not despawn or take ordinary damage and can be recalled.
+Recall loads only a temporary area around the saved location and transfers the actual
+entity or drop. If someone has already collected the item, the fob cannot produce
+another copy. Keys do not retrieve items from someone else's inventory or a container.
+Breaking or wrenching detaches a trailer; only a currently hitched trailer accompanies
+a deployed vehicle's recall. Unload animals before recalling a livestock trailer.
+
+Packed items are transferred when placed even in creative, so their cargo is not
+duplicated. Fresh Creative-tab vehicles remain reusable templates. This update uses
+network protocol 5 and requires matching clients and server. It is **not released**.
 
 ## Running things over
 
@@ -231,6 +279,11 @@ the body is drawn through the cutout shader, and a coordinate on a swatch's edge
 the neighbour or the atlas's empty padding, whose alpha is zero, which drops the whole
 face -- a generator's polygon caps, which carry one coordinate on a corner for every
 vertex, vanish that way.
+
+The optional `repair` field names a normal ingredient and the whole-vehicle cost:
+`"repair": {"ingredient": {"tag": "c:ingots/steel"}, "full_cost": 20}`.
+The count must be 1–64; omitted policies default to 20 steel. Vehicle packs can
+select iron or other ingredients independently of their chassis crafting recipe.
 
 ## Towing and animals
 

@@ -1,0 +1,22 @@
+[
+  {
+    "file": "vanillawheels-1.8.0.jar",
+    "sha256": "403489a2cb2c50105ced2376cd3a845f97fd9e4435d7d4df75359ed5585f3f78",
+    "bytes": 499869
+  },
+  {
+    "file": "trailblazer-1.8.0.jar",
+    "sha256": "97deec5e24329afac40b82fddefa5ac990eae110a39f4aa43e5687a8fa395e10",
+    "bytes": 550581
+  },
+  {
+    "file": "farmpickup-1.4.0.jar",
+    "sha256": "e0d4520a0f968d82f7ea7f33b5b52c4787dc46baeb264eb9f672c4b7017c691d",
+    "bytes": 573924
+  },
+  {
+    "file": "trailer-2.4.0.jar",
+    "sha256": "3e439952292d474e912cc1196c71ad6946c69df63621c6cd60c18cca73f974d3",
+    "bytes": 515758
+  }
+]

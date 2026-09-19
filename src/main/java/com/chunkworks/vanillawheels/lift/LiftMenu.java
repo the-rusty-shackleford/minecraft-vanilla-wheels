@@ -38,9 +38,9 @@ import net.minecraft.world.item.DyeItem;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * The lift's menu: four slots -- a chassis, wheels, an engine, a dye --
- * over the player's inventory, and two buttons. The server decides what
- * each button may do every tick and sends the answer down three data
+ * The lift's menu: chassis, wheels, engine and dye, plus a repair slot
+ * visible only for a damaged mounted vehicle. The server decides what
+ * each button may do every tick and sends the answer down seven data
  * slots, so the screen greys a button with the server's truth and no
  * round trip; a click is refused server-side by the same rule. The client's
  * copy holds no position at all. The slots are transient: closing the menu
@@ -55,17 +55,21 @@ public final class LiftMenu extends AbstractContainerMenu {
     public static final int WHEELS = 1;
     public static final int ENGINE = 2;
     public static final int DYE = 3;
-    private static final int PARTS = 4;
+    public static final int REPAIR = 4;
+    private static final int PARTS = 5;
     public static final int BUILD_BUTTON = 0;
     public static final int PAINT_BUTTON = 1;
+    public static final int REPAIR_BUTTON = 2;
 
     private final SimpleContainer parts = new SimpleContainer(PARTS);
     private final ContainerLevelAccess access;
-    private final ContainerData data = new SimpleContainerData(3);
+    private final ContainerData data = new SimpleContainerData(7);
+    private final Player owner;
 
     public LiftMenu(int id, Inventory inventory, ContainerLevelAccess access) {
         super(ModContent.LIFT_MENU.get(), id);
         this.access = access;
+        this.owner = inventory.player;
         addSlot(new Slot(parts, CHASSIS, 26, 24) {
             @Override
             public boolean mayPlace(ItemStack stack) {
@@ -100,6 +104,16 @@ public final class LiftMenu extends AbstractContainerMenu {
                 return stack.getItem() instanceof DyeItem;
             }
         });
+        addSlot(new Slot(parts, REPAIR, 192, 47) {
+            @Override public boolean isActive() { return repairVisible(); }
+            @Override public boolean mayPlace(ItemStack stack) {
+                LiftBlockEntity lift = lift();
+                Vehicle vehicle = lift == null ? null : lift.vehicleOnDeck();
+                // The client receives a representative icon, not the complete ingredient tag.
+                // Let the server validate all tag alternatives rather than rejecting valid substitutes here.
+                return repairVisible() && (vehicle == null || vehicle.profile().repair().ingredient().test(stack));
+            }
+        });
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 102 + row * 18));
@@ -125,6 +139,17 @@ public final class LiftMenu extends AbstractContainerMenu {
         return data.get(2);
     }
 
+    /** effects: reports a damaged mounted vehicle, as synced by the server */
+    public boolean repairVisible() { return data.get(3) > 0; }
+    /** effects: reports remaining condition in hundredths of a percent */
+    public int repairCondition() { return repairVisible() ? data.get(3) - 1 : 10000; }
+    /** effects: returns the server's proportional material count */
+    public int repairCost() { return data.get(4); }
+    /** effects: reports that repair is currently affordable and the lift is idle */
+    public boolean repairReady() { return data.get(5) == 1; }
+    /** effects: returns a display copy of the required repair material */
+    public ItemStack repairMaterial() { return data.get(6) > 0 ? new ItemStack(net.minecraft.world.item.Item.byId(data.get(6))) : ItemStack.EMPTY; }
+
     // --- the server's truth -----------------------------------------------
 
     @Nullable
@@ -142,13 +167,21 @@ public final class LiftMenu extends AbstractContainerMenu {
     private LiftStatus.Build build(LiftBlockEntity lift) {
         ResourceLocation id = chassisVehicle();
         VehicleProfile p = id == null ? null : lift.profile(id);
-        boolean matches = p != null && new Assembly(p.wheels().positions().size(), p.engine().isPresent())
-                .accepts(true, parts.getItem(WHEELS).getCount(), !parts.getItem(ENGINE).isEmpty());
+        boolean matches = p != null && (owner.hasInfiniteMaterials() || new Assembly(p.wheels().positions().size(), p.engine().isPresent())
+                .accepts(true, parts.getItem(WHEELS).getCount(), !parts.getItem(ENGINE).isEmpty()));
+        // A chassis selects the vehicle; creative needs no wheels or engine.
         return LiftStatus.build(lift.busy(), matches, p != null && lift.occupied(p));
     }
 
     private LiftStatus.Paint paint(LiftBlockEntity lift) {
         return LiftStatus.paint(lift.busy(), lift.vehicleOnDeck() != null, parts.getItem(DYE).getItem() instanceof DyeItem);
+    }
+
+    private boolean repair(LiftBlockEntity lift, Vehicle vehicle) {
+        if (lift.busy() || vehicle == null || vehicle.condition() == 10000 || vehicle.profile() == null) return false;
+        var policy = vehicle.profile().repair();
+        int cost = new com.chunkworks.vanillawheels.domain.Condition(vehicle.condition()).repairCost(policy.fullCost());
+        return owner.hasInfiniteMaterials() || policy.ingredient().test(parts.getItem(REPAIR)) && parts.getItem(REPAIR).getCount() >= cost;
     }
 
     @Override
@@ -158,6 +191,19 @@ public final class LiftMenu extends AbstractContainerMenu {
             data.set(0, build(lift).ordinal());
             data.set(1, paint(lift).ordinal());
             data.set(2, lift.jobTicks());
+            Vehicle vehicle = lift.vehicleOnDeck();
+            boolean damaged = vehicle != null && vehicle.profile() != null && vehicle.condition() < 10000;
+            data.set(3, damaged ? vehicle.condition() + 1 : 0);
+            data.set(4, damaged ? new com.chunkworks.vanillawheels.domain.Condition(vehicle.condition()).repairCost(vehicle.profile().repair().fullCost()) : 0);
+            data.set(5, damaged && repair(lift, vehicle) ? 1 : 0);
+            if (damaged) {
+                ItemStack[] materials = vehicle.profile().repair().ingredient().getItems();
+                data.set(6, materials.length == 0 ? 0 : net.minecraft.world.item.Item.getId(materials[0].getItem()));
+            } else {
+                data.set(6, 0);
+                // Once the section disappears, no ingredients may be stranded in an invisible slot.
+                if (!parts.getItem(REPAIR).isEmpty()) owner.getInventory().placeItemBackInInventory(parts.removeItemNoUpdate(REPAIR));
+            }
         }
         super.broadcastChanges();
     }
@@ -178,10 +224,10 @@ public final class LiftMenu extends AbstractContainerMenu {
             if (p == null) {
                 return false;
             }
-            parts.removeItem(CHASSIS, 1);
-            parts.removeItem(WHEELS, p.wheels().positions().size());
-            if (p.engine().isPresent()) {
-                parts.removeItem(ENGINE, 1);
+            if (!player.hasInfiniteMaterials()) {
+                parts.removeItem(CHASSIS, 1);
+                parts.removeItem(WHEELS, p.wheels().positions().size());
+                if (p.engine().isPresent()) parts.removeItem(ENGINE, 1);
             }
             lift.build(vehicle);
             return true;
@@ -194,8 +240,17 @@ public final class LiftMenu extends AbstractContainerMenu {
             if (v == null || !(parts.getItem(DYE).getItem() instanceof DyeItem dye)) {
                 return false;
             }
-            parts.removeItem(DYE, 1);
+            if (!player.hasInfiniteMaterials()) parts.removeItem(DYE, 1);
             lift.paint(v, dye.getDyeColor());
+            return true;
+        }
+        if (id == REPAIR_BUTTON) {
+            Vehicle vehicle = lift.vehicleOnDeck();
+            if (!repair(lift, vehicle)) return false;
+            int cost = new com.chunkworks.vanillawheels.domain.Condition(vehicle.condition()).repairCost(vehicle.profile().repair().fullCost());
+            if (!player.hasInfiniteMaterials()) parts.removeItem(REPAIR, cost);
+            lift.repair(vehicle);
+            broadcastChanges();
             return true;
         }
         return false;

@@ -105,6 +105,8 @@ neoForge {
         // the gametest source set. Needs a display.
         photoBooth {
             client()
+            // Pixel assertions and review crops use one reproducible viewport.
+            programArguments.addAll('--width', '1280', '--height', '720')
             sourceSet = sourceSets.gametest
             gameDirectory = file('run/booth')
             systemProperty 'vanillawheels.photobooth', 'true'

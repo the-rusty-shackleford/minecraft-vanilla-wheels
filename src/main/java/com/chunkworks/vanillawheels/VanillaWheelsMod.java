@@ -47,5 +47,9 @@ public final class VanillaWheelsMod {
         NeoForge.EVENT_BUS.addListener(Vehicle::onEntityJoin);
         NeoForge.EVENT_BUS.addListener(Vehicle::onIncomingDamage);
         NeoForge.EVENT_BUS.addListener(TickClock::onLevelTick);
+        NeoForge.EVENT_BUS.addListener(RecoveryData::onJoin);
+        NeoForge.EVENT_BUS.addListener(RecoveryData::onLeave);
+        NeoForge.EVENT_BUS.addListener(RecoveryData::onEntityTick);
+        NeoForge.EVENT_BUS.addListener(RecoveryData::onTick);
     }
 }

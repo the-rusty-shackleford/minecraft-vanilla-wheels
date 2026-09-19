@@ -163,6 +163,12 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
         startJob();
     }
 
+    /** effects: restores the mounted vehicle's condition and runs the lift's ordinary job animation */
+    void repair(Vehicle vehicle) {
+        vehicle.setCondition(com.chunkworks.vanillawheels.domain.Condition.MAX);
+        startJob();
+    }
+
     // --- persistence and sync ---------------------------------------------
 
     @Override

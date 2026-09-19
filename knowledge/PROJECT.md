@@ -230,3 +230,16 @@ steel aliases and gameplay are unchanged. Unit/server checks, recursive jar/payl
 
 Validation: see Metals and Materials `devtools/verification/separate-dependency.md`;
 all six packaging builds and the complete-pack client/server check passed.
+
+## Vehicle recovery — 2026-09-18, local review
+
+Version 1.8.0 implements [D-0014](decisions/D-0014.md): persistent condition,
+cargo-preserving packed vehicles and wrecks, proportional lift repairs, and one
+paired recovery fob per owner. Recall transfers the actual vehicle/drop and hitched
+trailer, paying distance-based fuel with half-rate condition loss for shortfall.
+The repair section appears only for damaged mounted vehicles. Protocol 5 requires
+matching clients and server. The separate-materials dependency from D-0013 remains.
+
+Publication and deployment are held pending Rusty’s review. See
+[local verification](../devtools/verification/vehicle-recovery.md) for current tests
+and limitations; historical multiplayer/capacity follow-ups above remain open.

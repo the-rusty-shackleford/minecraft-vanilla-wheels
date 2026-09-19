@@ -48,6 +48,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
@@ -105,6 +106,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private static final EntityDataAccessor<String> DATA_PROFILE = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> DATA_PAINT = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_FUEL = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_CONDITION = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Byte> DATA_LIGHTS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Boolean> DATA_LIT = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> DATA_HORN = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
@@ -136,6 +138,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The profile's id, resolved lazily against the level's registries. */
     @Nullable private VehicleProfile profile;
     private ResourceLocation profileId = VanillaWheels.id("none");
+    @Nullable private java.util.UUID recoveryBinding;
+    private boolean placingFromItem;
+    private boolean packedRemoval;
     private Tuning tuning = Tuning.pickup();
 
     private Drive drive = Drive.atRest(0.0);
@@ -288,6 +293,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_PROFILE, "");
         builder.define(DATA_PAINT, -1);
         builder.define(DATA_FUEL, 0);
+        builder.define(DATA_CONDITION, com.chunkworks.vanillawheels.domain.Condition.MAX);
         builder.define(DATA_LIGHTS, (byte) 0);
         builder.define(DATA_LIT, false);
         builder.define(DATA_HORN, false);
@@ -1086,7 +1092,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (t == null) {
             return;
         }
-        t.loadFromItem(stack);
+        RecoveryData recovery = RecoveryData.get(server.getServer());
+        if (!recovery.canPlace(stack) || !t.loadFromItem(stack)) {
+            player.displayClientMessage(Component.translatable("vanillawheels.key.stale_vehicle"), true);
+            return;
+        }
         VehicleProfile tp = t.profile();
         Vec3 coupler = t.rotate(tp.localBlocks(tp.hitch().front().get()));
         t.setPos(ball.x - coupler.x, getY(), ball.z - coupler.z);
@@ -1096,9 +1106,12 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             player.displayClientMessage(Component.translatable("vanillawheels.no_room"), true);
             return;
         }
-        server.addFreshEntity(t);
+        t.placingFromItem = true;
+        if (!server.addFreshEntity(t)) return;
+        t.placingFromItem = false;
+        recovery.deployed(t, stack);
         hitch(t);
-        if (!player.hasInfiniteMaterials()) {
+        if (!player.hasInfiniteMaterials() || stack.has(ModContent.PACKED_TOKEN.get())) {
             stack.shrink(1);
         }
     }
@@ -1140,6 +1153,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     @Override
     public void tick() {
         super.tick();
+        if (recoveryBinding != null && level() instanceof ServerLevel server) RecoveryData.get(server.getServer()).track(this);
         VehicleProfile p = profile();
         tickLerp();
         suspensionO = suspension;
@@ -1930,7 +1944,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** effects: returns whether the engine may run: fuel in the tank, or fuel not required ({@link #fuelRequired}) */
     public boolean hasFuel() {
-        return !fuelRequired() || tank().hasFuel();
+        return condition() > 0 && (!fuelRequired() || tank().hasFuel());
     }
 
     /** effects: returns how full the tank is for the gauge, 1 when fuel is not required */
@@ -1947,6 +1961,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
+        if (held.is(ModContent.KEY_FOB.get())) {
+            if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, held);
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
         boolean wrenching = player.isSecondaryUseActive() && held.is(ModContent.WRENCH.get());
         // A chest the click lands in: opens, crouching or not, before anything else the click could
         // mean. A chest further along the click's line waits its turn, after every other gesture,
@@ -2025,6 +2043,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         VehicleProfile p = profile();
         if (p == null) {
             return InteractionResult.PASS;
+        }
+        if (player.getItemInHand(hand).is(ModContent.KEY_FOB.get())) {
+            if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, player.getItemInHand(hand));
+            return InteractionResult.sidedSuccess(level().isClientSide());
         }
         if (player.isSecondaryUseActive()) {
             return InteractionResult.PASS;
@@ -2151,34 +2173,65 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return where.distanceTo(hit) <= radius;
     }
 
-    /** effects: takes this vehicle back into {@code player}'s hand as an item, spilling the chest */
+    /** effects: transfers this vehicle and every chest slot into a single packed item */
     private void pickUp(Player player) {
-        ItemStack item = toItem();
-        if (!player.getInventory().add(item)) {
-            spawnAtLocation(item);
+        if (storageOpen()) {
+            player.displayClientMessage(Component.translatable("vanillawheels.key.occupied"), true);
+            return;
         }
-        Containers.dropContents(level(), this, this);
+        ItemStack item = toItem();
+        RecoveryData data = RecoveryData.get(((ServerLevel) level()).getServer());
+        data.held(item);
+        int slot = player.getInventory().getFreeSlot();
+        if (slot < 0) {
+            if (!dropPacked(item)) { data.deployed(this, item); return; }
+        } else {
+            // Inventory.add deliberately deletes overflow in creative; this is property, not a fresh catalog item.
+            player.getInventory().setItem(slot, item);
+            player.getInventory().setChanged();
+            player.containerMenu.broadcastChanges();
+        }
         level().playSound(null, getX(), getY(), getZ(), ModContent.WRENCH_CLANK.get(), SoundSource.PLAYERS, 1.0f, 1.0f);
-        ejectPassengers();
-        discard();
+        packAway();
     }
 
-    /** effects: returns this vehicle as an item: its profile, paint, fuel and disc */
+    /** effects: transfers a packed stack only if the level accepts its item entity, including other mods' join events */
+    private boolean dropPacked(ItemStack stack) {
+        var drop = new net.minecraft.world.entity.item.ItemEntity(level(), getX(), getY(), getZ(), stack);
+        drop.setDefaultPickUpDelay();
+        // Entity.spawnAtLocation ignores addFreshEntity's result and cannot establish a successful transfer.
+        return level().addFreshEntity(drop);
+    }
+
+    /** effects: returns a defensive packed snapshot, including cargo, condition and recovery identity */
     public ItemStack toItem() {
+        unpackChestVehicleLootTable(null);
         ItemStack stack = ModContent.vehicleStack(profileId);
         DyeColor paint = paint();
         if (paint != null) {
             stack.set(ModContent.PAINT.get(), paint);
         }
         stack.set(ModContent.FUEL.get(), tank().ticks());
+        stack.set(ModContent.CONDITION.get(), condition());
+        stack.set(ModContent.CARGO.get(), VehicleCargo.capture(items));
+        stack.set(ModContent.PACKED_TOKEN.get(), java.util.UUID.randomUUID());
+        if (recoveryBinding != null) stack.set(ModContent.BINDING.get(), recoveryBinding);
+        if (getCustomName() != null) stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, getCustomName());
         if (!disc().isEmpty()) {
             stack.set(ModContent.DISC.get(), disc().copy());
         }
         return stack;
     }
 
-    /** effects: takes the paint, fuel and disc {@code stack} carries */
-    public void loadFromItem(ItemStack stack) {
+    /** effects: restores packed state; returns false without accepting cargo that no longer fits its profile */
+    public boolean loadFromItem(ItemStack stack) {
+        var cargo = stack.getOrDefault(ModContent.CARGO.get(), java.util.List.<net.minecraft.world.item.component.ItemContainerContents>of());
+        if (!VehicleCargo.fits(cargo, items.size())) return false;
+        var unpacked = VehicleCargo.unpack(cargo);
+        for (int i = 0; i < items.size(); i++) items.set(i, i < unpacked.size() ? unpacked.get(i) : ItemStack.EMPTY);
+        setCondition(stack.getOrDefault(ModContent.CONDITION.get(), com.chunkworks.vanillawheels.domain.Condition.MAX));
+        recoveryBinding = stack.get(ModContent.BINDING.get());
+        setCustomName(stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME));
         DyeColor paint = stack.get(ModContent.PAINT.get());
         if (paint != null) {
             setPaint(paint);
@@ -2191,7 +2244,36 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (disc != null && !disc.isEmpty()) {
             entityData.set(DATA_DISC, disc.copy());
         }
+        return true;
     }
+
+    /** requires: server thread; effects: removes only the now-packed physical vehicle; no second cargo drop; throws: none. */
+    public void packAway() {
+        packedRemoval = true;
+        for (int i = 0; i < items.size(); i++) items.set(i, ItemStack.EMPTY);
+        entityData.set(DATA_DISC, ItemStack.EMPTY);
+        ejectPassengers();
+        discard();
+    }
+
+    /** requires: none; effects: reports persistent condition in 0..10000; throws: none. */
+    public int condition() { return entityData.get(DATA_CONDITION); }
+    /** requires: none; effects: clamps and syncs condition; a wreck cannot power its engine; throws: none. */
+    public void setCondition(int remaining) { entityData.set(DATA_CONDITION, Math.max(0, Math.min(10000, remaining))); }
+    /** requires: none; effects: returns the optional server recovery identity; throws: none. */
+    @Nullable public java.util.UUID binding() { return recoveryBinding; }
+    /** requires: server thread; effects: sets/clears the server-owned pairing; throws: none. */
+    public void binding(@Nullable java.util.UUID value) { recoveryBinding = value; }
+    /** requires: none; effects: reports an authorized item placement in progress; throws: none. */
+    public boolean placingFromItem() { return placingFromItem; }
+    /** requires: server thread; effects: marks the bounded addFreshEntity placement transaction; throws: none. */
+    public void placingFromItem(boolean value) { placingFromItem = value; }
+    /** requires: none; effects: reports whether any chest is currently open; throws: none. */
+    public boolean storageOpen() { for (int count : openers) if (count > 0) return true; return false; }
+    /** requires: none; effects: reports a saved tow link, including one still loading; throws: none. */
+    public boolean hasSavedTrailer() { return trailerUuid != null; }
+    /** requires: server thread; effects: resolves saved links and returns the trailer if loaded; throws: none. */
+    @Nullable public Vehicle recoveryTrailer() { relink(); return trailer(); }
 
     // --- the chest -------------------------------------------------------
 
@@ -2296,17 +2378,36 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     @Override
     protected void destroy(net.minecraft.world.damagesource.DamageSource source) {
-        kill();
-        if (level().getGameRules().getBoolean(GameRules.RULE_DOENTITYDROPS)) {
-            spawnAtLocation(toItem());
+        if (isRemoved() || level().isClientSide()) return;
+        setCondition(0);
+        ItemStack packed = toItem();
+        RecoveryData data = RecoveryData.get(((ServerLevel) level()).getServer());
+        data.held(packed);
+        if (!dropPacked(packed)) {
+            data.deployed(this, packed);
+            return;
         }
-        chestVehicleDestroyed(source, level(), this);
+        packAway();
+    }
+
+    /** effects: command/void kills use the same cargo-preserving destruction path as combat damage */
+    @Override public void kill() { destroy(level().damageSources().genericKill()); }
+
+    /** Persistent wear replaces vanilla's transient boat hit counter; five points of damage break a pristine vehicle. */
+    @Override public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
+        if (level().isClientSide() || isRemoved()) return true;
+        if (isInvulnerableTo(source) || !Float.isFinite(amount) || amount <= 0) return false;
+        setHurtDir(-getHurtDir()); setHurtTime(10); markHurt();
+        setCondition(condition() - (int) Math.min(10000, Math.ceil(amount * 2000.0)));
+        gameEvent(GameEvent.ENTITY_DAMAGE, source.getEntity());
+        if (condition() == 0) destroy(source);
+        return true;
     }
 
     @Override
     public void remove(Entity.RemovalReason reason) {
         if (!level().isClientSide() && reason.shouldDestroy()) {
-            Containers.dropContents(level(), this, this);
+            if (!packedRemoval && !items.isEmpty()) Containers.dropContents(level(), this, this);
             // Gone for good: whatever was hitched to it is on its own.
             unhitch();
             Vehicle trailer = trailer();
@@ -2332,6 +2433,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         tag.putString("Profile", profileId.toString());
         tag.putInt("Paint", entityData.get(DATA_PAINT));
         tag.putInt("Fuel", entityData.get(DATA_FUEL));
+        tag.putInt("Condition", condition());
+        if (recoveryBinding != null) tag.putUUID("RecoveryBinding", recoveryBinding);
         tag.putByte("Lights", entityData.get(DATA_LIGHTS));
         if (!disc().isEmpty()) {
             tag.put("Disc", disc().save(registryAccess()));
@@ -2344,6 +2447,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         tag.putBoolean("DoorsOpen", doorsOpen());
         addChestVehicleSaveData(tag, registryAccess());
+        // Preserve slots above 255 too; the old ContainerEntity format uses a byte slot index.
+        tag.remove("Items");
+        tag.put("VehicleCargo", VehicleCargo.CODEC.encodeStart(registryAccess().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), VehicleCargo.capture(items)).getOrThrow());
     }
 
     @Override
@@ -2351,6 +2457,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         ResourceLocation id = ResourceLocation.tryParse(tag.getString("Profile"));
         entityData.set(DATA_PAINT, tag.getInt("Paint"));
         entityData.set(DATA_FUEL, tag.getInt("Fuel"));
+        setCondition(tag.contains("Condition") ? tag.getInt("Condition") : 10000);
+        recoveryBinding = tag.hasUUID("RecoveryBinding") ? tag.getUUID("RecoveryBinding") : null;
         entityData.set(DATA_LIGHTS, tag.getByte("Lights"));
         if (tag.contains("Disc")) {
             entityData.set(DATA_DISC, ItemStack.parse(registryAccess(), tag.getCompound("Disc")).orElse(ItemStack.EMPTY));
@@ -2364,6 +2472,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             setProfile(id);
         }
         readChestVehicleSaveData(tag, registryAccess());
+        if (tag.contains("VehicleCargo")) {
+            var cargo = VehicleCargo.CODEC.parse(registryAccess().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), tag.get("VehicleCargo")).getOrThrow();
+            var restored = VehicleCargo.unpack(cargo);
+            // A changed datapack must not silently discard occupied slots on world load.
+            if (!VehicleCargo.fits(cargo, items.size())) items = NonNullList.withSize(restored.size(), ItemStack.EMPTY);
+            for (int i = 0; i < items.size(); i++) items.set(i, i < restored.size() ? restored.get(i) : ItemStack.EMPTY);
+        }
         drive = Drive.atRest(Math.toRadians(getYRot()));
     }
 

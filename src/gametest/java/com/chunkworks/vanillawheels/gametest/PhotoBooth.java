@@ -459,8 +459,71 @@ public final class PhotoBooth {
             // The blue windshield and steel deck remain blue after a red repaint.
             verdict("the lift painted the car red", () -> painted && red > 300 ? null : "red " + red + ", paint state " + painted);
         }));
+        // Repair is a client/server menu operation, with its panel appearing only for actual damage.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            if (sp.serverLevel().getBlockEntity(liftPos) instanceof LiftBlockEntity lift && lift.vehicleOnDeck() != null) {
+                sp.setGameMode(GameType.SURVIVAL);
+                lift.vehicleOnDeck().setCondition(3750);
+                lift.vehicleOnDeck().setItem(0, new ItemStack(Items.DIAMOND, 7));
+                sp.openMenu(lift);
+            }
+        })));
+        s.add(new Step(t += 30, () -> {
+            shoot(mc, "booth-lift-repair-empty");
+            verdict("damage reveals repair cost on the actual client", () -> mc.player != null
+                    && mc.player.containerMenu instanceof LiftMenu menu && menu.repairVisible()
+                    && menu.repairCondition() == 3750 && menu.repairCost() == 13 && !menu.repairReady() ? null : "repair state did not sync");
+            onServer(mc, sp -> {
+                if (sp.containerMenu instanceof LiftMenu menu) {
+                    ItemStack material = menu.repairMaterial(); material.setCount(15);
+                    menu.getSlot(LiftMenu.REPAIR).set(material); menu.broadcastChanges();
+                }
+            });
+        }));
+        s.add(new Step(t += 20, () -> {
+            shoot(mc, "booth-lift-repair-ready");
+            verdict("repair becomes available with enough material", () -> mc.player != null
+                    && mc.player.containerMenu instanceof LiftMenu menu && menu.repairReady() ? null : "repair not ready");
+            if (mc.screen instanceof LiftScreen screen) {
+                int x = (mc.getWindow().getGuiScaledWidth() - 294) / 2 + 235;
+                int y = (mc.getWindow().getGuiScaledHeight() - 184) / 2 + 101;
+                screen.mouseClicked(x, y, 0);
+            }
+        }));
+        s.add(new Step(t += LiftMotion.JOB + 20, () -> {
+            shoot(mc, "booth-lift-repaired");
+            verdict("the real repair button hides the panel after completion", () -> mc.player != null
+                    && mc.player.containerMenu instanceof LiftMenu menu && !menu.repairVisible()
+                    && menu.getSlot(LiftMenu.REPAIR).getItem().isEmpty() ? null : "repair button did not complete");
+            onServer(mc, sp -> {
+                sp.closeContainer();
+                if (sp.serverLevel().getBlockEntity(liftPos) instanceof LiftBlockEntity lift && lift.vehicleOnDeck() != null) {
+                    Vehicle vehicle = lift.vehicleOnDeck();
+                    ItemStack key = new ItemStack(ModContent.KEY_FOB.get());
+                    sp.getInventory().setItem(0, key);
+                    com.chunkworks.vanillawheels.RecoveryData.get(sp.server).bind(sp, vehicle, key);
+                    ItemStack example = vehicle.toItem(); example.remove(ModContent.BINDING.get());
+                    example.set(ModContent.CONDITION.get(), 0); sp.getInventory().setItem(1, example);
+                    sp.containerMenu.broadcastChanges();
+                }
+            });
+        }));
+        s.add(new Step(t += 20, () -> {
+            if (mc.player != null) mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+            int x = (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 16;
+            int y = (mc.getWindow().getGuiScaledHeight() - 166) / 2 + 150;
+            pointAt(mc, x, y);
+        }));
+        s.add(new Step(t += 12, () -> {
+            shoot(mc, "booth-key-fob");
+            int x = (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 34;
+            int y = (mc.getWindow().getGuiScaledHeight() - 166) / 2 + 150;
+            pointAt(mc, x, y);
+        }));
+        s.add(new Step(t += 12, () -> { shoot(mc, "booth-broken-item"); if (mc.player != null) mc.player.closeContainer(); }));
         // The trailer: hitched behind a car off to the east, doors open, two cows aboard, seen from the side.
         s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            sp.setGameMode(GameType.CREATIVE);
             ServerLevel level = sp.serverLevel();
             double y = level.getMinBuildHeight() + 5;
             double x = X + 24.0;

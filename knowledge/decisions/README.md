@@ -26,3 +26,5 @@ tags: [index]
 | D-0012 | One Vanilla Wheels Creative tab groups every vehicle, chassis and shared part |
 
 - [D-0013](D-0013.md): Require separately installed Metals and Materials.
+
+- [D-0014](D-0014.md): Persistent cargo, lift repairs and paired recovery keys.

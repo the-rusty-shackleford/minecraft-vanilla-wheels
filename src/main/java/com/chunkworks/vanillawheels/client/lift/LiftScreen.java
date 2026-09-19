@@ -42,6 +42,7 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
             .toArray(ResourceLocation[]::new);
     private Button build;
     private Button paint;
+    private Button repair;
 
     public LiftScreen(LiftMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -59,6 +60,8 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
         paint = addRenderableWidget(Button.builder(Component.translatable("vanillawheels.lift.paint"), b -> press(LiftMenu.PAINT_BUTTON))
                 .bounds(leftPos + 98, topPos + 46, 60, 20)
                 .tooltip(Tooltip.create(Component.translatable("vanillawheels.lift.paint.help"))).build());
+        repair = addRenderableWidget(Button.builder(Component.translatable("vanillawheels.lift.repair"), b -> press(LiftMenu.REPAIR_BUTTON))
+                .bounds(leftPos + 190, topPos + 91, 92, 20).build());
     }
 
     private void press(int button) {
@@ -69,6 +72,11 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        imageWidth = menu.repairVisible() ? 294 : 176;
+        leftPos = (width - imageWidth) / 2;
+        build.setX(leftPos + 26); paint.setX(leftPos + 98); repair.setX(leftPos + 190);
+        repair.visible = menu.repairVisible();
+        repair.active = menu.repairReady();
         build.active = menu.buildStatus() == LiftStatus.Build.READY;
         paint.active = menu.paintStatus() == LiftStatus.Paint.READY;
         super.render(g, mouseX, mouseY, partialTick);
@@ -81,7 +89,19 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
 
     @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
-        g.blit(BACKGROUND, leftPos, topPos, 0, 0, imageWidth, imageHeight);
+        g.blit(BACKGROUND, leftPos, topPos, 0, 0, 176, imageHeight);
+        if (menu.repairVisible()) {
+            int x = leftPos + 182;
+            g.fill(x, topPos, x + 112, topPos + 120, 0xFF373737);
+            g.fill(x + 1, topPos + 1, x + 111, topPos + 119, 0xFFFFFFFF);
+            g.fill(x + 3, topPos + 3, x + 109, topPos + 117, 0xFFC6C6C6);
+            g.fill(leftPos + 191, topPos + 46, leftPos + 209, topPos + 64, 0xFF373737);
+            g.fill(leftPos + 192, topPos + 47, leftPos + 208, topPos + 63, 0xFF8B8B8B);
+            if (!menu.getSlot(LiftMenu.REPAIR).hasItem()) {
+                g.renderItem(menu.repairMaterial(), leftPos + 192, topPos + 47);
+                g.fill(leftPos + 192, topPos + 47, leftPos + 208, topPos + 63, 0x708B8B8B);
+            }
+        }
         for (int i = 0; i < SLOT_HINTS.length; i++) {
             var slot = menu.getSlot(i);
             if (!slot.hasItem()) {
@@ -98,6 +118,12 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
     @Override
     protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
         super.renderLabels(g, mouseX, mouseY);
+        if (menu.repairVisible()) {
+            g.drawString(font, Component.translatable("vanillawheels.lift.repair"), 190, 10, 0x404040, false);
+            g.drawString(font, Component.translatable("vanillawheels.condition", String.format(java.util.Locale.ROOT, "%.1f", menu.repairCondition() / 100.0)), 190, 27, 0x404040, false);
+            g.drawString(font, Component.translatable("vanillawheels.lift.repair_cost", menu.repairCost()), 215, 51, 0x404040, false);
+            g.drawString(font, Component.translatable(menu.repairReady() ? "vanillawheels.lift.repair_ready" : "vanillawheels.lift.repair_material"), 190, 73, 0x404040, false);
+        }
         Component status = menu.jobTicks() > 0 ? Component.translatable("vanillawheels.lift.status.busy")
                 : menu.buildStatus() == LiftStatus.Build.READY ? Component.translatable("vanillawheels.lift.status.build_ready")
                 : menu.paintStatus() == LiftStatus.Paint.READY ? Component.translatable("vanillawheels.lift.status.paint_ready")

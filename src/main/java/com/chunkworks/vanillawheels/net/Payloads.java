@@ -39,7 +39,7 @@ public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "4";
+    private static final String VERSION = "5";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {

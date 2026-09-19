@@ -154,7 +154,7 @@ at speed had the server refuse every tick and snap the vehicle back.
   inventory with its paint, fuel, disc, damage and all chest contents. A full inventory
   leaves a packed drop, including in creative. Right-click the ground to place it.
 
-## Damage, repairs and recovery keys (1.8.0, local review)
+## Damage, repairs and recovery keys (1.8.0)
 
 Vehicles have persistent condition. Breaking one drops a packed vehicle at zero
 condition with its cargo intact. Place this wreck on a Mechanic Lift; its engine
@@ -199,7 +199,7 @@ a deployed vehicle's recall. Unload animals before recalling a livestock trailer
 
 Packed items are transferred when placed even in creative, so their cargo is not
 duplicated. Fresh Creative-tab vehicles remain reusable templates. This update uses
-network protocol 5 and requires matching clients and server. It is **not released**.
+network protocol 5 and requires matching clients and server. Update the full pack on both sides before connecting.
 
 ## Running things over
 

@@ -243,3 +243,11 @@ matching clients and server. The separate-materials dependency from D-0013 remai
 Publication and deployment are held pending Rusty’s review. See
 [local verification](../devtools/verification/vehicle-recovery.md) for current tests
 and limitations; historical multiplayer/capacity follow-ups above remain open.
+
+## Release authorization — 2026-09-19
+
+Rusty explicitly requested: "Deploy it all so I can test that stuff."
+Version 1.8.0 is authorized for public source/jar publication and deployment
+in pack 1.47.0, superseding the earlier local-review and dependency-packaging holds.
+Clean release builds, exact jar checks, staged pack comparison and an empty-server
+restart gate deployment. The other vehicle mods are updated together for protocol 5.

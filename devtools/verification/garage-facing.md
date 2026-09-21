@@ -57,3 +57,13 @@ SHA-256: `3440e4c315f71a3d6bc35db61c58cbfd8aa54807e402107ca065b075b3855a58`.
 The source and artifact remain local and unreleased. No independent multiplayer
 observer or upgrade of a live-world copy is claimed; legacy compatibility was
 verified through the actual vanilla block-state palette serialization path.
+
+## Release-build camera correction
+
+The first clean release build passed every server and garage check but failed
+the existing blue-to-red vehicle paint assertion. Its captured car was correctly
+red; the camera had drifted off-centre and the pixel counter included shader sky.
+The automated booth now releases mouse capture while in-world, keeping desktop
+mouse movement and window-manager cursor warps out of its scripted camera. This
+changes only the verification harness. The clean release rerun is recorded in
+the release verification record.

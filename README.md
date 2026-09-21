@@ -469,3 +469,5 @@ fixed. Multi-player synchronization remains a later group-test gate. Network pro
 4 carries owner contact velocities and requires matching 1.7.0 builds on peers. See D-0011.
 
 Clean release results: [version 1.9.0](devtools/verification/release-1.9.0.md).
+
+The automated booth releases mouse capture so desktop mouse movement cannot steer its scripted camera.

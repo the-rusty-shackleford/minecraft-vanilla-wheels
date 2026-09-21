@@ -123,6 +123,9 @@ public final class PhotoBooth {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
+        // Every gesture in this automated booth is scripted. Keep desktop mouse
+        // movement (including window-manager cursor warps) out of its camera.
+        if (mc.player != null && mc.screen == null) mc.mouseHandler.releaseMouse();
         if (!muted) {
             // Silent from the first tick, before the title music: Rusty listens to music while these run.
             mc.options.getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.MASTER).set(0.0);

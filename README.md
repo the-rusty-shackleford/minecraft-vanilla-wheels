@@ -21,7 +21,7 @@ The ordinary vanilla categories and Creative search remain available too.
 Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
 [full-pack tab check](devtools/verification/creative-tab.md).
 
-## Rolling garage doors — local 1.9.0
+## Rolling garage doors
 
 Craft **eight Rolling Garage Door panels** from eight steel ingots surrounding one
 redstone dust. Place adjoining panels across and upward to form a flat rectangle,
@@ -37,7 +37,7 @@ Breaking a section returns one panel. An incomplete rectangle stops moving and
 keeps its existing clearance until repaired; it cannot be powered as a door.
 Assemblies crossing unloaded chunks suspend without loading those chunks.
 
-This addition is locally verified and **unreleased**. See the
+Available in **1.9.0**. See the
 [server and shader-client evidence](devtools/verification/garage-door.md).
 
 ## Driving
@@ -456,3 +456,5 @@ truck, glass and stone; Pickup and rugged driving are separate gates. Historic l
 Pickup movement corrections have not reproduced on these courses and are not claimed
 fixed. Multi-player synchronization remains a later group-test gate. Network protocol
 4 carries owner contact velocities and requires matching 1.7.0 builds on peers. See D-0011.
+
+Clean release results: [version 1.9.0](devtools/verification/release-1.9.0.md).

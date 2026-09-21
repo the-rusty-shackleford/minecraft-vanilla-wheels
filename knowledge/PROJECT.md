@@ -271,3 +271,11 @@ Version 1.9.0 adds connected redstone rolling doors under D-0015. The existing
 vehicle protocol remains 5. The complete local server suite and shader booth
 passed; see [evidence](../devtools/verification/garage-door.md). Publication,
 pack updates and deployment require Rusty's explicit release instruction.
+
+## Release authorization — September 20, 2026
+
+Rusty requested: "release it all, 2 minute server warning". Version 1.9.0 is
+authorized for public source/jar publication and pack 1.54.0 deployment. The clean
+build passed 92 JUnit tests, 57 real-server GameTests and the complete
+GPU shader booth. See [release verification](../devtools/verification/release-1.9.0.md).
+Earlier release holds are superseded for this version.

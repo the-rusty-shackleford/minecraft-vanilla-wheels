@@ -325,3 +325,7 @@ all players start from scratch, with no inventories, animals or structures
 carried into the new save. They requested release while their personal client
 remains active, so the GPU held-item capture is not a gate. See
 [release verification](../devtools/verification/release-1.9.3.md).
+
+Version 1.9.3 is published and deployed in pack 1.54.3. Installed bytes match
+the public release; pack parity and 20 TPS are verified. The held-item GPU
+appearance remains the stated unverified limitation.

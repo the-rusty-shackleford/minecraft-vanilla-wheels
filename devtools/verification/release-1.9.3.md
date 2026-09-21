@@ -20,4 +20,7 @@ Artifact: `vanillawheels-1.9.3.jar` (527049 bytes).
 SHA-1: `c70003d8479a7f206437eb18bd35a00b88c1acbb`.
 SHA-256: `465aa7fd02450f722e0893b03d74cc70ce97e54df29eb7746bde2ca9f12fb1de`.
 
-Deployment details will be recorded after the fresh world is verified.
+Published and deployed in pack 1.54.3. The downloaded JAR and both HTTP pack
+archives match their verified sources. Mod Hub reports parity, TPS is 20, and
+startup added no errors. World-reset and operator details remain in the private
+server deployment record.

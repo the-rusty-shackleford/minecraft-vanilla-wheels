@@ -69,7 +69,10 @@ public final class VehicleGameTests {
     public VehicleGameTests() {}
 
     private static void layFloor(GameTestHelper helper) {
-        for (int x = 0; x < LENGTH; x++) {
+        // Some stationary tests use the 15-block arena, not the 48-block runway.
+        // Writing a runway there spills dirt into the next test's lift footprint.
+        int length = Math.min(LENGTH, (int) helper.getBounds().getXsize());
+        for (int x = 0; x < length; x++) {
             for (int z = 0; z < WIDTH; z++) {
                 for (int y = 0; y < FLOOR; y++) {
                     helper.setBlock(new BlockPos(x, y, z), Blocks.DIRT);

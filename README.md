@@ -31,6 +31,13 @@ Craft **eight Rolling Garage Door panels** from eight steel ingots surrounding o
 redstone dust. Place adjoining panels across and upward to form a flat rectangle,
 up to **16 × 16** blocks. Adjacent panels inherit the first panel's orientation.
 The finished rectangle becomes one door with side tracks and a roll at its top.
+Fill the entire opening with panels; you can build from the top down or bottom up.
+
+**Local 1.9.1, unreleased:** the first panel's outside faces you, so place it from
+the opposite side to reverse the door. All four compass directions are supported.
+Coplanar extensions inherit that facing, including panels placed on the floor
+beside it. Existing doors retain their original orientation. Doors facing opposite
+ways cannot be bridged into one assembly. See [verification](devtools/verification/garage-facing.md).
 
 Power any section with redstone: **on opens, off closes**. A lever beside a section
 works. Closing pauses while a player, mob, vehicle, boat or minecart occupies the

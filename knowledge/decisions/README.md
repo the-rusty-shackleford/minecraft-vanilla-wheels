@@ -30,3 +30,5 @@ tags: [index]
 - [D-0014](D-0014.md): Persistent cargo, lift repairs and paired recovery keys.
 
 - [D-0015](D-0015.md): Connected redstone rolling garage doors.
+
+- [D-0016](D-0016.md): Four-direction garage doors preserving existing inside/outside.

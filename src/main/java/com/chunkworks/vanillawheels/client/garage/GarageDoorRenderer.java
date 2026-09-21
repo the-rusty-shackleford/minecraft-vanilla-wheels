@@ -3,6 +3,7 @@ package com.chunkworks.vanillawheels.client.garage;
 
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity;
+import com.chunkworks.vanillawheels.garage.GarageDoorBlock;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import net.minecraft.client.renderer.*;
@@ -23,7 +24,7 @@ public final class GarageDoorRenderer implements BlockEntityRenderer<GarageDoorB
         if (!door.renders() || door.getLevel() == null) return;
         // Sample exposed air in front of the housing, not the opaque lintel above it.
         light = LevelRenderer.getLightColor(door.getLevel(),door.origin().above(door.height()-1)
-                .relative(door.axis()==Direction.Axis.X ? Direction.NORTH : Direction.WEST));
+                .relative(GarageDoorBlock.facing(door.getBlockState())));
         pose.pushPose();
         if (!door.formed()) {
             var pieces = buffers.getBuffer(RenderType.entityCutoutNoCull(STEEL));
@@ -34,6 +35,12 @@ public final class GarageDoorRenderer implements BlockEntityRenderer<GarageDoorB
         }
         if (door.axis() == Direction.Axis.Z) { pose.translate(1,0,0); pose.mulPose(Axis.YP.rotationDegrees(-90)); }
         float w=door.width(), h=door.height(), cap=h-.5f;
+        if (door.getBlockState().getValue(GarageDoorBlock.REVERSED)) {
+            // Rotate around the entire assembly's centre, keeping its root and
+            // bounds fixed while exchanging inside and outside.
+            pose.translate(w,0,1);
+            pose.mulPose(Axis.YP.rotationDegrees(180));
+        }
         float raised=Math.min(cap,Math.max(0,door.clearance(partial)));
         var out=buffers.getBuffer(RenderType.entityCutoutNoCull(STEEL));
         // Tracks stay inside the cells; the frame never steals an adjacent building block.

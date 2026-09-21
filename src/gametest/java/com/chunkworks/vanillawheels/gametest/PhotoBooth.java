@@ -18,6 +18,7 @@
 package com.chunkworks.vanillawheels.gametest;
 
 import com.chunkworks.vanillawheels.ModContent;
+import com.chunkworks.vanillawheels.garage.GarageDoorBlock;
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.client.lift.LiftScreen;
 import com.chunkworks.vanillawheels.domain.LiftMotion;
@@ -651,8 +652,56 @@ public final class PhotoBooth {
                 return door!=null&&door.lift()==0 ? null : "door did not close";
             });
         }));
+        return garageFacingPlan(mc,s,t);
+    }
+
+    /** Actual client floor placement from every heading, then front/back renders
+     * of the resulting three-by-three assembly. Server tests cover its extensions. */
+    private static int garageFacingPlan(Minecraft mc,List<Step> steps,int t) {
+        for (var facing:Direction.Plane.HORIZONTAL) {
+            steps.add(new Step(t+=5,()->onServer(mc,sp->{
+                var level=sp.serverLevel();int y=garagePos.getY();
+                for(int x=19;x<=30;x++)for(int z=1;z<=17;z++) {
+                    level.setBlock(new BlockPos(x,y-1,z),Blocks.SMOOTH_STONE.defaultBlockState(),3);
+                    for(int up=0;up<7;up++)level.setBlock(new BlockPos(x,y+up,z),Blocks.AIR.defaultBlockState(),3);
+                }
+                sp.setGameMode(GameType.SURVIVAL);
+                var eye=Vec3.atBottomCenterOf(garagePos).add(Vec3.atLowerCornerOf(facing.getNormal()).scale(2.5));
+                sp.teleportTo(level,eye.x,eye.y,eye.z,facing.getOpposite().toYRot(),40);
+                sp.setShiftKeyDown(false);
+                sp.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(ModContent.GARAGE_DOOR_ITEM.get()));
+                sp.inventoryMenu.broadcastChanges();
+            })));
+            steps.add(new Step(t+=20,()->{
+                var support=garagePos.below();
+                mc.gameMode.useItemOn(mc.player,InteractionHand.MAIN_HAND,
+                        new BlockHitResult(Vec3.atCenterOf(support).add(0,.5,0),Direction.UP,support,false));
+            }));
+            steps.add(new Step(t+=15,()->onServer(mc,sp->{
+                var level=sp.serverLevel();var state=level.getBlockState(garagePos);
+                verdict("client placement chooses outside "+facing,()->state.is(ModContent.GARAGE_DOOR.get())
+                        &&GarageDoorBlock.facing(state)==facing&&sp.getMainHandItem().isEmpty()?null:"wrong facing or item count: "+state);
+                if (!state.is(ModContent.GARAGE_DOOR.get())) return;
+                var across=state.getValue(GarageDoorBlock.AXIS)==Direction.Axis.X?Direction.EAST:Direction.SOUTH;
+                for(int up=0;up<3;up++)for(int x=0;x<3;x++)
+                    if(up!=0||x!=0)level.setBlock(garagePos.relative(across,x).above(up),state.setValue(GarageDoorBlock.ROOT,false),3);
+                garageFacingView(sp,facing,true);
+            })));
+            steps.add(new Step(t+=35,()->shoot(mc,"booth-garage-facing-"+facing.getName()+"-outside")));
+            steps.add(new Step(t+=5,()->onServer(mc,sp->garageFacingView(sp,facing,false))));
+            steps.add(new Step(t+=30,()->shoot(mc,"booth-garage-facing-"+facing.getName()+"-inside")));
+        }
         return t;
     }
+
+    private static void garageFacingView(ServerPlayer sp,Direction facing,boolean outside) {
+        var center=Vec3.atBottomCenterOf(garagePos).add(facing.getAxis()==Direction.Axis.Z?new Vec3(1,0,0):new Vec3(0,0,1));
+        var side=outside?facing:facing.getOpposite();
+        var eye=center.add(Vec3.atLowerCornerOf(side.getNormal()).scale(5)).add(0,.25,0);
+        sp.getAbilities().mayfly=true;sp.getAbilities().flying=true;sp.onUpdateAbilities();
+        sp.teleportTo(sp.serverLevel(),eye.x,eye.y,eye.z,side.getOpposite().toYRot(),4);
+    }
+
     private static void garageView(ServerPlayer sp) {
         sp.getAbilities().mayfly=true;sp.getAbilities().flying=true;sp.onUpdateAbilities();
         sp.teleportTo(sp.serverLevel(),24.5,garagePos.getY()+1.2,2,0,2.5f);

@@ -9,7 +9,7 @@ import net.minecraft.world.level.Level;
 import java.util.*;
 
 /** Event-driven, bounded discovery of connected panels. AF: a scan is the loaded
- * coplanar component. RI: at most 257 visited panels; unloaded neighbors suspend
+ * coplanar component with one shared facing. RI: at most 257 visited panels; unloaded neighbors suspend
  * rebuilding rather than splitting a door or forcing chunks. No world scan in idle ticks. */
 public final class GarageDoorAssembly {
     private GarageDoorAssembly() {}
@@ -26,7 +26,7 @@ public final class GarageDoorAssembly {
         level.scheduleTick(pos.relative(across.getOpposite()), block, 1);
     }
 
-    private static Scan scan(Level level, BlockPos start, Direction.Axis axis, boolean adding) {
+    private static Scan scan(Level level, BlockPos start, Direction.Axis axis, boolean reversed, boolean adding) {
         var queue = new ArrayDeque<BlockPos>();
         var seen = new HashSet<BlockPos>();
         var panels = new ArrayList<BlockPos>();
@@ -39,7 +39,8 @@ public final class GarageDoorAssembly {
             if (!level.hasChunkAt(pos)) { loaded = false; continue; }
             var state = level.getBlockState(pos);
             if (!(adding && pos.equals(start))
-                    && (!state.is(ModContent.GARAGE_DOOR.get()) || state.getValue(GarageDoorBlock.AXIS) != axis)) continue;
+                    && (!state.is(ModContent.GARAGE_DOOR.get()) || state.getValue(GarageDoorBlock.AXIS) != axis
+                        || state.getValue(GarageDoorBlock.REVERSED) != reversed)) continue;
             panels.add(pos.immutable());
             if (panels.size() > Shutter.MAX_PANELS) return new Scan(List.copyOf(panels), loaded, true);
             for (var direction : directions) queue.add(pos.relative(direction));
@@ -49,8 +50,8 @@ public final class GarageDoorAssembly {
 
     /** requires: horizontal axis; effects: validates new panel against bounded loaded
      * neighbors; incomplete rectangles are allowed while building; throws: none. */
-    public static boolean canAdd(Level level, BlockPos pos, Direction.Axis axis) {
-        var scan = scan(level, pos, axis, true);
+    public static boolean canAdd(Level level, BlockPos pos, Direction.Axis axis, boolean reversed) {
+        var scan = scan(level, pos, axis, reversed, true);
         if (!scan.loaded || scan.overflow) return false;
         var min = pos; var max = pos;
         for (var p : scan.panels) {
@@ -67,7 +68,7 @@ public final class GarageDoorAssembly {
         var state = level.getBlockState(start);
         if (!state.is(ModContent.GARAGE_DOOR.get())) return;
         var axis = state.getValue(GarageDoorBlock.AXIS);
-        var scan = scan(level, start, axis, false);
+        var scan = scan(level, start, axis, state.getValue(GarageDoorBlock.REVERSED), false);
         if (!scan.loaded) return;
         var rectangle = scan.overflow ? Optional.<Shutter.Rectangle>empty() : Shutter.rectangle(scan.panels.stream()
                 .map(p -> new Shutter.Cell(axis == Direction.Axis.X ? p.getX() : p.getZ(), p.getY())).toList());

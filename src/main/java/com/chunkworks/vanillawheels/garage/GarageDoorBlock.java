@@ -19,20 +19,23 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.*;
 
 /** One recoverable shutter panel. AF: adjacent panels in the same plane form a
- * rectangular redstone door. RI: axis is horizontal; only the elected root ticks.
+ * rectangular redstone door with a shared outside face. RI: axis is horizontal;
+ * axis/reversed encode exactly four facings; only the elected root ticks.
+ * The original axis and reversed=false preserve both legacy orientations.
  * Shape, collision and rendering use the same server-owned travel. */
 public final class GarageDoorBlock extends BaseEntityBlock {
     public static final MapCodec<GarageDoorBlock> CODEC = simpleCodec(GarageDoorBlock::new);
     public static final EnumProperty<Direction.Axis> AXIS = BlockStateProperties.HORIZONTAL_AXIS;
+    public static final BooleanProperty REVERSED = BooleanProperty.create("reversed");
     public static final BooleanProperty ROOT = BooleanProperty.create("root");
 
     /** requires: block properties; effects: creates panel type; throws: registry errors. */
     public GarageDoorBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(AXIS, Direction.Axis.X).setValue(ROOT, false));
+        registerDefaultState(stateDefinition.any().setValue(AXIS, Direction.Axis.X).setValue(REVERSED, false).setValue(ROOT, false));
     }
     @Override protected MapCodec<? extends BaseEntityBlock> codec() { return CODEC; }
-    @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> b) { b.add(AXIS, ROOT); }
+    @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> b) { b.add(AXIS, REVERSED, ROOT); }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.INVISIBLE; }
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) { return new GarageDoorBlockEntity(pos, state); }
     @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
@@ -43,14 +46,42 @@ public final class GarageDoorBlock extends BaseEntityBlock {
         var level = context.getLevel();
         var pos = context.getClickedPos();
         var against = level.getBlockState(pos.relative(context.getClickedFace().getOpposite()));
-        var axis = against.is(this) ? against.getValue(AXIS)
-                : context.getHorizontalDirection().getAxis() == Direction.Axis.Z ? Direction.Axis.X : Direction.Axis.Z;
-        if (!GarageDoorAssembly.canAdd(level, pos, axis)) return null;
-        return defaultBlockState().setValue(AXIS, axis);
+        var state = withFacing(defaultBlockState(), context.getHorizontalDirection().getOpposite());
+        boolean inherited = against.is(this) && (context.getClickedFace().getAxis() == Direction.Axis.Y
+                || context.getClickedFace().getAxis() == against.getValue(AXIS));
+        if (inherited) state = withFacing(state, facing(against));
+        var axis = state.getValue(AXIS);
+        var across = axis == Direction.Axis.X ? Direction.EAST : Direction.SOUTH;
+        // Floor placement beside a door also adopts its outside. A bridge must
+        // not silently flip either of two existing, oppositely facing doors.
+        for (var direction : new Direction[]{Direction.UP, Direction.DOWN, across, across.getOpposite()}) {
+            var neighborPos = pos.relative(direction);
+            if (!level.hasChunkAt(neighborPos)) return null;
+            var neighbor = level.getBlockState(neighborPos);
+            if (!neighbor.is(this) || neighbor.getValue(AXIS) != axis) continue;
+            if (inherited && facing(neighbor) != facing(state)) return null;
+            state = withFacing(state, facing(neighbor));
+            inherited = true;
+        }
+        if (!GarageDoorAssembly.canAdd(level, pos, axis, state.getValue(REVERSED))) return null;
+        return state;
     }
+
+    /** requires: garage panel state; effects: returns its horizontal outside face;
+     * throws: invalid state properties. Legacy X faces north and legacy Z east. */
+    public static Direction facing(BlockState state) {
+        var original = state.getValue(AXIS) == Direction.Axis.X ? Direction.NORTH : Direction.EAST;
+        return state.getValue(REVERSED) ? original.getOpposite() : original;
+    }
+
+    private static BlockState withFacing(BlockState state, Direction facing) {
+        return state.setValue(AXIS, facing.getAxis() == Direction.Axis.Z ? Direction.Axis.X : Direction.Axis.Z)
+                .setValue(REVERSED, facing == Direction.SOUTH || facing == Direction.WEST);
+    }
+
     @Override protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState old, boolean moved) {
         super.onPlace(state, level, pos, old, moved);
-        if (!level.isClientSide && (!old.is(this) || old.getValue(AXIS) != state.getValue(AXIS))) {
+        if (!level.isClientSide && (!old.is(this) || facing(old) != facing(state))) {
             GarageDoorAssembly.schedule(level, pos, state.getValue(AXIS));
             if (old.is(this)) GarageDoorAssembly.schedule(level, pos, old.getValue(AXIS));
         }
@@ -81,7 +112,9 @@ public final class GarageDoorBlock extends BaseEntityBlock {
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
     @Override protected BlockState rotate(BlockState state, Rotation rotation) {
-        return rotation == Rotation.CLOCKWISE_90 || rotation == Rotation.COUNTERCLOCKWISE_90
-                ? state.cycle(AXIS) : state;
+        return withFacing(state, rotation.rotate(facing(state)));
+    }
+    @Override protected BlockState mirror(BlockState state, Mirror mirror) {
+        return withFacing(state, mirror.mirror(facing(state)));
     }
 }

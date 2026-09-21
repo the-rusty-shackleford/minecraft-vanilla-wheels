@@ -207,7 +207,21 @@ public final class PhotoBooth {
         List<Step> s = new ArrayList<>();
         int t = HOLD;
         if (Boolean.getBoolean("vanillawheels.garagebooth")) {
-            t = garagePlan(mc, s, t);
+            // The ordinary booth hides the HUD and hand. Keep both visible here
+            // so the garage item has an actual held-item reference image.
+            mc.options.hideGui = false;
+            s.add(new Step(t, () -> shoot(mc, "booth-garage-hand-empty")));
+            s.add(new Step(t + 1, () -> onServer(mc, sp -> {
+                sp.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.GARAGE_DOOR_ITEM.get()));
+                sp.inventoryMenu.broadcastChanges();
+            })));
+            s.add(new Step(t + 15, () -> {
+                shoot(mc, "booth-garage-hand-held");
+                verdict("garage panel reaches the client hand", () ->
+                        mc.player.getMainHandItem().is(ModContent.GARAGE_DOOR_ITEM.get()) ? null : "wrong held item");
+                mc.options.hideGui = true;
+            }));
+            t = garagePlan(mc, s, t + 17);
             s.add(new Step(t + 20, () -> {
                 LOG.info("booth: PASS all checks ran (garage-only)");
                 phase = Phase.DONE; mc.stop();

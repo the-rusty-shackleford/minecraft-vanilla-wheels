@@ -1,7 +1,7 @@
 # Vanilla Wheels
 
-**[Version 1.9.2](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.9.2)**
-is published and deployed in shared pack **1.54.2**. Install matching client and
+**[Version 1.9.3](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.9.3)**
+is released for shared pack **1.54.3**. Install matching client and
 server versions; shared-pack players can use **Update Pack** in Prism.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
@@ -24,6 +24,12 @@ Trailer and Farmer's Pickup share this page. New vehicle profiles join it automa
 The ordinary vanilla categories and Creative search remain available too.
 Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
 [full-pack tab check](devtools/verification/creative-tab.md).
+
+## Held garage panel in 1.9.3
+
+The held garage panel now has a larger, front-facing item pose so its slats are
+visible in first person and in the inventory. Released alongside a fresh world on seed 1000820165;
+[visual verification](devtools/verification/garage-held-item.md) was skipped at Rusty's request while their personal Prism client is running.
 
 ## Rolling garage doors
 

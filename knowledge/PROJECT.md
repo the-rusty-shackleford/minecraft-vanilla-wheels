@@ -310,3 +310,18 @@ Validation and deployment are recorded in
 Version 1.9.2 is now published and deployed in pack 1.54.2. The installed jar
 matches the release; Mod Hub reports parity and the server runs at 20 TPS with
 no new startup errors after the full warning and authorized disconnection.
+
+## Held garage panel — 1.9.3 release
+
+Rusty reported that a garage panel appears absent from the player's hand. The
+published 1.9.2 JAR contains the item model, and the active client logs no garage
+model load failure. The model inherits Minecraft's small angled block-item pose.
+An item-only display transform enlarges and faces the panel toward the camera.
+The garage GPU booth now captures empty and held first-person reference frames
+with the GUI visible; it awaits the personal client's closure for visual review.
+Rusty then explicitly requested release batched with a new world on seed
+1000820165. The item-only build is complete and Rusty superseded the migration request:
+all players start from scratch, with no inventories, animals or structures
+carried into the new save. They requested release while their personal client
+remains active, so the GPU held-item capture is not a gate. See
+[release verification](../devtools/verification/release-1.9.3.md).

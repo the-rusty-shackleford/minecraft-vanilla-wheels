@@ -306,3 +306,7 @@ the consuming interaction handler. The existing construction regression now uses
 normal clicks and can run alone with `-PgameTestNamespaces=vanillawheels_chaining`.
 Validation and deployment are recorded in
 [release verification](../devtools/verification/release-1.9.2.md).
+
+Version 1.9.2 is now published and deployed in pack 1.54.2. The installed jar
+matches the release; Mod Hub reports parity and the server runs at 20 TPS with
+no new startup errors after the full warning and authorized disconnection.

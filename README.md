@@ -1,7 +1,7 @@
 # Vanilla Wheels
 
-**[Version 1.9.0](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.9.0)**
-is published and deployed in shared pack **1.54.0**. Install matching client and
+**[Version 1.9.1](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.9.1)**
+is released; the shared-pack rollout is **1.54.1**. Install matching client and
 server versions; shared-pack players can use **Update Pack** in Prism.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
@@ -33,7 +33,7 @@ up to **16 × 16** blocks. Adjacent panels inherit the first panel's orientation
 The finished rectangle becomes one door with side tracks and a roll at its top.
 Fill the entire opening with panels; you can build from the top down or bottom up.
 
-**Local 1.9.1, unreleased:** the first panel's outside faces you, so place it from
+**Since 1.9.1:** the first panel's outside faces you, so place it from
 the opposite side to reverse the door. All four compass directions are supported.
 Coplanar extensions inherit that facing, including panels placed on the floor
 beside it. Existing doors retain their original orientation. Doors facing opposite
@@ -468,6 +468,6 @@ Pickup movement corrections have not reproduced on these courses and are not cla
 fixed. Multi-player synchronization remains a later group-test gate. Network protocol
 4 carries owner contact velocities and requires matching 1.7.0 builds on peers. See D-0011.
 
-Clean release results: [version 1.9.0](devtools/verification/release-1.9.0.md).
+Clean release results: [version 1.9.1](devtools/verification/release-1.9.1.md).
 
 The automated booth releases mouse capture so desktop mouse movement cannot steer its scripted camera.

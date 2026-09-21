@@ -7,14 +7,16 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## Local follow-up — 1.9.1, unreleased
+## Garage facing — 1.9.1
 
 [D-0016](decisions/D-0016.md) adds four-direction garage door placement: outside
 faces the first panel's placer, extensions inherit it, and legacy doors keep
 their appearance. Full-rectangle construction and interaction behavior remain.
 All 92 domain tests, 61 real-server GameTests and the complete RTX 4070 shader
 booth passed. Verification is recorded in [garage facing](../devtools/verification/garage-facing.md).
-Publication and deployment await Rusty's next explicit release instruction.
+Rusty authorized public release and deployment, with a full two-minute warning
+and disconnection of remaining players before restart. See
+[release verification](../devtools/verification/release-1.9.1.md).
 
 Version **1.9.0** is published and deployed in pack **1.54.0**.
 See [release and deployment verification](../devtools/verification/release-1.9.0.md).

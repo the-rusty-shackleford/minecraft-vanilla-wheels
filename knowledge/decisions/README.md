@@ -32,3 +32,5 @@ tags: [index]
 - [D-0015](D-0015.md): Connected redstone rolling garage doors.
 
 - [D-0016](D-0016.md): Four-direction garage doors preserving existing inside/outside.
+
+- [D-0017](D-0017.md): Normal garage panel clicks allow adjacent placement without warnings.

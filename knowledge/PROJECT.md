@@ -297,3 +297,12 @@ authorized for public source/jar publication and pack 1.54.0 deployment. The cle
 build passed 92 JUnit tests, 57 real-server GameTests and the complete
 GPU shader booth. See [release verification](../devtools/verification/release-1.9.0.md).
 Earlier release holds are superseded for this version.
+
+## Garage chaining — 1.9.2
+
+Rusty requested and authorized immediate release of ordinary garage-panel edge
+placement, then approved removing the instruction message entirely. D-0017 removes
+the consuming interaction handler. The existing construction regression now uses
+normal clicks and can run alone with `-PgameTestNamespaces=vanillawheels_chaining`.
+Validation and deployment are recorded in
+[release verification](../devtools/verification/release-1.9.2.md).

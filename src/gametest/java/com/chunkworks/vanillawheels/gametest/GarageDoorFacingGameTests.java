@@ -90,7 +90,7 @@ public final class GarageDoorFacingGameTests {
         h.succeed();
     }
 
-    @GameTest(template="garage_arena",timeoutTicks=65)
+    @GameTest(template="garage_arena",templateNamespace="vanillawheels_chaining",timeoutTicks=65)
     public void allFacingsInheritTopDownAndRunTheSameRedstoneDoor(GameTestHelper h) {
         var p=player(h);
         var origins=new ArrayList<BlockPos>();
@@ -108,12 +108,12 @@ public final class GarageDoorFacingGameTests {
                 place(h,p,pos,Direction.UP);
                 h.setBlock(pos,Blocks.AIR);
                 look(p,facing);
-                p.setShiftKeyDown(true);
-                place(h,p,pos.above(),Direction.DOWN);
-                // Ordinary floor placement beside an existing panel inherits it too.
                 p.setShiftKeyDown(false);
-                place(h,p,pos.relative(across).below(),Direction.UP);
-                p.setShiftKeyDown(true);
+                place(h,p,pos.above(),Direction.DOWN);
+                // Ordinary edge clicks extend the door without crouching.
+                p.setShiftKeyDown(false);
+                place(h,p,pos,across);
+                p.setShiftKeyDown(false);
                 place(h,p,pos.relative(across),Direction.UP);
                 p.setShiftKeyDown(false);
                 for (var panel:new BlockPos[]{pos,pos.above(),pos.relative(across),pos.relative(across).above()})

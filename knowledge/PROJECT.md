@@ -7,6 +7,9 @@ tags: [overview]
 
 # Vanilla Wheels
 
+Version **1.9.0** is published and deployed in pack **1.54.0**.
+See [release and deployment verification](../devtools/verification/release-1.9.0.md).
+
 ## What this is
 
 A NeoForge 1.21.1 vehicle protocol, built the way the ranged-weapons protocol was: one

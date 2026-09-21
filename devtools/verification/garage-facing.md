@@ -1,8 +1,9 @@
-# Garage door facing — local 1.9.1
+# Garage door facing — 1.9.1
 
 Rusty acknowledged four-direction placement and withdrew the separate chaining
 report. Full-rectangle construction, interaction messages and redstone behavior
-are retained. This version is not released or deployed.
+are retained. Initial local validation is recorded below; see the
+[release and deployment record](release-1.9.1.md) for the published version.
 
 ## Reproduction and compatibility
 
@@ -54,7 +55,7 @@ Each pair below shows **outside on the left, inside on the right**:
 Artifact: `vanillawheels-1.9.1.jar` (verification fixtures excluded).
 SHA-256: `3440e4c315f71a3d6bc35db61c58cbfd8aa54807e402107ca065b075b3855a58`.
 
-The source and artifact remain local and unreleased. No independent multiplayer
+The published release uses this exact artifact. No independent multiplayer
 observer or upgrade of a live-world copy is claimed; legacy compatibility was
 verified through the actual vanilla block-state palette serialization path.
 

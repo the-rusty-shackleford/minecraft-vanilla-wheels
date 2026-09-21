@@ -9,6 +9,10 @@ tags: [overview]
 
 ## Garage facing — 1.9.1
 
+Version **1.9.1** is published and deployed in pack **1.54.1**. The installed
+jar matches the public release, Mod Hub reports parity, and the server runs at
+20 TPS with no new startup errors after the authorized warning and restart.
+
 [D-0016](decisions/D-0016.md) adds four-direction garage door placement: outside
 faces the first panel's placer, extensions inherit it, and legacy doors keep
 their appearance. Full-rectangle construction and interaction behavior remain.
@@ -18,7 +22,7 @@ Rusty authorized public release and deployment, with a full two-minute warning
 and disconnection of remaining players before restart. See
 [release verification](../devtools/verification/release-1.9.1.md).
 
-Version **1.9.0** is published and deployed in pack **1.54.0**.
+The previous **1.9.0** release was deployed in pack **1.54.0**.
 See [release and deployment verification](../devtools/verification/release-1.9.0.md).
 
 ## What this is

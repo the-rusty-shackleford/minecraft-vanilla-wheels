@@ -25,6 +25,7 @@ import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
 import com.chunkworks.vanillawheels.lift.LiftMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionResult;
@@ -201,6 +202,14 @@ public final class PhotoBooth {
     private static List<Step> plan(Minecraft mc) {
         List<Step> s = new ArrayList<>();
         int t = HOLD;
+        if (Boolean.getBoolean("vanillawheels.garagebooth")) {
+            t = garagePlan(mc, s, t);
+            s.add(new Step(t + 20, () -> {
+                LOG.info("booth: PASS all checks ran (garage-only)");
+                phase = Phase.DONE; mc.stop();
+            }));
+            return s;
+        }
         s.add(new Step(t, () -> {
             int blue = count(mc, PhotoBooth::lightBlue);
             stockBlue = blue;
@@ -567,12 +576,91 @@ public final class PhotoBooth {
             verdict("its doors are swung open", () -> found != null && found.doorSwing(1.0f) > 0.9f ? null : "swing " + (found == null ? null : found.doorSwing(1.0f)));
             verdict("with two cows aboard", () -> found != null && found.animals().size() == 2 ? null : "animals " + (found == null ? null : found.animals()));
         }));
+        t = garagePlan(mc, s, t);
         s.add(new Step(t += 20, () -> {
             LOG.info("booth: PASS all checks ran");
             phase = Phase.DONE;
             mc.stop();
         }));
         return s;
+    }
+
+    private static BlockPos garagePos = BlockPos.ZERO;
+    private static UUID garageVehicle;
+
+    private static int garagePlan(Minecraft mc, List<Step> s, int t) {
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            var l=sp.serverLevel(); int y=(int)Math.floor(sp.getY());
+            // A separate patch of the disposable booth world, away from the vehicle courses.
+            garagePos=new BlockPos(22,y,9);
+            l.getEntities((net.minecraft.world.entity.Entity)null,new AABB(19,y-1,1,31,y+7,18),
+                    e -> !(e instanceof net.minecraft.world.entity.player.Player)).forEach(net.minecraft.world.entity.Entity::discard);
+            for(int x=19;x<=30;x++)for(int z=1;z<=17;z++) {
+                l.setBlock(new BlockPos(x,y-1,z),Blocks.SMOOTH_STONE.defaultBlockState(),3);
+                for(int up=0;up<7;up++)l.setBlock(new BlockPos(x,y+up,z),Blocks.AIR.defaultBlockState(),3);
+            }
+            for(int x=-1;x<=5;x++)for(int up=0;up<=5;up++)
+                l.setBlock(garagePos.offset(x,up,0),
+                        (x==-1||x==5||up==5 ? Blocks.STONE_BRICKS.defaultBlockState()
+                                : ModContent.GARAGE_DOOR.get().defaultBlockState()),3);
+            l.setBlock(garagePos.offset(4,0,-1),Blocks.LEVER.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.LeverBlock.FACE,
+                            net.minecraft.world.level.block.state.properties.AttachFace.FLOOR),3);
+            l.setDayTime(1800);sp.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);
+            garageView(sp);
+        })));
+        s.add(new Step(t += 50, () -> {
+            shoot(mc,"booth-garage-closed");
+            verdict("garage client sees a joined closed door",()-> {
+                var door=(com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity)mc.level.getBlockEntity(garagePos);
+                return door!=null&&door.formed()&&door.width()==5&&door.height()==5&&door.lift()==0 ? null : "door not formed/closed";
+            });
+            onServer(mc,sp->sp.teleportTo(sp.serverLevel(),26.5,garagePos.getY(),7,0,30));
+        }));
+        s.add(new Step(t += 10, () -> garageSwitch(mc)));
+        s.add(new Step(t += 3, () -> onServer(mc,PhotoBooth::garageView)));
+        s.add(new Step(t += 15, () -> shoot(mc,"booth-garage-rolling")));
+        s.add(new Step(t += 35, () -> {
+            shoot(mc,"booth-garage-open");
+            verdict("actual client lever packet opens garage",()-> {
+                var door=(com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity)mc.level.getBlockEntity(garagePos);
+                return door!=null&&door.lift()==36 ? null : "door not fully open";
+            });
+            onServer(mc,sp->{
+                Vehicle v=Vehicle.create(sp.serverLevel(),BOX_CAR,new Vec3(24.5,garagePos.getY(),9.5),0);
+                v.setNoGravity(true);sp.serverLevel().addFreshEntity(v);garageVehicle=v.getUUID();
+                sp.teleportTo(sp.serverLevel(),26.5,garagePos.getY(),7,0,30);
+            });
+        }));
+        s.add(new Step(t += 10, () -> garageSwitch(mc)));
+        s.add(new Step(t += 3, () -> onServer(mc,PhotoBooth::garageView)));
+        s.add(new Step(t += 20, () -> {
+            shoot(mc,"booth-garage-obstruction");
+            onServer(mc,sp->{
+                var door=(com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity)sp.serverLevel().getBlockEntity(garagePos);
+                verdict("garage pauses closure for a real vehicle",()->door.lift()==36 ? null : "door closed onto vehicle");
+                var v=(Vehicle)sp.serverLevel().getEntity(garageVehicle);
+                v.move(net.minecraft.world.entity.MoverType.SELF,new Vec3(0,0,6));
+                verdict("vehicle moves through open garage without a hidden barrier",()->v.getZ()>13 ? null : "vehicle stopped at "+v.getZ());
+            });
+        }));
+        s.add(new Step(t += 60, () -> {
+            shoot(mc,"booth-garage-reclosed");
+            verdict("garage closes after the vehicle clears",()-> {
+                var door=(com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity)mc.level.getBlockEntity(garagePos);
+                return door!=null&&door.lift()==0 ? null : "door did not close";
+            });
+        }));
+        return t;
+    }
+    private static void garageView(ServerPlayer sp) {
+        sp.getAbilities().mayfly=true;sp.getAbilities().flying=true;sp.onUpdateAbilities();
+        sp.teleportTo(sp.serverLevel(),24.5,garagePos.getY()+1.2,2,0,2.5f);
+    }
+    private static void garageSwitch(Minecraft mc) {
+        var pos=garagePos.offset(4,0,-1);
+        mc.gameMode.useItemOn(mc.player,InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(pos),Direction.UP,pos,false));
     }
 
     /** The lift's steel: a grey with little tint, mid-bright, lit by day. */

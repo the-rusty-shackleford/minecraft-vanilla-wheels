@@ -110,6 +110,7 @@ neoForge {
             sourceSet = sourceSets.gametest
             gameDirectory = file('run/booth')
             systemProperty 'vanillawheels.photobooth', 'true'
+            if (project.hasProperty('garageBooth')) systemProperty 'vanillawheels.garagebooth', 'true'
             taskBefore prepareBooth
         }
         configureEach {

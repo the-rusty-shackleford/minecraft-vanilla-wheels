@@ -28,3 +28,5 @@ tags: [index]
 - [D-0013](D-0013.md): Require separately installed Metals and Materials.
 
 - [D-0014](D-0014.md): Persistent cargo, lift repairs and paired recovery keys.
+
+- [D-0015](D-0015.md): Connected redstone rolling garage doors.

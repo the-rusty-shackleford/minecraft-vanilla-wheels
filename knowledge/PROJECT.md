@@ -264,3 +264,10 @@ reports pack/server parity and RCON measured 20 TPS. The client and server packs
 change only the five mod downloads and version label; shared preferences are
 preserved. Rusty imports the client update in Prism for multiplayer playtesting.
 The earlier release holds above are superseded.
+
+## Rolling garage doors — 2026-09-20, local review
+
+Version 1.9.0 adds connected redstone rolling doors under D-0015. The existing
+vehicle protocol remains 5. The complete local server suite and shader booth
+passed; see [evidence](../devtools/verification/garage-door.md). Publication,
+pack updates and deployment require Rusty's explicit release instruction.

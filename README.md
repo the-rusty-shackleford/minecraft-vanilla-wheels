@@ -15,11 +15,30 @@ Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-lumi
 ## Creative inventory
 
 The **Vanilla Wheels** tab contains every installed vehicle and its chassis, followed
-by the Mechanic Lift, wrench, wheels, engine and full/empty gas cans. Trailblazer,
+by the Mechanic Lift, Rolling Garage Door panels, wrench, wheels, engine and full/empty gas cans. Trailblazer,
 Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
 The ordinary vanilla categories and Creative search remain available too.
 Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
 [full-pack tab check](devtools/verification/creative-tab.md).
+
+## Rolling garage doors — local 1.9.0
+
+Craft **eight Rolling Garage Door panels** from eight steel ingots surrounding one
+redstone dust. Place adjoining panels across and upward to form a flat rectangle,
+up to **16 × 16** blocks. Adjacent panels inherit the first panel's orientation.
+The finished rectangle becomes one door with side tracks and a roll at its top.
+
+Power any section with redstone: **on opens, off closes**. A lever beside a section
+works. Closing pauses while a player, mob, vehicle, boat or minecart occupies the
+opening, then resumes when it clears. The top housing occupies half a block;
+a four-block-high door leaves three and a half blocks of vertical clearance.
+
+Breaking a section returns one panel. An incomplete rectangle stops moving and
+keeps its existing clearance until repaired; it cannot be powered as a door.
+Assemblies crossing unloaded chunks suspend without loading those chunks.
+
+This addition is locally verified and **unreleased**. See the
+[server and shader-client evidence](devtools/verification/garage-door.md).
 
 ## Driving
 

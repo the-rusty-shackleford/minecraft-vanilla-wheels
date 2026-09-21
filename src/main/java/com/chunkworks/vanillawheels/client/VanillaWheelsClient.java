@@ -53,6 +53,7 @@ public final class VanillaWheelsClient {
     public static void onRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModContent.VEHICLE_ENTITY.get(), VehicleRenderer::new);
         event.registerBlockEntityRenderer(ModContent.LIFT_BE.get(), com.chunkworks.vanillawheels.client.lift.LiftRenderer::new);
+        event.registerBlockEntityRenderer(ModContent.GARAGE_DOOR_BE.get(), com.chunkworks.vanillawheels.client.garage.GarageDoorRenderer::new);
     }
 
     @SubscribeEvent

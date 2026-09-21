@@ -73,5 +73,8 @@
   "vanillawheels.key.stale_vehicle": "This packed vehicle is stale, or its cargo no longer fits the current vehicle profile.",
   "vanillawheels.key.hold": "Hold use to preview the cost and recall your vehicle.",
   "vanillawheels.key.bind_help": "Use on a motor vehicle to pair. Use in air to replace a lost paired fob.",
-  "vanillawheels.key.cost_help": "Farther recall costs more fuel. Other dimensions cost a full tank."
+  "vanillawheels.key.cost_help": "Farther recall costs more fuel. Other dimensions cost a full tank.",
+  "block.vanillawheels.garage_door": "Rolling Garage Door",
+  "garage.vanillawheels.power": "Power any section with redstone to open. Remove power to close.",
+  "garage.vanillawheels.rectangle": "Complete a rectangle of matching panels (up to 16 × 16)."
 }

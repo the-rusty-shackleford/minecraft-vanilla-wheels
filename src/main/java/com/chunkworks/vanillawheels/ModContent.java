@@ -137,6 +137,16 @@ public final class ModContent {
     public static final DeferredHolder<MenuType<?>, MenuType<LiftMenu>> LIFT_MENU = MENUS.register("mechanic_lift",
             () -> new MenuType<>((id, inventory) -> new LiftMenu(id, inventory, net.minecraft.world.inventory.ContainerLevelAccess.NULL), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
 
+    /** Individually craftable sections joining into one redstone shutter. */
+    public static final DeferredBlock<com.chunkworks.vanillawheels.garage.GarageDoorBlock> GARAGE_DOOR =
+            BLOCKS.registerBlock("garage_door", com.chunkworks.vanillawheels.garage.GarageDoorBlock::new,
+                    BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3,6).sound(SoundType.METAL)
+                            .noOcclusion().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> GARAGE_DOOR_ITEM = ITEMS.registerSimpleBlockItem(GARAGE_DOOR);
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity>> GARAGE_DOOR_BE =
+            BLOCK_ENTITIES.register("garage_door", () -> BlockEntityType.Builder.of(
+                    com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity::new, GARAGE_DOOR.get()).build(null));
+
     private static BlockBehaviour.Properties liftProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0f, 6.0f).sound(SoundType.METAL).noOcclusion().noLootTable().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK);
     }
@@ -214,6 +224,7 @@ public final class ModContent {
                 profiles.forEach(id -> output.accept(vehicleStack(id)));
                 profiles.forEach(id -> output.accept(chassisStack(id)));
                 output.accept(LIFT_ITEM.get());
+                output.accept(GARAGE_DOOR_ITEM.get());
                 output.accept(WRENCH.get());
                 output.accept(KEY_FOB.get());
                 output.accept(WHEEL.get());

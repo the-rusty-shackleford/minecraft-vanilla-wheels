@@ -155,6 +155,17 @@ dependencies {
             prefer "1.1.0"
         }
     }
+    // Carried (D-0019): what the vehicle hands back to a player (a disc, a lead, a repair
+    // ingredient) goes where a give goes, their bags included. Nested, as every consumer nests it;
+    // `./gradlew publishToMavenLocal` in minecraft-carried first.
+    jarJar(implementation("com.chunkworks.carried:carried")) {
+        version {
+            strictly "[1.0,2.0)"
+            prefer "1.0.0"
+        }
+    }
+    // Backpacks+ on the gametest server only, so a give is proven against a real bag.
+    gametestRuntimeOnly files('../minecraft-backpacks-plus/build/libs/backpacksplus-0.6.0.jar')
     // Metals and Materials supplies the steel the part recipes take
     // (#c:ingots/steel and #c:storage_blocks/steel). Install it separately.
     implementation("com.chunkworks.metalsandmaterials:metalsandmaterials") {

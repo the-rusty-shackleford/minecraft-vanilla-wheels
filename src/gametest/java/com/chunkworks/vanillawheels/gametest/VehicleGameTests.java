@@ -403,6 +403,21 @@ public final class VehicleGameTests {
         v.interactAt(p, radio, InteractionHand.MAIN_HAND);
         helper.assertTrue(v.disc().isEmpty(), "ejected");
         helper.assertTrue(p.getInventory().contains(new ItemStack(Items.MUSIC_DISC_CAT)), "back in the inventory");
+        // D-0019: a player whose hands are full reaches the radio with an empty offhand (the game
+        // tries the offhand when the main hand's item does nothing); with every main slot full and
+        // a bag in a pocket, the disc goes into the bag, not onto the ground. The bag is
+        // Backpacks+'s by registry id (loaded on the gametest server).
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.MUSIC_DISC_CAT));
+        v.interactAt(p, Vec3.ZERO, InteractionHand.MAIN_HAND);
+        helper.assertTrue(v.disc().is(Items.MUSIC_DISC_CAT), "the disc is in again");
+        p.getInventory().clearContent();
+        for (int i = 0; i < 36; i++) p.getInventory().setItem(i, new ItemStack(Items.DIRT, 64));
+        p.getInventory().setItem(20, new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse("backpacksplus:basic_backpack"))));
+        v.interactAt(p, radio, InteractionHand.OFF_HAND);
+        helper.assertTrue(v.disc().isEmpty(), "ejected again");
+        var cells = p.getInventory().getItem(20).getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY);
+        helper.assertTrue(cells.stream().anyMatch(s -> s.is(Items.MUSIC_DISC_CAT)), "into the pocketed bag: " + cells);
+        helper.assertTrue(helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(p.blockPosition()).inflate(8)).isEmpty(), "nothing dropped");
         helper.succeed();
     }
 

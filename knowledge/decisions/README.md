@@ -36,3 +36,5 @@ tags: [index]
 - [D-0017](D-0017.md): Normal garage panel clicks allow adjacent placement without warnings.
 
 - [D-0018](D-0018.md): The suspension takes seven blocks of a fall; riders feel the rest.
+
+- [D-0019](D-0019.md): What a vehicle hands back (a disc, a lead, a repair ingredient) goes where a give goes, a carried bag included, through Carried.

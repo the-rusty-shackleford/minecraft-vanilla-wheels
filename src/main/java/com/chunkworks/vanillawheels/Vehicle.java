@@ -17,6 +17,7 @@
  */
 package com.chunkworks.vanillawheels;
 
+import com.chunkworks.carried.api.Carried;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.client.Controls;
@@ -2028,7 +2029,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             }
             if (p.radio().isPresent() && held.isEmpty() && !disc().isEmpty() && inRegion(p, p.radio().get().at(), 1.2, hit)) {
                 if (!level().isClientSide()) {
-                    player.getInventory().placeItemBackInInventory(disc());
+                    Carried.giveOrDrop(player, disc());
                     entityData.set(DATA_DISC, ItemStack.EMPTY);
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
@@ -2140,7 +2141,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 continue;
             }
             a.dropLeash(true, false);
-            player.getInventory().placeItemBackInInventory(new ItemStack(Items.LEAD));
+            Carried.giveOrDrop(player, new ItemStack(Items.LEAD));
             if (a.startRiding(this, true)) {
                 boarded++;
             }

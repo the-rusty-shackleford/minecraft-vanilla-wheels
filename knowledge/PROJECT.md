@@ -7,6 +7,15 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## Carried — 1.9.5, unreleased
+
+Rusty's one change for every mod that looks at a player's inventory: the Carried protocol.
+[D-0019](decisions/D-0019.md): the disc, the leads and a stranded repair ingredient go where a give
+goes, a carried bag included, before the ground. 63 GameTests with Backpacks+ 0.6.0 on the
+gametest server, green; the radio's new check failed on 1.9.4. Ships with Carried and Backpacks+
+0.6.0 as one pack on Rusty's go; Trailblazer, Trailer and Farmer's Truck nest an older Vanilla
+Wheels, which the pack's own 1.9.5 outranks.
+
 ## Riders and falls — 1.9.4
 
 A friend was hurt driving the Trailblazer downhill. The cause was the vehicle's own fall,

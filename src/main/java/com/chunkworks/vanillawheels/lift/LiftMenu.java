@@ -17,6 +17,7 @@
  */
 package com.chunkworks.vanillawheels.lift;
 
+import com.chunkworks.carried.api.Carried;
 import com.chunkworks.vanillawheels.ChassisItem;
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
@@ -202,7 +203,7 @@ public final class LiftMenu extends AbstractContainerMenu {
             } else {
                 data.set(6, 0);
                 // Once the section disappears, no ingredients may be stranded in an invisible slot.
-                if (!parts.getItem(REPAIR).isEmpty()) owner.getInventory().placeItemBackInInventory(parts.removeItemNoUpdate(REPAIR));
+                if (!parts.getItem(REPAIR).isEmpty()) Carried.giveOrDrop(owner, parts.removeItemNoUpdate(REPAIR));
             }
         }
         super.broadcastChanges();

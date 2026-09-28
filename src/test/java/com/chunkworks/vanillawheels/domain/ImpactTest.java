@@ -63,9 +63,21 @@ final class ImpactTest {
     }
 
     @Test
+    void theSuspensionTakesAHillsHopAndPassesOnTheRestOfAFall() {
+        assertEquals(0.0, Impact.riderFall(0.0));
+        assertEquals(0.0, Impact.riderFall(5.76), "the flight a hill of one in two throws at top speed");
+        assertEquals(0.0, Impact.riderFall(Impact.SUSPENSION), "all of the suspension's share");
+        assertEquals(0.5, Impact.riderFall(Impact.SUSPENSION + 0.5), 1e-9, "past it, the rest");
+        assertEquals(13.0 - Impact.SUSPENSION, Impact.riderFall(13.0), 1e-9);
+    }
+
+    @Test
     void badNumbersAreRefused() {
         assertThrows(IllegalArgumentException.class, () -> Impact.damage(1, 0, 1));
         assertThrows(IllegalArgumentException.class, () -> Impact.damage(1, 1, 0));
         assertThrows(IllegalArgumentException.class, () -> Impact.knockback(1, 0));
+        assertThrows(IllegalArgumentException.class, () -> Impact.riderFall(-0.1));
+        assertThrows(IllegalArgumentException.class, () -> Impact.riderFall(Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> Impact.riderFall(Double.POSITIVE_INFINITY));
     }
 }

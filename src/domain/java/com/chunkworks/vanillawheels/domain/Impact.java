@@ -21,7 +21,8 @@ package com.chunkworks.vanillawheels.domain;
  * What running into something costs, from the vehicle's speed as a
  * fraction of its top speed and its mass: nothing under a walking pace,
  * then damage that grows with the square of the speed and a shove that
- * grows with it, and a loss of speed for the vehicle by what it hit.
+ * grows with it, and a loss of speed for the vehicle by what it hit; and
+ * what of a fall the vehicle hands on to its riders.
  */
 public final class Impact {
     private Impact() {}
@@ -38,6 +39,12 @@ public final class Impact {
     public static final double KEEP_AFTER_SMALL = 0.97;
     /** A victim at least this wide is large. */
     public static final double LARGE_WIDTH = 0.9;
+    /**
+     * The blocks of any fall the suspension takes before a rider feels it. At speed a hill of a
+     * block down for every two on throws the car some six blocks through the air between
+     * landings, and the game hands a vehicle's fall to its riders whole.
+     */
+    public static final double SUSPENSION = 7.0;
 
     /**
      * effects: returns the damage a vehicle of {@code mass} moving at
@@ -71,6 +78,19 @@ public final class Impact {
     /** effects: returns the vehicle's speed after hitting a victim {@code width} blocks wide: less for a cow than a chicken */
     public static double speedAfter(double speed, double width) {
         return speed * (width >= LARGE_WIDTH ? KEEP_AFTER_LARGE : KEEP_AFTER_SMALL);
+    }
+
+    /**
+     * effects: returns the part of a vehicle's fall of {@code fall} blocks its riders take: none
+     * of the first {@link #SUSPENSION} blocks, all of the rest (each rider's own safe distance
+     * then applies to that, as it does on foot)<br>
+     * throws: {@link IllegalArgumentException} if fall is negative or not finite
+     */
+    public static double riderFall(double fall) {
+        if (!Double.isFinite(fall) || fall < 0) {
+            throw new IllegalArgumentException("a fall is finite and not negative: " + fall);
+        }
+        return Math.max(0.0, fall - SUSPENSION);
     }
 
     /** A planar velocity. RI: finite components. AF: blocks travelled along x/z per tick. */

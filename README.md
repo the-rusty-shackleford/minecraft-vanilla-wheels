@@ -31,6 +31,20 @@ The held garage panel now has a larger, front-facing item pose so its slats are
 visible in first person and in the inventory. Released alongside a fresh world on seed 1000820165;
 [visual verification](devtools/verification/garage-held-item.md) was skipped at Rusty's request while their personal Prism client is running.
 
+## Falls in 1.9.4
+
+A vehicle's suspension takes the first **seven blocks** of any fall before its riders feel
+it; riders take the rest, and their own three-block safe distance applies to that as it
+does on foot. So a fall of up to ten blocks hurts nobody aboard, and past that each block
+costs a point. The game hands a vehicle's whole fall to everyone aboard, and a car taken
+down a hill at speed leaves the ground at the brow and lands blocks lower: at the
+Trailblazer's top speed, a slope of one block down for every two throws it 5.8 blocks,
+which cost riders 4 points before 1.9.4 and costs nothing now. A drive off a cliff still
+hurts: a fourteen-block drop costs 3 points. A slope of one in one taken at top speed is a
+cliff to the car, which clears all sixteen blocks of the test hill without touching it.
+Animals in a trailer are spared the same way. Riders' heads passing through low blocks have
+been spared the wall's damage since 1.5.0; nothing about the rider's collision changes.
+
 ## Rolling garage doors
 
 Craft **eight Rolling Garage Door panels** from eight steel ingots surrounding one
@@ -148,7 +162,7 @@ cow and bystander. The living are run over instead (below).
 A body within its climb of the ground is on it, for the wheel and for the step: at speed
 over rough ground the box is off the ground a few ticks at a time, and a riser met an inch
 in the air would be a wall and the wheel dead over every drop; a fall from higher is a
-fall. The driver's client drives (the boat rule), the server re-runs the same move and resets a
+fall, and its riders feel only what the suspension does not take (see [Falls](#falls-in-194)). The driver's client drives (the boat rule), the server re-runs the same move and resets a
 client that disagrees by more than a quarter block, and every other client is told the
 speed, steer, drift and burn for its wheels, sounds and flames -- and the pose. The tilt
 and lift are computed where the driving is, the driver's client (the server for a
@@ -423,7 +437,9 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 PATH="$JAVA_HOME/bin:$PATH"
 
 The gametests drive the box car on a runway: it reaches speed and coasts to a stop,
 climbs a two-block step and settles level on top, slides along a wall met at a slant
-without stopping, hurts and shoves a cow at speed and
+without stopping, carries a villager (behind an armor stand at the wheel, so the server
+drives) down a hill at top speed unhurt and off a fourteen-block cliff hurt by the part of
+the fall past ten blocks, hurts and shoves a cow at speed and
 nothing at a walk, pours from a gas can held at it until the can is an empty can, fuels
 nothing from coal and refuses a throttle with an empty tank, crafts the empty can from
 iron and fills it with four coals,

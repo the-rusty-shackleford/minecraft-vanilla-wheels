@@ -32,9 +32,13 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -83,7 +87,12 @@ public final class VehicleGameTests {
 
     /** A box car at {@code (x, z)} on the floor, facing +x (east: yaw -90), fuelled, unless {@code fuel} is false. */
     private static Vehicle car(GameTestHelper helper, double x, double z, boolean fuel) {
-        Vec3 at = helper.absoluteVec(new Vec3(x, FLOOR, z));
+        return car(helper, x, FLOOR, z, fuel);
+    }
+
+    /** A box car standing at height {@code y}, otherwise as {@link #car(GameTestHelper, double, double, boolean)}. */
+    private static Vehicle car(GameTestHelper helper, double x, double y, double z, boolean fuel) {
+        Vec3 at = helper.absoluteVec(new Vec3(x, y, z));
         Vehicle v = Vehicle.create(helper.getLevel(), BOX_CAR, at, -90.0f);
         helper.assertTrue(v != null, "the box car profile is registered");
         if (fuel) {
@@ -707,6 +716,122 @@ public final class VehicleGameTests {
                     "successive contacts conserve the initial momentum: " + total);
             helper.succeed();
         });
+    }
+
+    /** The hillside's plateau runs from x = 0 to here, long enough for the box car to reach its top speed. */
+    private static final int EDGE = 34;
+    private static final int HILLSIDE_LENGTH = 80;
+
+    /**
+     * effects: lays the hillside's ground, one block thick: a plateau {@code rise} blocks over the
+     * floor up to {@link #EDGE}, then down to the floor a block for every {@code run} blocks on, or
+     * all at once for a run of 0 (a cliff)
+     */
+    private static void layHillside(GameTestHelper helper, int rise, int run) {
+        for (int x = 0; x < HILLSIDE_LENGTH; x++) {
+            int drop = x < EDGE ? 0 : run == 0 ? rise : Math.min(rise, 1 + (x - EDGE) / run);
+            for (int z = 0; z < WIDTH; z++) {
+                helper.setBlock(new BlockPos(x, FLOOR + rise - drop - 1, z), Blocks.STONE);
+            }
+        }
+    }
+
+    /**
+     * effects: returns a villager with no AI in {@code v}'s second seat, behind an armor stand at the
+     * wheel -- a driver that is no player, so the server drives by the script. Not a player in the
+     * seat: the game seats a player ahead of anyone who is not one, and a player at the wheel leaves
+     * the driving to its client. A vehicle's fall reaches every living rider by the same call, a
+     * player's included, and a villager with no AI never heals, so what it loses is the damage.
+     */
+    private static LivingEntity riderBehindAStandIn(GameTestHelper helper, Vehicle v) {
+        ArmorStand stand = EntityType.ARMOR_STAND.create(helper.getLevel());
+        Villager rider = EntityType.VILLAGER.create(helper.getLevel());
+        helper.assertTrue(stand != null && rider != null, "an armor stand and a villager");
+        for (LivingEntity e : List.of(stand, rider)) {
+            e.setPos(v.getX(), v.getY(), v.getZ());
+            helper.getLevel().addFreshEntity(e);
+        }
+        rider.setNoAi(true);
+        helper.assertTrue(stand.startRiding(v, true), "the stand-in takes the wheel");
+        helper.assertTrue(rider.startRiding(v, true), "the villager takes the second seat");
+        helper.assertTrue(v.getControllingPassenger() == stand, "the stand-in drives, so the server does");
+        return rider;
+    }
+
+    /** A ride over the hillside, sampled every tick: the car's longest fall, the rider's lowest health, a trace. */
+    private static final class Ride {
+        double flight;
+        float lowest;
+        final StringBuilder trace = new StringBuilder();
+
+        /** effects: returns a ride that samples {@code v} and {@code rider} on each of the test's ticks */
+        static Ride watch(GameTestHelper helper, Vehicle v, LivingEntity rider) {
+            Ride ride = new Ride();
+            ride.lowest = rider.getHealth();
+            Vec3 origin = helper.absoluteVec(Vec3.ZERO);
+            int[] tick = {0};
+            helper.onEachTick(() -> {
+                ride.flight = Math.max(ride.flight, v.fallDistance);
+                ride.lowest = Math.min(ride.lowest, rider.getHealth());
+                if (tick[0]++ % 10 == 0) {
+                    ride.trace.append(String.format(java.util.Locale.ROOT, " t%d:x%.1f,y%.1f,v%.2f,fall%.1f,hp%.0f",
+                            tick[0], v.getX() - origin.x, v.getY() - origin.y, v.speed(), v.fallDistance, rider.getHealth()));
+                }
+            });
+            return ride;
+        }
+    }
+
+    @GameTest(template = "hillside", templateNamespace = "vanillawheels_falls", timeoutTicks = 240)
+    public void aHillTakenAtSpeedHurtsNoRider(GameTestHelper helper) {
+        // A plateau ten blocks up, then a hill down to the floor of a block for every two on: at top
+        // speed the car leaves the ground at the brow and lands blocks lower down the slope.
+        int rise = 10;
+        layHillside(helper, rise, 2);
+        Vehicle v = car(helper, 3.5, FLOOR + rise, 7.5, true);
+        LivingEntity rider = riderBehindAStandIn(helper, v);
+        float health = rider.getHealth();
+        Ride ride = Ride.watch(helper, v, rider);
+        double foot = helper.absoluteVec(new Vec3(EDGE + 2 * rise, 0, 0)).x;
+        double floorY = helper.absoluteVec(new Vec3(0, FLOOR, 0)).y;
+        v.setScriptedInput(GAS);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(v.getX() > foot && v.onGround() && v.getY() < floorY + 0.1, "down the hill on the floor:" + ride.trace))
+                .thenExecute(() -> {
+                    v.setScriptedInput(null);
+                    float lost = health - Math.min(ride.lowest, rider.getHealth());
+                    helper.assertTrue(ride.flight > 3.0, "the car flew further than a rider falls unhurt on foot: " + ride.flight + ride.trace);
+                    helper.assertValueEqual(lost, 0.0f, "the rider's loss after a flight of " + ride.flight + " blocks:" + ride.trace);
+                    org.slf4j.LoggerFactory.getLogger("Vanilla Wheels gametest").info("hill at speed: longest flight {} blocks, rider lost {}", ride.flight, lost);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = "hillside", templateNamespace = "vanillawheels_falls", timeoutTicks = 240)
+    public void aCliffStillHurtsTheRiderByWhatTheSuspensionCannotTake(GameTestHelper helper) {
+        // Off a sheer drop fourteen blocks high: a real fall, not a hill's hop.
+        int rise = 14;
+        layHillside(helper, rise, 0);
+        Vehicle v = car(helper, 3.5, FLOOR + rise, 7.5, true);
+        LivingEntity rider = riderBehindAStandIn(helper, v);
+        float health = rider.getHealth();
+        Ride ride = Ride.watch(helper, v, rider);
+        double edge = helper.absoluteVec(new Vec3(EDGE, 0, 0)).x;
+        double floorY = helper.absoluteVec(new Vec3(0, FLOOR, 0)).y;
+        v.setScriptedInput(GAS);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(v.getX() > edge && v.onGround() && v.getY() < floorY + 0.1, "off the cliff on the floor:" + ride.trace))
+                .thenExecute(() -> {
+                    v.setScriptedInput(null);
+                    float lost = health - Math.min(ride.lowest, rider.getHealth());
+                    // The suspension takes seven blocks and the rider's own safe distance three more: a
+                    // point for every block past ten, as the game counts it, rounded up.
+                    int expected = Mth.ceil(ride.flight - 10.0);
+                    helper.assertTrue(expected >= 1, "a fall past what the suspension and the rider take: " + ride.flight + ride.trace);
+                    helper.assertValueEqual(lost, (float) expected, "the rider's loss after a fall of " + ride.flight + " blocks:" + ride.trace);
+                    org.slf4j.LoggerFactory.getLogger("Vanilla Wheels gametest").info("cliff: fall {} blocks, rider lost {}", ride.flight, lost);
+                })
+                .thenSucceed();
     }
 
 }

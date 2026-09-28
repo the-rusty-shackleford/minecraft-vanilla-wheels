@@ -34,3 +34,5 @@ tags: [index]
 - [D-0016](D-0016.md): Four-direction garage doors preserving existing inside/outside.
 
 - [D-0017](D-0017.md): Normal garage panel clicks allow adjacent placement without warnings.
+
+- [D-0018](D-0018.md): The suspension takes seven blocks of a fall; riders feel the rest.

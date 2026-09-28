@@ -7,6 +7,16 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## Riders and falls — 1.9.4, local review
+
+A friend was hurt driving the Trailblazer downhill. The cause was the vehicle's own fall,
+which the game hands whole to its riders, not the rider's collision.
+[D-0018](decisions/D-0018.md) lets the suspension take the first seven blocks, so a hill
+at speed costs nothing and a cliff still hurts past ten blocks. Two gametests on a new
+hillside template reproduced the damage on 1.9.3 and pass on 1.9.4. Publication and
+deployment wait for Rusty's go. Open question for Rusty: a one-in-one slope at full speed
+still hurts, because the car clears it like a cliff.
+
 ## Garage facing — 1.9.1
 
 Version **1.9.1** is published and deployed in pack **1.54.1**. The installed

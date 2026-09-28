@@ -2404,6 +2404,21 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return true;
     }
 
+    /**
+     * effects: hands the riders only what of a fall the suspension does not take
+     * ({@link Impact#riderFall}). The game hands a vehicle's whole fall to everyone aboard, and a
+     * car taken down a hill at speed leaves the ground at every brow and lands blocks lower:
+     * riders were hurt driving downhill. A drive off a cliff still hurts them.
+     */
+    @Override
+    public boolean causeFallDamage(float fallDistance, float multiplier, net.minecraft.world.damagesource.DamageSource source) {
+        if (!Float.isFinite(fallDistance) || fallDistance <= 0.0f) {
+            return false;   // riderFall refuses such a number, and a throw here would stop the server's tick
+        }
+        float felt = (float) Impact.riderFall(fallDistance);
+        return felt > 0.0f && super.causeFallDamage(felt, multiplier, source);
+    }
+
     @Override
     public void remove(Entity.RemovalReason reason) {
         if (!level().isClientSide() && reason.shouldDestroy()) {

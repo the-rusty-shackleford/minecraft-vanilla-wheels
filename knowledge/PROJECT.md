@@ -45,8 +45,17 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   client's two packets through the server's own `handleInteract` at the trailer's hit box, with
   NeoForge's events on the way. It passes, so the server route in Vanilla Wheels alone is clean.
   (Its first version sent them the tick the trailer spawned, before it had placed its hit boxes:
-  the server's reach check dropped the click.) Next: the same test on a disposable server with
-  the box's whole mod set.
+  the server's reach check dropped the click.)
+- **Cow loading, step 2** (not reproduced). The box's 97 jars (sha1-checked) were loaded into this
+  repo's gametest server, `run/mods`. Connector, Forgified Fabric API and Old Cannons cannot run
+  in a dev environment; Distant Horizons casts the gametest server to a dedicated one; Immersive
+  Aircraft and Man of Many Planes, then Moonlight, send payloads at join that a mock player's
+  connection refuses. So every mock-player test fails at spawn, and the full pack cannot be
+  exercised this way without teaching the mock connection NeoForge's channel negotiation. Read
+  statically, nothing in the pack takes a lead click on a non-`Leashable` entity. Rusty's call
+  (2026-09-29): stop digging and make the click say why when it does nothing. A lead click with
+  no led animal within ten blocks now says so, like "Open the doors first" (gametest; it failed
+  with the message removed). Shut doors, the likeliest cause, already had a message.
 - Still to come: each vehicle's own crowbar.
 
 ## Carried — 1.9.5, released 2026-09-29 in pack 1.68.0

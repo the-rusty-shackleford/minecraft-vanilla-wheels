@@ -2161,7 +2161,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * effects: every animal {@code player} holds on a lead within ten
      * blocks boards, nearest first, one by one, while the cargo has room
      * and the doors are open; each lead comes back to the player; the
-     * player is told when the doors are shut or the trailer is full
+     * player is told when the doors are shut, when no animal on their leads
+     * is near, or when the trailer is full -- a lead click never fails in
+     * silence (Bobandy_'s cows, 2026-09-28)
      */
     private void load(Player player) {
         if (!doorsOpen()) {
@@ -2172,6 +2174,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         // Nearest first: the level hands them back in entity-section order, which is the
         // world's business, and who fits depends on who comes first.
         led.sort(java.util.Comparator.comparingDouble(a -> a.distanceToSqr(player)));
+        if (led.isEmpty()) {
+            player.displayClientMessage(Component.translatable("vanillawheels.no_led_animals"), true);
+            return;
+        }
         int boarded = 0;
         for (Animal a : led) {
             if (!canAddPassenger(a)) {

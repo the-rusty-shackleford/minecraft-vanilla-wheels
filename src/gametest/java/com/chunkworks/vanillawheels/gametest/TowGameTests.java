@@ -273,6 +273,26 @@ public final class TowGameTests {
         });
     }
 
+    /** Bobandy_'s click did nothing he could see. A lead click with no led animal near says so. */
+    @GameTest(template = "runway", timeoutTicks = 20)
+    public void aLeadClickWithNoLedAnimalNearSaysSoRatherThanNothing(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
+        trailer.toggleDoors();
+        List<net.minecraft.network.chat.Component> told = new ArrayList<>();
+        Player p = new Player(helper.getLevel(), helper.absolutePos(new BlockPos(16, FLOOR, 7)), 0.0f,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "told")) {
+            @Override public boolean isSpectator() { return false; }
+            @Override public boolean isCreative() { return false; }
+            @Override public void displayClientMessage(net.minecraft.network.chat.Component message, boolean actionBar) { told.add(message); }
+        };
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
+        helper.assertTrue(trailer.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "the lead click is taken");
+        helper.assertTrue(told.size() == 1 && told.get(0).getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t
+                && t.getKey().equals("vanillawheels.no_led_animals"), "and says why: " + told);
+        helper.succeed();
+    }
+
     @GameTest(template = "runway", timeoutTicks = 100)
     public void aLeadLoadsAnimalsThroughOpenDoorsUpToTheRoomAndALeadAtTheDoorLetsThemOut(GameTestHelper helper) {
         layFloor(helper);

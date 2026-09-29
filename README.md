@@ -379,7 +379,9 @@ boards, nearest to you first, while there is room -- an adult takes a whole shar
 young one a half, so room for four adults is room for eight calves or two cows and four
 calves -- and each lead comes back to you. Crouch and right-click a door, empty-handed,
 anywhere on it, to shut or open it, load or no load. Crouch and right-click the trailer holding a lead with the doors open and
-animals aboard to let them out behind. Animals never board through shut doors. `doors`
+animals aboard to let them out behind. Animals never board through shut doors. A lead click
+never fails in silence: shut doors, no animal on your leads within ten blocks, and a full
+trailer each say so above the hotbar. `doors`
 swing about their hinges when open. Loaded animals lean with the floor as riders do.
 
 ## Parts, recipes, the Mechanic Lift
@@ -465,7 +467,7 @@ the car on the deck and refuses one beside it), and keeps its job across a save;
 catches the trailer's tongue, tows it straight and through a turn with the tongue on the
 hitch, lets go on a click, rolls back clear and stays behind as the car drives off (against a
 wall too) and hitches again when the car backs onto it; a lead loads a cow and two calves through open doors and no
-more, shut doors refuse, the door click shuts them in and a lead at the open door unloads
+more, shut doors refuse, a lead click with no led animal near says so, the door click shuts them in and a lead at the open door unloads
 them behind; the tow link survives a save.
 The booth photographs the stock car, a red one, the dash from the driver's seat, the lamps at
 night from behind (the beam on the ground, through Luminance) and from the front (the

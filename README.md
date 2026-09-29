@@ -207,6 +207,14 @@ at speed had the server refuse every tick and snap the vehicle back.
   contents. A full inventory leaves a packed drop, including in creative. Right-click the
   ground to place it. The crowbar replaced the wrench: a wrench in a world loads as a crowbar.
   Automobility's crowbar (item tag `vanillawheels:pries_vehicles`) works too.
+- **Its own crowbar** (D-0023): every vehicle is built with a crowbar of its own, and one built
+  before 1.10.0 gets one the first time it loads. Crouch and right-click the body empty-handed,
+  anywhere but a door, the tongue or the radio, to open its toolbox, whose one slot holds that
+  crowbar. It may be in its slot, in your inventory, or in a bag you carry. Drop it, die with
+  it, or leave it in a chest, an ender chest or a decorated pot, and it goes back to its
+  toolbox, even while the vehicle is packed away (it is there when the vehicle is set down
+  again). Pried loose with its own crowbar, a vehicle packs the crowbar inside. Spare crowbars
+  have none of this. Deleting it in the creative inventory, or `/clear`, loses it.
 
 ## Damage, repairs and recovery keys (1.8.0)
 

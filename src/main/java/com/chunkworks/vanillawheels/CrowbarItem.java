@@ -35,8 +35,15 @@ public final class CrowbarItem extends Item {
         super(properties);
     }
 
+    /** effects: how it is used; for a vehicle's own crowbar, whose it is and that it goes home when lost (D-0023) */
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.vanillawheels.crowbar.use").withStyle(ChatFormatting.GRAY));
+        OwnCrowbars.Owner owner = stack.get(ModContent.CROWBAR_OF.get());
+        if (owner != null) {
+            Component vehicle = Component.translatable("vehicle." + owner.profile().getNamespace() + "." + owner.profile().getPath());
+            tooltip.add(Component.translatable("item.vanillawheels.crowbar.own", vehicle).withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.translatable("item.vanillawheels.crowbar.home").withStyle(ChatFormatting.GRAY));
+        }
     }
 }

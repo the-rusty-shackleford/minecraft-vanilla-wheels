@@ -56,7 +56,14 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   (2026-09-29): stop digging and make the click say why when it does nothing. A lead click with
   no led animal within ten blocks now says so, like "Open the doors first" (gametest; it failed
   with the message removed). Shut doors, the likeliest cause, already had a message.
-- Still to come: each vehicle's own crowbar.
+- **Every vehicle's own crowbar** (D-0023). `OwnCrowbars` (the mark, the waiting record, the
+  guard), `ToolboxMenu`/`ToolboxScreen` (a plain menu, the id in four data slots), `HeldStack` for
+  the stack components (the radio's `disc` one failed the dev check once a disc was packed).
+  Eight gametests (`OwnCrowbarGameTests`): birth and first load, the toolbox's slot rules and
+  hold, toss and death, chest at once and ender chest at close, a carried bag keeps it, an item
+  frame refused and a decorated pot made to give it up, packed inside by its own crowbar, and a
+  crowbar waiting for its packed vehicle. With the guard's listeners removed, the four guard tests
+  failed. Protocol "6".
 
 ## Carried — 1.9.5, released 2026-09-29 in pack 1.68.0
 

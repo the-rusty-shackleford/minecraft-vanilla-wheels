@@ -686,6 +686,39 @@ public final class PhotoBooth {
         s.add(new Step(t += SETTLE / 2, () -> {
             shoot(mc, "booth-crowbar-held");
             verdict("the crowbar reaches the client's hand", () -> mc.player != null && mc.player.getMainHandItem().is(ModContent.CROWBAR.get()) ? null : "held " + (mc.player == null ? null : mc.player.getMainHandItem()));
+        }));
+        // The car's toolbox (D-0023), opened by a crouching empty hand: its own crowbar in the slot,
+        // then out in the inventory, the slot showing the crowbar's outline and its help.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            if (sp.serverLevel().getEntity(trailerId) instanceof Vehicle trailer && trailer.tower() != null) {
+                sp.getInventory().setItem(0, ItemStack.EMPTY);
+                sp.setShiftKeyDown(true);
+                trailer.tower().interactAt(sp, Vec3.ZERO, InteractionHand.MAIN_HAND);
+                sp.setShiftKeyDown(false);
+            }
+        })));
+        s.add(new Step(t += 20, () -> {
+            shoot(mc, "booth-toolbox-full");
+            verdict("the toolbox opens with the car's own crowbar in it", () -> mc.player != null
+                    && mc.player.containerMenu instanceof com.chunkworks.vanillawheels.ToolboxMenu m
+                    && com.chunkworks.vanillawheels.OwnCrowbars.isOwn(m.getSlot(com.chunkworks.vanillawheels.ToolboxMenu.SLOT).getItem())
+                    ? null : "menu " + (mc.player == null ? null : mc.player.containerMenu));
+            onServer(mc, sp -> {
+                if (sp.containerMenu instanceof com.chunkworks.vanillawheels.ToolboxMenu m) {
+                    m.quickMoveStack(sp, com.chunkworks.vanillawheels.ToolboxMenu.SLOT);
+                    m.broadcastChanges();
+                }
+            });
+        }));
+        s.add(new Step(t += 12, () -> pointAt(mc, (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 88, (mc.getWindow().getGuiScaledHeight() - 133) / 2 + 28)));
+        s.add(new Step(t += 12, () -> {
+            shoot(mc, "booth-toolbox-empty");
+            verdict("taken out, the slot is empty and the crowbar is in the inventory", () -> mc.player != null
+                    && mc.player.containerMenu instanceof com.chunkworks.vanillawheels.ToolboxMenu m
+                    && m.getSlot(com.chunkworks.vanillawheels.ToolboxMenu.SLOT).getItem().isEmpty()
+                    && mc.player.getInventory().items.stream().anyMatch(com.chunkworks.vanillawheels.OwnCrowbars::isOwn)
+                    ? null : "slot " + (mc.player == null ? null : mc.player.containerMenu.getSlot(0).getItem()));
+            if (mc.player != null) mc.player.closeContainer();
             onServer(mc, sp -> sp.setGameMode(GameType.CREATIVE));
             mc.options.hideGui = true;
         }));

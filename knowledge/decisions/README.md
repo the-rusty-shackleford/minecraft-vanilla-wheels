@@ -44,3 +44,5 @@ tags: [index]
 - [D-0021](D-0021.md): A vehicle's condition is a row of wrenches above the hunger bar, blinking and jiggling as hearts do; no red hurt tint.
 
 - [D-0022](D-0022.md): A trailer let go by hand rolls back a hair, and the vehicle it left cannot catch it again until the two have parted.
+
+- [D-0023](D-0023.md): Every vehicle has its own crowbar in a one-slot toolbox; lost, dropped or left anywhere but on a person, it goes home. Stack components go through `HeldStack`.

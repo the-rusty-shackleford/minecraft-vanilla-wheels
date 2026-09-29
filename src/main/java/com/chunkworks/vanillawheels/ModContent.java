@@ -88,8 +88,8 @@ public final class ModContent {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> FUEL = COMPONENTS.register("fuel",
             () -> DataComponentType.<Integer>builder().persistent(Codec.intRange(0, Integer.MAX_VALUE)).networkSynchronized(ByteBufCodecs.VAR_INT).build());
     /** The disc in a picked-up vehicle's radio. */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ItemStack>> DISC = COMPONENTS.register("disc",
-            () -> DataComponentType.<ItemStack>builder().persistent(ItemStack.OPTIONAL_CODEC).networkSynchronized(ItemStack.OPTIONAL_STREAM_CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<HeldStack>> DISC = COMPONENTS.register("disc",
+            () -> DataComponentType.<HeldStack>builder().persistent(HeldStack.CODEC).networkSynchronized(HeldStack.STREAM_CODEC).build());
     /** Remaining durability, out of 10000; zero remains an item. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> CONDITION = COMPONENTS.register("condition",
             () -> DataComponentType.<Integer>builder().persistent(Codec.intRange(0, 10000)).networkSynchronized(ByteBufCodecs.VAR_INT).build());
@@ -102,6 +102,14 @@ public final class ModContent {
     /** The owner and current active fob token. Replacing a key invalidates older tokens. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> KEY_OWNER = uuidComponent("key_owner");
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> KEY_TOKEN = uuidComponent("key_token");
+    /** A packed vehicle's own id, which its own crowbar is marked with (D-0023). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> VEHICLE_ID = uuidComponent("vehicle_id");
+    /** What a packed vehicle's toolbox holds: its own crowbar, if it is aboard (D-0023). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<HeldStack>> OWN_CROWBAR = COMPONENTS.register("own_crowbar",
+            () -> DataComponentType.<HeldStack>builder().persistent(HeldStack.CODEC).networkSynchronized(HeldStack.STREAM_CODEC).build());
+    /** The mark on a vehicle's own crowbar: which vehicle it belongs to (D-0023). A spare crowbar has none. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<OwnCrowbars.Owner>> CROWBAR_OF = COMPONENTS.register("crowbar_of",
+            () -> DataComponentType.<OwnCrowbars.Owner>builder().persistent(OwnCrowbars.Owner.CODEC).networkSynchronized(OwnCrowbars.Owner.STREAM_CODEC).build());
 
     private static DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> uuidComponent(String name) {
         return COMPONENTS.register(name, () -> DataComponentType.<java.util.UUID>builder()
@@ -141,6 +149,9 @@ public final class ModContent {
     /** The client's copy needs no position: it reads the server's verdicts from the data slots. */
     public static final DeferredHolder<MenuType<?>, MenuType<LiftMenu>> LIFT_MENU = MENUS.register("mechanic_lift",
             () -> new MenuType<>((id, inventory) -> new LiftMenu(id, inventory, net.minecraft.world.inventory.ContainerLevelAccess.NULL), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
+    /** A vehicle's toolbox: its own crowbar's one slot. A plain menu: the vehicle's id rides its data slots. */
+    public static final DeferredHolder<MenuType<?>, MenuType<ToolboxMenu>> TOOLBOX_MENU = MENUS.register("toolbox",
+            () -> new MenuType<>(ToolboxMenu::client, net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
 
     /** Individually craftable sections joining into one redstone shutter. */
     public static final DeferredBlock<com.chunkworks.vanillawheels.garage.GarageDoorBlock> GARAGE_DOOR =

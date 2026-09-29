@@ -377,6 +377,43 @@ def lift_gui():
     return px
 
 
+def toolbox_gui():
+    """A vehicle's toolbox (D-0023): a 176 x 133 panel on a 256 x 256 sheet, laid out as the game lays a hopper --
+    its one slot centred at the top, the player's inventory under it."""
+    W, H = 176, 133
+    px = [[(0, 0, 0, 0) for _ in range(256)] for _ in range(256)]
+    panel, light, dark, slot = (198, 198, 198), (255, 255, 255), (85, 85, 85), (139, 139, 139)
+    for y in range(H):
+        for x in range(W):
+            c = panel
+            if x < 3 or y < 3:
+                c = light if not ((x < 3 and y >= H - 3) or (y < 3 and x >= W - 3)) else panel
+            if x >= W - 3 or y >= H - 3:
+                c = dark if not ((x >= W - 3 and y < 3) or (y >= H - 3 and x < 3)) else panel
+            if (x, y) in ((0, 0), (0, 1), (1, 0), (W - 1, H - 1), (W - 2, H - 1), (W - 1, H - 2), (0, H - 1), (W - 1, 0)):
+                c = None
+            if c is not None:
+                px[y][x] = (*c, 255)
+
+    def slot_at(sx, sy):
+        for y in range(18):
+            for x in range(18):
+                c = slot
+                if x == 0 or y == 0:
+                    c = dark
+                if x == 17 or y == 17:
+                    c = light
+                px[sy - 1 + y][sx - 1 + x] = (*c, 255)
+
+    slot_at(80, 20)
+    for row in range(3):
+        for col in range(9):
+            slot_at(8 + col * 18, 51 + row * 18)
+    for col in range(9):
+        slot_at(8 + col * 18, 109)
+    return px
+
+
 # ---------------------------------------------------------------- the box car
 #
 # A mesh in pixels, +Z forward, +Y up, right-handed (+X is the car's left).
@@ -645,6 +682,7 @@ def main(argv) -> None:
         write_png(ASSETS / "textures/block/mechanic_lift_deck.png", 16, 16, lift_deck())
         write_png(ASSETS / "textures/block/mechanic_lift_stripe.png", 16, 16, lift_stripe())
         write_png(ASSETS / "textures/gui/mechanic_lift.png", 256, 256, lift_gui())
+        write_png(ASSETS / "textures/gui/toolbox.png", 256, 256, toolbox_gui())
         for name, pixels in slot_hint_icons().items():
             write_png(ASSETS / f"textures/gui/slot_{name}.png", 16, 16, pixels)
         print("wrote the icons and the lift's textures")

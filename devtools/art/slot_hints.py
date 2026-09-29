@@ -64,11 +64,25 @@ PATTERNS: dict[str, tuple[str, ...]] = {
         "...#####....",
         "............",
     ),
+    "crowbar": (
+        ".......###..",
+        "......#+++#.",
+        "......#+##+#",
+        "......#+#.##",
+        ".....#+#....",
+        "....#+#.....",
+        "...#+#......",
+        "..#+#.......",
+        ".#+#........",
+        "#++#........",
+        "####........",
+        "............",
+    ),
 }
 
 
 def icons() -> dict[str, Raster]:
-    """effects: returns four immutable 16-square RGBA glyphs.
+    """effects: returns the immutable 16-square RGBA glyphs, one per pattern.
 
     throws: ValueError if an authored row is malformed; no external inputs or I/O.
     """

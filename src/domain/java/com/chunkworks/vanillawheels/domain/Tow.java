@@ -70,6 +70,59 @@ public final class Tow {
         return new double[] {axleX - Math.sin(heading) * length, axleZ + Math.cos(heading) * length};
     }
 
+    /**
+     * effects: returns whether a loose tongue {@code distance} from a moving tower's ball is caught:
+     * within {@code reach}, unless it was let go by hand from this very tower and the two have not
+     * yet parted ({@code released}). Without the release, the first tick of driving off caught the
+     * tongue still lying on the ball again (Rusty, 2026-09-28; D-0022).
+     */
+    public static boolean catches(double distance, boolean released, double reach) {
+        return !released && distance < reach;
+    }
+
+    /** effects: returns whether a release still holds: until the tongue is first {@code reach} or more from the tower's ball */
+    public static boolean stillReleased(double distance, boolean released, double reach) {
+        return released && distance < reach;
+    }
+
+    /** effects: returns how far a vehicle on the ground rolls from {@code speed} with nothing on the throttle, under {@link Drive}'s rule, before it stops */
+    public static double coasted(double speed, Tuning t) {
+        Input coast = Input.coasting(true, true);
+        Drive d = Drive.onRails(speed, 0.0, 0.0, 0);
+        double rolled = 0.0;
+        for (int i = 0; i < 10_000 && d.speed() != 0.0; i++) {
+            d = d.step(coast, t).next();
+            rolled += Math.abs(d.speed());
+        }
+        return rolled;
+    }
+
+    /**
+     * requires: distance > 0
+     * effects: returns the least speed, to a ten-thousandth of a block a tick, from which a
+     * trailer let go by hand coasts at least {@code distance} before it stops (D-0022); the top
+     * speed when even that does not
+     * throws: IllegalArgumentException for a distance that is not positive
+     */
+    public static double letGoSpeed(double distance, Tuning t) {
+        if (!(distance > 0)) {
+            throw new IllegalArgumentException("a roll is forward of nothing: " + distance);
+        }
+        if (coasted(t.maxSpeed(), t) < distance) {
+            return t.maxSpeed();
+        }
+        double lo = 0.0, hi = t.maxSpeed();
+        while (hi - lo > 1e-4) {
+            double mid = (lo + hi) / 2;
+            if (coasted(mid, t) >= distance) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        return hi;
+    }
+
     /** effects: returns {@code a} wrapped into -pi..pi */
     public static double wrap(double a) {
         a %= 2 * Math.PI;

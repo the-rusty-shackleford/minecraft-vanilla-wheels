@@ -354,8 +354,10 @@ trailer item and right-click a vehicle that has a rear hitch (`hitch.rear`) and 
 behind it: the trailer is put down coupler on the ball, facing the same way, hitched, and
 the item is used up (nothing happens if there is no room). Or back the hitch to within half
 a block of a loose trailer's tongue, measured in the ground plane, while moving, and it
-catches with a clunk. Crouch and right-click the tongue to let go, and the trailer rolls to
-a stop on its own. A hitched trailer goes where its tower goes: its axle is dragged along
+catches with a clunk. Crouch and right-click the tongue to let go: the trailer rolls back
+about three quarters of a block, clear of the ball, and the vehicle it left does not catch it
+again until the two have parted, even if a wall behind stopped the roll (D-0022). Drive off
+and it stays; back onto it and it hitches. A hitched trailer goes where its tower goes: its axle is dragged along
 the line to the hitch, so it tracks a turn the way a real trailer does and never folds past
 a right angle, and it climbs and drops with the ground like anything else. Its drawn pose
 is a lever on its axle: the coupler sits on the car's drawn ball, the axle on a line fitted
@@ -461,7 +463,8 @@ and a cow, broken from any block for one drop, worked through its real menu by a
 player (Build spawns the car facing the front and takes exactly its parts; Paint colours
 the car on the deck and refuses one beside it), and keeps its job across a save; the car
 catches the trailer's tongue, tows it straight and through a turn with the tongue on the
-hitch, lets go on a click; a lead loads a cow and two calves through open doors and no
+hitch, lets go on a click, rolls back clear and stays behind as the car drives off (against a
+wall too) and hitches again when the car backs onto it; a lead loads a cow and two calves through open doors and no
 more, shut doors refuse, the door click shuts them in and a lead at the open door unloads
 them behind; the tow link survives a save.
 The booth photographs the stock car, a red one, the dash from the driver's seat, the lamps at

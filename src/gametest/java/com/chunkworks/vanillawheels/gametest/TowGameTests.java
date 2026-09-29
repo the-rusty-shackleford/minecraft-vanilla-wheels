@@ -62,6 +62,7 @@ public final class TowGameTests {
     private static final ResourceLocation BOX_TRAILER = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_trailer");
     private static final Input GAS = new Input(1, 0, false, true, true);
     private static final Input GAS_RIGHT = new Input(1, 1, false, true, true);
+    private static final Input REVERSE = new Input(-1, 0, false, true, true);
 
     public TowGameTests() {}
 
@@ -92,6 +93,31 @@ public final class TowGameTests {
         double gap = 0.3;
         Vehicle trailer = spawn(helper, BOX_TRAILER, 8.5 - 26 / 16.0 - 34 / 16.0 - gap, 7.5, -90.0f);
         return new Vehicle[] {car, trailer};
+    }
+
+    /** effects: returns the flat distance from the trailer's tongue to the car's hitch ball */
+    private static double tongueToBall(Vehicle car, Vehicle trailer) {
+        Vec3 t = trailer.tongue(), h = car.hitchPoint();
+        return Math.hypot(t.x - h.x, t.z - h.z);
+    }
+
+    /** effects: a crouching, empty-handed click on the trailer's tongue */
+    private static InteractionResult clickTongue(GameTestHelper helper, Vehicle trailer) {
+        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        p.setShiftKeyDown(true);
+        return trailer.interactAt(p, trailer.tongue().subtract(trailer.position()), InteractionHand.MAIN_HAND);
+    }
+
+    /** effects: returns the vehicle's hit box nearest {@code eye}: what a click from there meets */
+    private static Vehicle.Part nearestPart(Vehicle v, Vec3 eye) {
+        Vehicle.Part best = null;
+        for (var e : v.getParts()) {
+            if (e instanceof Vehicle.Part part && part.box() != null
+                    && (best == null || part.getBoundingBox().distanceToSqr(eye) < best.getBoundingBox().distanceToSqr(eye))) {
+                best = part;
+            }
+        }
+        return best;
     }
 
     private static double yawGap(Vehicle a, Vehicle b) {
@@ -144,6 +170,105 @@ public final class TowGameTests {
             helper.assertTrue(r.consumesAction(), "the click was taken: " + r);
             helper.assertTrue(trailer.tower() == null, "let go");
             helper.assertTrue(car.trailer() == null, "and the car knows");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Bobandy_'s report (2026-09-28): a lead in hand at the trailer and the cows did not board. The
+     * loading test above calls the trailer's interact directly. This one goes the way a real click
+     * does, through the server's packet handler: the client's two packets (at a point, then plain)
+     * aimed at the trailer's hit box, with NeoForge's interaction events and every mod's hooks on
+     * the way.
+     */
+    @GameTest(template = "runway", timeoutTicks = 100)
+    public void aLeadClickThroughTheServersPacketHandlerLoadsLedCowsThroughOpenDoors(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
+        trailer.toggleDoors();
+        net.minecraft.server.level.ServerPlayer p = helper.makeMockServerPlayerInLevel();
+        p.setGameMode(GameType.SURVIVAL);
+        Vec3 at = helper.absoluteVec(new Vec3(16.5, FLOOR, 7.5));
+        p.teleportTo(at.x, at.y, at.z);
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD, 3));
+        List<Cow> herd = List.of(cow(helper, 15.5, 6.5, false), cow(helper, 15.5, 8.5, false));
+        for (Cow c : herd) {
+            c.setLeashedTo(p, true);
+        }
+        // A few ticks for the trailer to place its hit boxes, as it has in any world a player walks up to.
+        helper.runAtTickTime(5, () -> {
+            Vehicle.Part part = nearestPart(trailer, p.getEyePosition());
+            helper.assertTrue(p.canInteractWithEntity(part.getBoundingBox(), 3.0), "the hit box is within the server's reach");
+            Vec3 onBox = part.getBoundingBox().getCenter().subtract(part.position());
+            p.connection.handleInteract(net.minecraft.network.protocol.game.ServerboundInteractPacket.createInteractionPacket(part, false, InteractionHand.MAIN_HAND, onBox));
+            p.connection.handleInteract(net.minecraft.network.protocol.game.ServerboundInteractPacket.createInteractionPacket(part, false, InteractionHand.MAIN_HAND));
+            helper.assertValueEqual(trailer.animals().size(), 2, "both led cows boarded through the real route");
+            for (Cow c : herd) {
+                helper.assertTrue(c.getLeashHolder() == null, "off the lead");
+            }
+            p.connection.disconnect(net.minecraft.network.chat.Component.literal("test complete"));
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Bobandy_ (2026-09-28): let go of the trailer, get in, drive off, and it hitched itself again.
+     * Let go by hand, it rolls back past the ball's reach; the car drives off without it; backing
+     * onto it afterwards still hitches (D-0022).
+     */
+    @GameTest(template = "runway", timeoutTicks = 320)
+    public void lettingGoByHandRollsTheTrailerBackAHairAndTheCarDrivesOffWithoutIt(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle[] pair = carAndTrailer(helper);
+        Vehicle car = pair[0];
+        Vehicle trailer = pair[1];
+        car.hitch(trailer);
+        helper.runAtTickTime(10, () -> {
+            helper.assertTrue(trailer.tower() == car, "hitched to begin with");
+            helper.assertTrue(tongueToBall(car, trailer) < 0.1, "the tongue on the ball: " + tongueToBall(car, trailer));
+            helper.assertTrue(clickTongue(helper, trailer).consumesAction(), "the click on the tongue is taken");
+            helper.assertTrue(trailer.tower() == null && car.trailer() == null, "let go");
+        });
+        helper.runAtTickTime(50, () -> {
+            double d = tongueToBall(car, trailer);
+            helper.assertTrue(d >= Vehicle.CATCH && d < 1.5, "it rolled back a hair, past the ball's reach: " + d);
+            helper.assertTrue(Math.abs(trailer.speed()) < 0.01, "and stopped: " + trailer.speed());
+            car.setScriptedInput(GAS);
+        });
+        helper.runAtTickTime(80, () -> {
+            helper.assertTrue(trailer.tower() == null, "the car drove off without it");
+            helper.assertTrue(tongueToBall(car, trailer) > 3.0, "and away: " + tongueToBall(car, trailer));
+            car.setScriptedInput(REVERSE);
+            helper.succeedWhen(() -> helper.assertTrue(trailer.tower() == car, "backing onto it hitches it again"));
+        });
+    }
+
+    /** A wall right behind the trailer stops the roll; the release alone keeps the car from catching it again (D-0022). */
+    @GameTest(template = "runway", timeoutTicks = 160)
+    public void aTrailerLetGoAgainstAWallIsNotCaughtAgainAsTheCarDrivesOff(GameTestHelper helper) {
+        layFloor(helper);
+        int wall = 6;
+        for (int z = 3; z < 12; z++) {
+            for (int y = FLOOR; y < FLOOR + 3; y++) {
+                helper.setBlock(new BlockPos(wall, y, z), Blocks.STONE);
+            }
+        }
+        Vehicle trailer = spawn(helper, BOX_TRAILER, 30.5, 7.5, -90.0f);
+        double centre = wall + 1 + trailer.profile().body().length() / 2.0 + 0.05;
+        Vec3 at = helper.absoluteVec(new Vec3(centre, FLOOR, 7.5));
+        trailer.moveTo(at.x, at.y, at.z, -90.0f, 0.0f);
+        Vehicle car = spawn(helper, BOX_CAR, centre + 34 / 16.0 + 26 / 16.0, 7.5, -90.0f);
+        car.hitch(trailer);
+        helper.runAtTickTime(10, () -> {
+            helper.assertTrue(trailer.tower() == car, "hitched to begin with");
+            helper.assertTrue(clickTongue(helper, trailer).consumesAction(), "the click on the tongue is taken");
+        });
+        helper.runAtTickTime(40, () -> {
+            helper.assertTrue(tongueToBall(car, trailer) < Vehicle.CATCH, "the wall held it within the ball's reach: " + tongueToBall(car, trailer));
+            car.setScriptedInput(GAS);
+        });
+        helper.runAtTickTime(80, () -> {
+            helper.assertTrue(trailer.tower() == null, "the car drove off without it");
             helper.succeed();
         });
     }

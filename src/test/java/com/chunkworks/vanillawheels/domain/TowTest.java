@@ -30,7 +30,11 @@ import org.junit.jupiter.api.Test;
  * turns toward it and the tongue meets it; a long pull converges on the
  * tower's line. A hitch pushed back past a right angle: the fold is held
  * at a right angle. Length refused at zero. Angles wrap. The tongue helper
- * inverts follow.
+ * inverts follow. The catch: a loose tongue within reach, outside, at the
+ * edge; a release holds on the ball, ends at the first parting, and the
+ * trailer is caught again after. The let-go speed: it coasts the distance,
+ * a hair less does not, a longer distance takes more, a distance the top
+ * speed cannot coast gives the top speed, and no distance is refused.
  */
 final class TowTest {
     private static final double L = 3.0;
@@ -92,5 +96,35 @@ final class TowTest {
         // A tower at yaw just past pi and a trailer just under -pi are nearly aligned, not folded.
         Tow.Follow f = Tow.follow(0.0, -L - 0.1, 0.0, 0.0, -Math.PI + 0.01, L, Math.PI - 0.01);
         assertTrue(Math.abs(Tow.wrap(f.heading() - (Math.PI - 0.01))) < 0.05, "aligned across the wrap: " + f.heading());
+    }
+
+    @Test
+    void aReleaseHoldsUntilTheTwoPartThenTheTrailerIsCaughtAsAnyLooseOne() {
+        double reach = 0.5;
+        assertTrue(Tow.catches(0.1, false, reach), "a loose tongue on the ball is caught");
+        assertTrue(!Tow.catches(0.5, false, reach), "at reach, not");
+        assertTrue(!Tow.catches(0.9, false, reach), "beyond, not");
+        // Let go by hand: the tongue lies on the ball and the tower drives off.
+        boolean released = true;
+        double[] path = {0.0, 0.1, 0.3, 0.49, 0.6, 1.2, 0.8, 0.3};
+        StringBuilder caught = new StringBuilder();
+        for (double d : path) {
+            caught.append(Tow.catches(d, released, reach) ? '#' : '.');
+            released = Tow.stillReleased(d, released, reach);
+        }
+        assertEquals(".......#", caught.toString(), "not caught until the two have parted and come together again");
+        assertTrue(!released, "the release is spent");
+    }
+
+    @Test
+    void theLetGoSpeedCoastsTheDistanceAndAHairLessDoesNot() {
+        Tuning t = Tuning.pickup();
+        double v = Tow.letGoSpeed(0.75, t);
+        assertTrue(Tow.coasted(v, t) >= 0.75, "it coasts the distance: " + Tow.coasted(v, t));
+        assertTrue(Tow.coasted(v - 0.001, t) < 0.75, "a hair less does not: " + Tow.coasted(v - 0.001, t));
+        assertTrue(v < t.maxSpeed() / 2, "a gentle roll, not a shove: " + v);
+        assertTrue(Tow.letGoSpeed(1.5, t) > v, "further takes more");
+        assertEquals(t.maxSpeed(), Tow.letGoSpeed(10_000.0, t), 0.0, "past what the top speed coasts: the top speed, never a throw in a click");
+        assertThrows(IllegalArgumentException.class, () -> Tow.letGoSpeed(0.0, t));
     }
 }

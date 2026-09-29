@@ -179,6 +179,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The tow links as saved: entity ids do not survive a reload, so the server re-finds them by these. */
     @Nullable private UUID towerUuid;
     @Nullable private UUID trailerUuid;
+    /** The tower this trailer was let go from by hand, which does not catch it again until they part (D-0022); never saved. */
+    @Nullable private UUID releasedFrom;
     /** The doors' swing on the client, 0 shut to 1 open, eased toward the synced state. */
     private float doorSwing;
     private float doorSwingO;
@@ -896,6 +898,29 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         level().playSound(null, at.x, at.y, at.z, SoundEvents.CHAIN_PLACE, SoundSource.NEUTRAL, 1.0f, 0.8f);
     }
 
+    /** How far a trailer let go by hand rolls back, blocks: its tongue clears the ball's reach (CATCH). */
+    static final double ROLL_BACK = 0.75;
+
+    /**
+     * effects: lets go of the tower by hand: unhitched, this trailer rolls back about ROLL_BACK
+     * along its heading, and that tower does not catch it again until the two have parted -- so
+     * driving off leaves it behind (Rusty, 2026-09-28; D-0022)
+     */
+    void letGo() {
+        Vehicle tower = tower();
+        unhitch();
+        if (tower == null || !(level() instanceof ServerLevel)) {
+            return;
+        }
+        releasedFrom = tower.getUUID();
+        // The synced speed, not only this drive: a trailer's first free tick takes its drive from it.
+        float back = (float) -Tow.letGoSpeed(ROLL_BACK, tuning);
+        entityData.set(DATA_SPEED, back);
+        entityData.set(DATA_STEER, 0.0f);
+        entityData.set(DATA_DRIFTING, false);
+        drive = Drive.onRails(back, Math.toRadians(getYRot()), 0.0, 0);
+    }
+
     /** effects: lets go of the tower, if any; the trailer rolls on and stops by itself */
     public void unhitch() {
         Vehicle tower = tower();
@@ -1127,7 +1152,15 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         for (Vehicle other : level().getEntitiesOfClass(Vehicle.class, getBoundingBox().inflate(4.0), v -> v != this && v.hasTongue() && v.tower() == null && v.towerUuid == null)) {
             Vec3 tongue = other.tongue();
-            if (tongue != null && flatDistance(tongue, hitch) < CATCH && other.trailer() != this) {
+            if (tongue == null || other.trailer() == this) {
+                continue;
+            }
+            double distance = flatDistance(tongue, hitch);
+            boolean released = getUUID().equals(other.releasedFrom);
+            if (!Tow.stillReleased(distance, released, CATCH)) {
+                other.releasedFrom = null;
+            }
+            if (Tow.catches(distance, released, CATCH)) {
                 hitch(other);
                 return;
             }
@@ -2003,7 +2036,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             // The tongue, when hitched: let go.
             if (held.isEmpty() && tower() != null && p.hitch().front().isPresent() && inRegion(p, p.hitch().front().get(), 0.9, hit)) {
                 if (!level().isClientSide()) {
-                    unhitch();
+                    letGo();
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }

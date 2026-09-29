@@ -42,3 +42,5 @@ tags: [index]
 - [D-0020](D-0020.md): A crowbar (the wrench, renamed and aliased) pries a vehicle loose, crouching or not; a player's own blow does nothing to a vehicle.
 
 - [D-0021](D-0021.md): A vehicle's condition is a row of wrenches above the hunger bar, blinking and jiggling as hearts do; no red hurt tint.
+
+- [D-0022](D-0022.md): A trailer let go by hand rolls back a hair, and the vehicle it left cannot catch it again until the two have parted.

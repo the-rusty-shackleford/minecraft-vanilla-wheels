@@ -36,8 +36,18 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   cargo, paint, fuel and wear; an old `vanillawheels:wrench` stack loads as a crowbar; six sword
   blows (survival and creative) leave a car unworn while a zombie's and a player's arrow wear it.
   With the rule removed, that test failed at 7498.
-- Still to come: cow loading (Bobandy_'s report, cause not yet found), the unhitch roll-back
-  (D-0022), and each vehicle's own crowbar.
+- **Unhitch roll-back** (done, D-0022). A trailer let go by hand rolls back ¾ block (`Tow.letGoSpeed`,
+  from the drive's own coasting) and holds a release from that tower until the two have parted
+  (`Tow.catches`/`stillReleased`, JUnit). Gametests: roll back, drive off alone, back on and
+  re-hitch; a wall behind the trailer stops the roll and the release alone keeps it. Both failed
+  with the old plain unhitch (the wall one exactly as Bobandy_ saw it: re-hitched and dragged).
+- **Cow loading, step 1** (Bobandy_: a lead in hand, nothing happened). A gametest sends the
+  client's two packets through the server's own `handleInteract` at the trailer's hit box, with
+  NeoForge's events on the way. It passes, so the server route in Vanilla Wheels alone is clean.
+  (Its first version sent them the tick the trailer spawned, before it had placed its hit boxes:
+  the server's reach check dropped the click.) Next: the same test on a disposable server with
+  the box's whole mod set.
+- Still to come: each vehicle's own crowbar.
 
 ## Carried — 1.9.5, released 2026-09-29 in pack 1.68.0
 

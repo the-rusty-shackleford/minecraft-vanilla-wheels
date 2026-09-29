@@ -7,14 +7,15 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## Carried — 1.9.5, unreleased
+## Carried — 1.9.5, released 2026-09-29 in pack 1.68.0
 
 Rusty's one change for every mod that looks at a player's inventory: the Carried protocol.
 [D-0019](decisions/D-0019.md): the disc, the leads and a stranded repair ingredient go where a give
-goes, a carried bag included, before the ground. 63 GameTests with Backpacks+ 0.6.0 on the
-gametest server, green; the radio's new check failed on 1.9.4. Ships with Carried and Backpacks+
-0.6.0 as one pack on Rusty's go; Trailblazer, Trailer and Farmer's Truck nest an older Vanilla
-Wheels, which the pack's own 1.9.5 outranks.
+goes, a carried bag included, before the ground. 93 JUnit, 63 GameTests with Backpacks+ 0.6.0 on
+the gametest server and the booth, green in the release gate; the radio's new check failed on
+1.9.4. Deployed with Carried and Backpacks+ 0.6.0, sha1 `31d417ab` on the server; Trailblazer,
+Trailer and Farmer's Truck nest an older Vanilla Wheels, which the pack's own 1.9.5 outranks (the
+usual JarJar warning in the log). Not yet seen in play.
 
 ## Riders and falls — 1.9.4
 

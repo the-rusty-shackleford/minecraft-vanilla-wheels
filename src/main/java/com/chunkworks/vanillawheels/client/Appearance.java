@@ -21,6 +21,7 @@ import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.domain.BakedMesh;
 import com.chunkworks.vanillawheels.domain.Dial;
 import com.chunkworks.vanillawheels.domain.Mesh;
+import com.chunkworks.vanillawheels.domain.Parts;
 import com.chunkworks.vanillawheels.domain.Rotation;
 import com.chunkworks.vanillawheels.domain.Transform;
 import com.chunkworks.vanillawheels.domain.Vec;
@@ -44,8 +45,7 @@ public final class Appearance {
     /** A needle and the dial it turns on, in blocks. */
     public record Needle(BakedMesh mesh, Dial dial, VehicleProfile.GaugeKind kind) {}
 
-    /** A door and its hinge, in blocks. */
-    /** A door: what swings on the hinge, split into the painted part (drawn with the paint), the lamps (drawn bright when lit) and the rest. */
+    /** A door:what swings on the hinge, split into the painted part (drawn with the paint), the lamps (drawn bright when lit) and the rest. */
     public record Hinge(BakedMesh mesh, BakedMesh painted, BakedMesh lamps, Rotation open) {}
 
     /** A wheel's place in blocks, whether it steers, and which side it is on (right-side wheels are turned round). */
@@ -73,43 +73,36 @@ public final class Appearance {
         Transform t = p.toLocal();
         double scale = p.scale();
         Mesh local = frame.transformed(t).orientedOutward();
-        Mesh remaining = local;
+        // Each piece is cut from what the pieces before it left (Parts), so a door's lenses and
+        // painted panels swing with the door and are not drawn a second time on the body.
+        Parts cut = Parts.cut(local,
+                p.gauges().stream().map(g -> g.part().transformed(t).selector()).toList(),
+                p.doors().stream().map(d -> d.part().transformed(t).selector()).toList(),
+                p.headlights().flatMap(VehicleProfile.Headlights::part).map(sel -> sel.transformed(t).selector()),
+                p.glass().map(sel -> sel.transformed(t).selector()),
+                p.cockpit().map(sel -> sel.transformed(t).selector()),
+                p.paint().map(paint -> paint.part().transformed(t).selector()));
         List<Needle> ns = new ArrayList<>();
-        for (VehicleProfile.Gauge g : p.gauges()) {
-            Mesh part = remaining.part(g.part().transformed(t).selector());
-            remaining = remaining.without(part);
+        for (int i = 0; i < p.gauges().size(); i++) {
+            VehicleProfile.Gauge g = p.gauges().get(i);
             Dial dial = g.dial(t);
-            ns.add(new Needle(BakedMesh.of(part, scale), new Dial(dial.pivot().times(scale), dial.axis(), dial.rest(), dial.sweep()), g.kind()));
+            ns.add(new Needle(BakedMesh.of(cut.needles().get(i), scale), new Dial(dial.pivot().times(scale), dial.axis(), dial.rest(), dial.sweep()), g.kind()));
         }
         List<Hinge> ds = new ArrayList<>();
-        for (VehicleProfile.Door d : p.doors()) {
-            Mesh part = remaining.part(d.part().transformed(t).selector());
-            remaining = remaining.without(part);
-            // A door's painted panels take the dye like the body's, and a door's lenses glow like the
-            // body's (a trailer's rear reflectors ride on its doors): both selectors are applied within the door.
-            Mesh painted = p.paint().map(paint -> part.part(paint.part().transformed(t).selector())).orElse(part.part(f -> false));
-            Mesh lamps = p.headlights().flatMap(VehicleProfile.Headlights::part).map(sel -> part.part(sel.transformed(t).selector())).orElse(part.part(f -> false));
+        for (int i = 0; i < p.doors().size(); i++) {
+            VehicleProfile.Door d = p.doors().get(i);
+            Parts.Door door = cut.doors().get(i);
             Rotation open = new Rotation(d.hinge(), d.axis(), d.open()).mirrored(t);
-            ds.add(new Hinge(BakedMesh.of(part.without(painted).without(lamps), scale), BakedMesh.of(painted, scale), BakedMesh.of(lamps, scale),
+            ds.add(new Hinge(BakedMesh.of(door.rest(), scale), BakedMesh.of(door.painted(), scale), BakedMesh.of(door.lamps(), scale),
                     new Rotation(open.pivot().times(scale), open.axis(), open.radians())));
         }
-        Mesh lampMesh = p.headlights().flatMap(VehicleProfile.Headlights::part).map(sel -> {
-            return local.part(sel.transformed(t).selector());
-        }).orElse(local.part(f -> false));
-        remaining = remaining.without(lampMesh);
-        Mesh glassMesh = p.glass().map(sel -> local.part(sel.transformed(t).selector())).orElse(local.part(f -> false));
-        remaining = remaining.without(glassMesh);
-        Mesh cockpitMesh = p.cockpit().map(sel -> local.part(sel.transformed(t).selector())).orElse(local.part(f -> false));
-        remaining = remaining.without(cockpitMesh);
-        Mesh bodyMesh = p.paint().map(paint -> local.part(paint.part().transformed(t).selector())).orElse(local.part(f -> false));
-        remaining = remaining.without(bodyMesh);
         this.texture = p.texture().or(() -> MeshLibrary.INSTANCE.embeddedTexture(p.mesh())).orElse(MISSING);
         this.wheelTexture = p.wheelMesh().flatMap(MeshLibrary.INSTANCE::embeddedTexture).orElse(this.texture);
-        this.rest = BakedMesh.of(remaining, scale);
-        this.body = BakedMesh.of(bodyMesh, scale);
-        this.lamps = BakedMesh.of(lampMesh, scale);
-        this.glass = BakedMesh.of(glassMesh, scale);
-        this.cockpit = BakedMesh.of(cockpitMesh, scale);
+        this.rest = BakedMesh.of(cut.rest(), scale);
+        this.body = BakedMesh.of(cut.body(), scale);
+        this.lamps = BakedMesh.of(cut.lamps(), scale);
+        this.glass = BakedMesh.of(cut.glass(), scale);
+        this.cockpit = BakedMesh.of(cut.cockpit(), scale);
         this.needles = List.copyOf(ns);
         this.doors = List.copyOf(ds);
         Mesh wheelLocal = wheelMesh.transformed(t).orientedOutward();

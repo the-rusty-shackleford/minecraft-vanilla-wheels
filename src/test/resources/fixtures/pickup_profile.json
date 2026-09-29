@@ -1,0 +1,236 @@
+{
+  "mesh": "farmpickup:pickup",
+  "wheel_mesh": "farmpickup:pickup_wheel",
+  "scale": 0.0625,
+  "handedness": "right",
+  "body": {
+    "width": 2.54,
+    "length": 6.44,
+    "height": 2.99,
+    "parts": [
+      {
+        "at": [
+          0,
+          11.04,
+          27.6
+        ],
+        "width": 3.16,
+        "height": 1.38
+      },
+      {
+        "at": [
+          0,
+          11.04,
+          -27.6
+        ],
+        "width": 3.16,
+        "height": 1.38
+      }
+    ]
+  },
+  "seats": [
+    {
+      "at": [
+        7.82,
+        22.5,
+        0.92
+      ],
+      "driver": true
+    },
+    {
+      "at": [
+        -7.82,
+        22.5,
+        0.92
+      ]
+    }
+  ],
+  "wheels": {
+    "radius": 11.04,
+    "positions": [
+      {
+        "forward": 27.6,
+        "right": 20.7,
+        "up": 11.04,
+        "steers": true
+      },
+      {
+        "forward": 27.6,
+        "right": -20.7,
+        "up": 11.04,
+        "steers": true
+      },
+      {
+        "forward": -27.6,
+        "right": 20.7,
+        "up": 11.04
+      },
+      {
+        "forward": -27.6,
+        "right": -20.7,
+        "up": 11.04
+      }
+    ]
+  },
+  "engine": {
+    "max_speed": 0.9,
+    "acceleration": 0.02,
+    "reverse_speed": 0.3,
+    "brake": 0.05,
+    "drag": 0.01
+  },
+  "handling": {
+    "grip": 0.85,
+    "steer_degrees": 32,
+    "drift_grip": 0.12,
+    "drift_boost": 0.3,
+    "drift_charge_ticks": 40
+  },
+  "climb": 1.0,
+  "mass": 1.45,
+  "fuel": {
+    "capacity": 24000
+  },
+  "storage": {
+    "chests": [
+      {
+        "at": [
+          8.8,
+          14,
+          -27.68
+        ],
+        "yaw": 90,
+        "scale": 0.97,
+        "rows": 6
+      },
+      {
+        "at": [
+          -8.8,
+          14,
+          -27.68
+        ],
+        "yaw": -90,
+        "scale": 0.97,
+        "rows": 6
+      }
+    ]
+  },
+  "gauges": [
+    {
+      "kind": "speed",
+      "part": {
+        "group": "needle_speed_grp"
+      },
+      "pivot": [
+        -1.564,
+        32.292,
+        9.568
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "zero": -2.094,
+      "sweep": 4.189
+    },
+    {
+      "kind": "fuel",
+      "part": {
+        "group": "needle_fuel_grp"
+      },
+      "pivot": [
+        4.416,
+        32.292,
+        9.568
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "zero": -2.094,
+      "sweep": 4.189
+    }
+  ],
+  "headlights": {
+    "at": [
+      [
+        16.376,
+        20.24,
+        47.05
+      ],
+      [
+        -16.376,
+        20.24,
+        47.05
+      ]
+    ],
+    "part": {
+      "group": "lenses"
+    },
+    "range": 10
+  },
+  "horn": "vanillawheels:horn.truck",
+  "radio": {
+    "at": [
+      -9,
+      32.66,
+      12.88
+    ]
+  },
+  "hitch": {
+    "rear": [
+      0,
+      11.04,
+      -52.9
+    ]
+  },
+  "doors": [
+    {
+      "part": {
+        "group": "tailgate_hinge"
+      },
+      "hinge": [
+        0,
+        14.9,
+        -46
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "open": -1.5708,
+      "from": [
+        -19.78,
+        13.8,
+        -46.64
+      ],
+      "to": [
+        19.78,
+        32.2,
+        -42.78
+      ]
+    }
+  ],
+  "paint": {
+    "part": {
+      "group": "paint"
+    },
+    "default": "red",
+    "factory": "#b22125"
+  },
+  "glass": {
+    "group": "glass"
+  },
+  "sounds": {
+    "engine": "vanillawheels:engine.petrol"
+  },
+  "repair": {
+    "ingredient": {
+      "tag": "c:ingots/iron"
+    },
+    "full_cost": 18
+  }
+}

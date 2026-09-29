@@ -7,6 +7,24 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.10.0 — in progress, unreleased (Rusty's notes of 2026-09-28)
+
+Rusty's notes on the trailer, some met by Bobandy_. The plan is
+`~/.claude/plans/some-changes-needed-to-zazzy-whale.md`; nothing ships until Rusty says so.
+
+- **Door lamps drawn once** (done). The trailer's rear reflectors were drawn twice since 1.6.0:
+  once swinging with the door, and once standing in the doorway where the shut door was. The
+  Farmer's Pickup left a painted ghost tailgate the same way. `Appearance` cut the body's lamps,
+  glass, cockpit and paint from the whole mesh, and a group selector matches any name on a face's
+  path, so a door's nested `lenses`/`paint` were cut twice. `domain/Parts` now cuts each piece
+  from what the pieces before it left. `PartsTest` runs over the three shipped models and their
+  profiles (copies in `src/test/resources/fixtures`). It failed on the old cutting: 6 reflector
+  faces drawn twice, 12 ghost tailgate faces. No other shipped element matched two roles, so
+  nothing else changes. The trailer booth's doors-open frames show the doorway empty (before and
+  after compared at 3×).
+- Still to come: the wrench row (D-0021), the crowbar (D-0020), cow loading (Bobandy_'s report,
+  cause not yet found), the unhitch roll-back, and each vehicle's own crowbar.
+
 ## Carried — 1.9.5, released 2026-09-29 in pack 1.68.0
 
 Rusty's one change for every mod that looks at a player's inventory: the Carried protocol.

@@ -55,7 +55,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * scripted input, forward to a distance and to a stop; it climbs a
  * two-block step and ends level on top; it runs a cow over at speed and
  * not at a walk; a gas can pours while held and coal no longer fuels, and an empty tank refuses the
- * throttle; the chest survives a wrench and a placing; a disc goes in and
+ * throttle; the chest survives a crowbar and a placing; a disc goes in and
  * out; the headlights cycle and light up at night; the profile round-trips
  * through its codec.
  *
@@ -339,8 +339,45 @@ public final class VehicleGameTests {
         });
     }
 
+    @GameTest(template = "runway", timeoutTicks = 20)
+    public void aPlayersBlowLeavesAVehicleAsItWasWhileAZombieAndAPlayersArrowWearIt(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 4.5, 7.5, true);
+        for (GameType mode : List.of(GameType.SURVIVAL, GameType.CREATIVE)) {
+            Player p = helper.makeMockPlayer(mode);
+            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
+            for (int i = 0; i < 6; i++) {
+                p.attack(v);
+                p.resetAttackStrengthTicker();
+            }
+            helper.assertTrue(!v.isRemoved(), mode + ": six sword blows leave it standing");
+            helper.assertValueEqual(v.condition(), com.chunkworks.vanillawheels.domain.Condition.MAX, mode + ": and unworn");
+        }
+        net.minecraft.world.entity.monster.Zombie zombie = EntityType.ZOMBIE.create(helper.getLevel());
+        helper.assertTrue(zombie != null, "a zombie");
+        helper.assertTrue(v.hurt(helper.getLevel().damageSources().mobAttack(zombie), 1.0f), "a zombie's blow lands");
+        helper.assertValueEqual(v.condition(), 8000, "and wears it");
+        Player archer = helper.makeMockPlayer(GameType.SURVIVAL);
+        net.minecraft.world.entity.projectile.Arrow arrow = new net.minecraft.world.entity.projectile.Arrow(helper.getLevel(), archer, new ItemStack(Items.ARROW), null);
+        helper.assertTrue(v.hurt(helper.getLevel().damageSources().arrow(arrow, archer), 1.0f), "a player's arrow lands");
+        helper.assertValueEqual(v.condition(), 6000, "and wears it: only a player's own blow is spared");
+        helper.succeed();
+    }
+
+    @GameTest(template = "runway", timeoutTicks = 20)
+    public void anOldWrenchLoadsAsACrowbarAndAutomobilitysMayPry(GameTestHelper helper) {
+        net.minecraft.nbt.CompoundTag old = new net.minecraft.nbt.CompoundTag();
+        old.putString("id", "vanillawheels:wrench");
+        old.putInt("count", 1);
+        ItemStack loaded = ItemStack.parseOptional(helper.getLevel().registryAccess(), old);
+        helper.assertTrue(loaded.is(ModContent.CROWBAR.get()), "a saved wrench loads as a crowbar: " + loaded);
+        helper.assertTrue(loaded.is(ModContent.PRIES_VEHICLES), "and pries");
+        helper.assertTrue(new ItemStack(ModContent.CROWBAR.get()).is(ModContent.PRIES_VEHICLES), "the crowbar is in the pry tag");
+        helper.succeed();
+    }
+
     @GameTest(template = "runway", timeoutTicks = 100)
-    public void theWrenchPacksCargoPaintFuelAndDamageWithoutLooseDrops(GameTestHelper helper) {
+    public void aCrowbarUnCrouchedPacksCargoPaintFuelAndDamageWithoutLooseDrops(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 4.5, 7.5, true);
         helper.assertValueEqual(v.getContainerSize(), 54, "two chests of three rows");
@@ -350,9 +387,9 @@ public final class VehicleGameTests {
         v.hurt(helper.getLevel().damageSources().generic(), 1);
         int fuel = v.tank().ticks();
         Player p = helper.makeMockPlayer(GameType.SURVIVAL);
-        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.WRENCH.get()));
-        p.setShiftKeyDown(true);
-        v.interactAt(p, Vec3.ZERO, InteractionHand.MAIN_HAND);
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.CROWBAR.get()));
+        // A plain right-click: the crowbar pries crouching or not (D-0020); the recovery suite crouches.
+        helper.assertTrue(v.interactAt(p, Vec3.ZERO, InteractionHand.MAIN_HAND).consumesAction(), "the crowbar's click is taken");
         helper.assertTrue(v.isRemoved(), "the vehicle is gone");
         int atOnce = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0)).stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
         helper.assertValueEqual(atOnce, 0, "no apples spilled");

@@ -19,7 +19,7 @@ Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-lumi
 ## Creative inventory
 
 The **Vanilla Wheels** tab contains every installed vehicle and its chassis, followed
-by the Mechanic Lift, Rolling Garage Door panels, wrench, wheels, engine and full/empty gas cans. Trailblazer,
+by the Mechanic Lift, Rolling Garage Door panels, crowbar, wheels, engine and full/empty gas cans. Trailblazer,
 Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
 The ordinary vanilla categories and Creative search remain available too.
 Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
@@ -178,7 +178,7 @@ presses its copy down before every move and can always step, while the reported 
 a step leaves the server's copy airborne and unable to -- without which a ramp of slabs
 at speed had the server refuse every tick and snap the vehicle back.
 
-## Fuel, storage, records, the wrench
+## Fuel, storage, records, the crowbar
 
 - **Fuel**: the gas can. An empty can is eight iron ingots in a can's shape (a handle top
   left over a square body); four coal or charcoal with it fill it, a tank's worth (24 000
@@ -196,21 +196,31 @@ at speed had the server refuse every tick and snap the vehicle back.
   click's line is followed on from the hull into the bed, so a chest sunk in a bed opens
   from outside; right-click anywhere else on the body and you board. A rider presses the inventory key for the first chest, since
   crouching dismounts. A chest's lid is up, with the chest's sounds, while anyone has it
-  open. Contents stay inside the packed vehicle when it is wrenched or destroyed,
+  open. Contents stay inside the packed vehicle when it is pried loose or destroyed,
   including item names, enchantments and other components.
 - **Records**: crouch and right-click a vehicle that has a radio while holding a music
   disc, and it plays for everyone in range the way a jukebox does, with the now-playing
   toast; crouch and right-click the radio empty-handed to eject it. The disc stays until
   ejected, as in a jukebox.
-- **Wrench**: crouch and right-click with the wrench to take the vehicle back into the
-  inventory with its paint, fuel, disc, damage and all chest contents. A full inventory
-  leaves a packed drop, including in creative. Right-click the ground to place it.
+- **Crowbar** (two steel, two iron; D-0020): right-click a vehicle with it, crouching or not,
+  to pry it loose into the inventory with its paint, fuel, disc, damage and all chest
+  contents. A full inventory leaves a packed drop, including in creative. Right-click the
+  ground to place it. The crowbar replaced the wrench: a wrench in a world loads as a crowbar.
+  Automobility's crowbar (item tag `vanillawheels:pries_vehicles`) works too.
 
 ## Damage, repairs and recovery keys (1.8.0)
 
-Vehicles have persistent condition. Breaking one drops a packed vehicle at zero
-condition with its cargo intact. Place this wreck on a Mechanic Lift; its engine
-cannot run until repaired. Older vehicles and items start at full condition.
+Vehicles have persistent condition. Mobs, arrows and bullets, explosions, fire and crashes
+wear it; a player's own blow does nothing, in creative too, since the crowbar is how a vehicle
+comes up (D-0020). Worn to nothing, a vehicle drops as a packed wreck with its cargo intact.
+Place this wreck on a Mechanic Lift; its engine cannot run until repaired. Older vehicles and
+items start at full condition.
+
+Condition shows as a row of ten wrenches above the hunger bar (D-0021), each a tenth, in
+halves: the vehicle you ride, with the trailer it tows above it, or on foot the vehicle under
+the crosshair. Like hearts, the row blinks when the vehicle is hurt (what was lost shown
+pale), jiggles at a fifth or less, and is hidden in creative and spectator. A hurt vehicle
+no longer flashes red.
 
 The lift shows a Repair section only while a damaged vehicle is mounted. Add the
 displayed material and press Repair. Cost scales with missing condition and rounds
@@ -246,7 +256,7 @@ A paired broken drop does not despawn or take ordinary damage and can be recalle
 Recall loads only a temporary area around the saved location and transfers the actual
 entity or drop. If someone has already collected the item, the fob cannot produce
 another copy. Keys do not retrieve items from someone else's inventory or a container.
-Breaking or wrenching detaches a trailer; only a currently hitched trailer accompanies
+Breaking or prying loose detaches a trailer; only a currently hitched trailer accompanies
 a deployed vehicle's recall. Unload animals before recalling a livestock trailer.
 
 Packed items are transferred when placed even in creative, so their cargo is not
@@ -325,7 +335,7 @@ material; `texture` may then be left out and the embedded texture is used. Paint
 are drawn with the dye as the vertex colour, lifted a quarter of the way toward white
 so a grey swatch reads as paint and not wool; a profile may name a `factory` colour, an
 exact `#rrggbb` no dye is, which an undyed vehicle wears until a dye replaces it and
-which a wrench and a lift leave alone. `assets/<ns>/lang/en_us.json` names the
+which a crowbar and a lift leave alone. `assets/<ns>/lang/en_us.json` names the
 vehicle under `vehicle.<ns>.<name>`. Keep every texture coordinate inside its swatch:
 the body is drawn through the cutout shader, and a coordinate on a swatch's edge samples
 the neighbour or the atlas's empty padding, whose alpha is zero, which drops the whole
@@ -375,7 +385,7 @@ swing about their hinges when open. Loaded animals lean with the floor as riders
 A vehicle is built from a **chassis** (the vehicle mod's own recipe; the item names the
 vehicle), one **wheel** per wheel position, and an **engine** if the profile has one -- no
 more, no less. Wheels are eight leather around a steel ingot; an engine is two redstone, a
-redstone torch, a diamond and five steel; the wrench two steel and two iron; the lift two
+redstone torch, a diamond and five steel; the crowbar two steel and two iron; the lift two
 pistons, three iron blocks, a redstone block and three smooth stone. Steel is Metals and
 Materials'. Install that required mod separately on both client and server;
 Mod Hub includes the shared version in our pack.
@@ -443,7 +453,7 @@ the fall past ten blocks, hurts and shoves a cow at speed and
 nothing at a walk, pours from a gas can held at it until the can is an empty can, fuels
 nothing from coal and refuses a throttle with an empty tank, crafts the empty can from
 iron and fills it with four coals,
-keeps its chest across a wrench and a placement, drives a creative driver on an empty tank
+keeps its chest across a crowbar and a placement, drives a creative driver on an empty tank
 and burns for a survival one, takes and ejects a disc, cycles its lamps
 and lights them by itself at night, and its profile round-trips through the codec; a
 lift is placed through its item facing each way and refused over a blocked cell, a hole

@@ -64,6 +64,7 @@ public final class VanillaWheelsClient {
     @SubscribeEvent
     public static void onGuiLayers(net.neoforged.neoforge.client.event.RegisterGuiLayersEvent event) {
         event.registerAbove(net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, com.chunkworks.vanillawheels.api.VanillaWheels.id("lights"), LightsIndicator::draw);
+        event.registerAbove(net.neoforged.neoforge.client.gui.VanillaGuiLayers.AIR_LEVEL, com.chunkworks.vanillawheels.api.VanillaWheels.id("wrenches"), WrenchBar::draw);
     }
 
     @SubscribeEvent

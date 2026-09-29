@@ -114,17 +114,35 @@ def engine_icon():
     return px
 
 
-def wrench_icon():
-    """An open-end wrench lying diagonally."""
+def crowbar_icon():
+    """A steel crowbar on the diagonal, as the game lays its tools: the gooseneck's claw at the top, a red
+    rubber grip, the flat chisel at the foot; outlined dark like the iron tools. Ours, not Automobility's
+    copper bar, which the pack may also carry."""
+    art = (
+        "................",
+        "...........OOO..",
+        "..........OLMMO.",
+        "..........OLOODO",
+        "..........OMO.OO",
+        ".........OLMO...",
+        "........OLMDO...",
+        ".......OLMDO....",
+        "......ORrDO.....",
+        ".....ORrrO......",
+        "....ORrrO.......",
+        "...ORrrO........",
+        "..OLMDO.........",
+        ".OLMDO..........",
+        ".OOOO...........",
+        "................",
+    )
+    colours = {"O": (34, 36, 42), "L": (170, 178, 190), "M": (118, 126, 138), "D": (78, 84, 96),
+               "R": (196, 44, 40), "r": (132, 26, 26)}
     px, put = _canvas()
-    for i in range(3, 13):
-        put(i, 15 - i, STEEL)
-        put(i + 1, 15 - i, STEEL_LIGHT)
-        put(i, 16 - i, STEEL_DARK)
-    for (x, y) in ((11, 1), (12, 1), (13, 1), (11, 2), (13, 2), (10, 3), (11, 3), (13, 3), (14, 3), (12, 4), (13, 4)):
-        put(x, y, STEEL_LIGHT)
-    for (x, y) in ((1, 13), (2, 13), (1, 14), (3, 14), (2, 15), (3, 12)):
-        put(x, y, STEEL_LIGHT)
+    for y, row in enumerate(art):
+        for x, c in enumerate(row):
+            if c in colours:
+                put(x, y, colours[c])
     return px
 
 
@@ -197,7 +215,77 @@ def gas_can_icon(full):
     return px
 
 
-ICONS = {"wheel": wheel_icon, "engine": engine_icon, "wrench": wrench_icon, "mechanic_lift": lift_icon,
+# ---------------------------------------------------------------- the wrench row
+# A vehicle's condition on the HUD (WrenchRow), drawn the way the game draws its hearts and
+# drumsticks: a 9 x 9 container -- a black outline round the shape, dark inside, white while
+# the row blinks -- with a fill laid over it: full, half (the handle's end), or pale for what a
+# blink shows was just lost. An open-jawed spanner on a diagonal, chosen by eye beside the
+# vanilla bars from five candidates.
+
+WRENCH_SHAPE = (
+    ".........",
+    ".....#.#.",
+    ".....###.",
+    "....##...",
+    "...##....",
+    "..##.....",
+    ".##......",
+    ".#.......",
+    ".........",
+)
+HUD_HI, HUD_MID, HUD_LO = (200, 208, 222), (140, 150, 168), (92, 100, 116)
+HUD_PALE, HUD_PALE_LO = (238, 240, 244), (214, 218, 226)
+
+
+def _wrench_cells():
+    return {(x, y) for y, row in enumerate(WRENCH_SHAPE) for x, c in enumerate(row) if c == "#"}
+
+
+def wrench_container(blinking):
+    """The empty wrench: its outline (4-neighbours of the shape) black, or white while blinking, over a dark body."""
+    cells = _wrench_cells()
+    px = [[(0, 0, 0, 0) for _ in range(9)] for _ in range(9)]
+    for (x, y) in cells:
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ox, oy = x + dx, y + dy
+            if (ox, oy) not in cells and 0 <= ox < 9 and 0 <= oy < 9:
+                px[oy][ox] = (255, 255, 255, 255) if blinking else (0, 0, 0, 255)
+    for (x, y) in cells:
+        px[y][x] = (40, 40, 40, 255)
+    return px
+
+
+def wrench_fill(half, lost):
+    """The wrench's fill: lit on its upper-left edges, shaded on its lower-right; half is the handle's end; lost is pale."""
+    cells = _wrench_cells()
+    px = [[(0, 0, 0, 0) for _ in range(9)] for _ in range(9)]
+    for (x, y) in cells:
+        if half and x > y:
+            continue
+        up, left = (x, y - 1) in cells, (x - 1, y) in cells
+        down, right = (x, y + 1) in cells, (x + 1, y) in cells
+        if not up and not left:
+            c = HUD_HI
+        elif not down and not right:
+            c = HUD_LO
+        elif not up or not left:
+            c = HUD_HI
+        elif not down or not right:
+            c = HUD_LO
+        else:
+            c = HUD_MID
+        if lost:
+            c = HUD_PALE_LO if c == HUD_LO else HUD_PALE
+        px[y][x] = (*c, 255)
+    return px
+
+
+HUD_ICONS = {"wrench_container": lambda: wrench_container(False), "wrench_container_blink": lambda: wrench_container(True),
+             "wrench_full": lambda: wrench_fill(False, False), "wrench_half": lambda: wrench_fill(True, False),
+             "wrench_lost_full": lambda: wrench_fill(False, True), "wrench_lost_half": lambda: wrench_fill(True, True)}
+
+
+ICONS = {"wheel": wheel_icon, "engine": engine_icon, "crowbar": crowbar_icon, "mechanic_lift": lift_icon,
          "gas_can": lambda: gas_can_icon(True), "empty_gas_can": lambda: gas_can_icon(False)}
 GUI_ICONS = {"lamp_off": lambda: lamp_icon(False), "lamp_on": lambda: lamp_icon(True)}
 
@@ -551,6 +639,8 @@ def main(argv) -> None:
             write_png(ASSETS / f"textures/item/{name}.png", 16, 16, bevel(draw()) if name in {"engine", "gas_can", "empty_gas_can"} else draw())
         for name, draw in GUI_ICONS.items():
             write_png(ASSETS / f"textures/gui/{name}.png", 16, 16, draw())
+        for name, draw in HUD_ICONS.items():
+            write_png(ASSETS / f"textures/gui/{name}.png", 9, 9, draw())
         write_png(ASSETS / "textures/block/mechanic_lift.png", 16, 16, lift_plate())
         write_png(ASSETS / "textures/block/mechanic_lift_deck.png", 16, 16, lift_deck())
         write_png(ASSETS / "textures/block/mechanic_lift_stripe.png", 16, 16, lift_stripe())

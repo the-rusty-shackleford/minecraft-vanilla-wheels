@@ -99,7 +99,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>Riders sit at the profile's seats; the driver is whoever is in the
  * driver's seat. A crouching click on the chest region opens the chest, a
  * rider opens it with the inventory key, a fuel in hand fills the tank, a
- * disc in hand loads the radio, the wrench takes the vehicle back into the
+ * disc in hand loads the radio, a crowbar pries the vehicle loose into the
  * hand. Hit boxes beyond the square the game gives an entity are
  * {@link Part}s, so the hood and bed of a long truck are clickable.
  */
@@ -142,6 +142,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     @Nullable private java.util.UUID recoveryBinding;
     private boolean placingFromItem;
     private boolean packedRemoval;
+    /** This client's watch on the condition, for the wrench row's blink (WrenchBar); unused on the server. */
+    private final com.chunkworks.vanillawheels.domain.WrenchRow.Watch wrenchWatch = new com.chunkworks.vanillawheels.domain.WrenchRow.Watch();
     private Tuning tuning = Tuning.pickup();
 
     private Drive drive = Drive.atRest(0.0);
@@ -1165,6 +1167,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return;
         }
         if (level().isClientSide()) {
+            wrenchWatch.observe(condition());
             doorSwing = Mth.clamp(doorSwing + (doorsOpen() ? 0.15f : -0.15f), 0.0f, 1.0f);
             int open = entityData.get(DATA_OPEN);
             for (int i = 0; i < lid.length; i++) {
@@ -1966,12 +1969,19 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, held);
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
-        boolean wrenching = player.isSecondaryUseActive() && held.is(ModContent.WRENCH.get());
+        // A crowbar pries the vehicle loose, crouching or not: it means nothing else at a vehicle,
+        // so it goes before a chest or a door (D-0020).
+        if (held.is(ModContent.PRIES_VEHICLES)) {
+            if (!level().isClientSide()) {
+                pickUp(player);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
+        }
         // A chest the click lands in: opens, crouching or not, before anything else the click could
         // mean. A chest further along the click's line waits its turn, after every other gesture,
         // so a click on the radio ejects the disc even with a chest behind it.
         int chest = chestAt(p, hit, player.getEyePosition(), 0.0);
-        if (chest >= 0 && !wrenching) {
+        if (chest >= 0) {
             openChest(player, chest);
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
@@ -1980,14 +1990,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return gesture;
         }
         chest = chestAt(p, hit, player.getEyePosition(), CHEST_REACH);
-        if (chest >= 0 && !wrenching) {
+        if (chest >= 0) {
             openChest(player, chest);
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
         return InteractionResult.PASS;
     }
 
-    /** effects: the crouching gestures at {@code hit}: the tongue, a door, unloading, the wrench, the radio; PASS for none */
+    /** effects: the crouching gestures at {@code hit}: the tongue, a door, unloading, the radio; PASS for none */
     private InteractionResult gestureAt(VehicleProfile p, Player player, ItemStack held, Vec3 hit) {
         if (player.isSecondaryUseActive()) {
             // The tongue, when hitched: let go.
@@ -2009,12 +2019,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (held.is(Items.LEAD) && p.cargo().isPresent() && doorsOpen() && !animals().isEmpty()) {
                 if (!level().isClientSide()) {
                     unload();
-                }
-                return InteractionResult.sidedSuccess(level().isClientSide());
-            }
-            if (held.is(ModContent.WRENCH.get())) {
-                if (!level().isClientSide()) {
-                    pickUp(player);
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }
@@ -2192,7 +2196,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             player.getInventory().setChanged();
             player.containerMenu.broadcastChanges();
         }
-        level().playSound(null, getX(), getY(), getZ(), ModContent.WRENCH_CLANK.get(), SoundSource.PLAYERS, 1.0f, 1.0f);
+        level().playSound(null, getX(), getY(), getZ(), ModContent.CLANK.get(), SoundSource.PLAYERS, 1.0f, 1.0f);
         packAway();
     }
 
@@ -2259,6 +2263,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** requires: none; effects: reports persistent condition in 0..10000; throws: none. */
     public int condition() { return entityData.get(DATA_CONDITION); }
+    /** effects: returns this client's watch on the condition, told once a tick, for the wrench row's blink */
+    public com.chunkworks.vanillawheels.domain.WrenchRow.Watch wrenchWatch() { return wrenchWatch; }
     /** requires: none; effects: clamps and syncs condition; a wreck cannot power its engine; throws: none. */
     public void setCondition(int remaining) { entityData.set(DATA_CONDITION, Math.max(0, Math.min(10000, remaining))); }
     /** requires: none; effects: returns the optional server recovery identity; throws: none. */
@@ -2394,9 +2400,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** effects: command/void kills use the same cargo-preserving destruction path as combat damage */
     @Override public void kill() { destroy(level().damageSources().genericKill()); }
 
-    /** Persistent wear replaces vanilla's transient boat hit counter; five points of damage break a pristine vehicle. */
+    /**
+     * Persistent wear replaces vanilla's transient boat hit counter; five points of damage break a pristine vehicle.
+     * A player's own blow does nothing -- the crowbar is how a vehicle comes up (D-0020) -- while mobs, arrows,
+     * bullets, explosions, fire and crashes still wear it.
+     */
     @Override public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (level().isClientSide() || isRemoved()) return true;
+        if (source.isDirect() && source.getEntity() instanceof Player) return false;
         if (isInvulnerableTo(source) || !Float.isFinite(amount) || amount <= 0) return false;
         setHurtDir(-getHurtDir()); setHurtTime(10); markHurt();
         setCondition(condition() - (int) Math.min(10000, Math.ceil(amount * 2000.0)));

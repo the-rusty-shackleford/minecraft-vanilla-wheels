@@ -83,7 +83,7 @@ public final class VehicleItem extends Item {
         if (!level.addFreshEntity(vehicle)) return InteractionResult.FAIL;
         vehicle.placingFromItem(false);
         recovery.deployed(vehicle, stack);
-        level.playSound(null, at.x, at.y, at.z, ModContent.WRENCH_CLANK.get(), net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 0.9f);
+        level.playSound(null, at.x, at.y, at.z, ModContent.CLANK.get(), net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 0.9f);
         if (!context.getPlayer().hasInfiniteMaterials() || stack.has(ModContent.PACKED_TOKEN.get())) {
             stack.shrink(1);
         }

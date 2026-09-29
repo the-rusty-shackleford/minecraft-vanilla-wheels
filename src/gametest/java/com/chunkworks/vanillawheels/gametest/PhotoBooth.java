@@ -594,6 +594,7 @@ public final class PhotoBooth {
             verdict("its doors are swung open", () -> found != null && found.doorSwing(1.0f) > 0.9f ? null : "swing " + (found == null ? null : found.doorSwing(1.0f)));
             verdict("with two cows aboard", () -> found != null && found.animals().size() == 2 ? null : "animals " + (found == null ? null : found.animals()));
         }));
+        t = wrenchPlan(mc, s, t);
         t = garagePlan(mc, s, t);
         s.add(new Step(t += 20, () -> {
             LOG.info("booth: PASS all checks ran");
@@ -601,6 +602,122 @@ public final class PhotoBooth {
             mc.stop();
         }));
         return s;
+    }
+
+    private static int redBeforeHit;
+
+    /**
+     * The wrench row (WrenchBar), with the HUD shown and the player in survival:
+     * on foot beside the hitched trailer with the crosshair on it, a full row;
+     * hurt, the row blinks and the body takes no red tint; worn to a tenth,
+     * the row jiggles; aboard the car, two rows -- the car's and, above it,
+     * its trailer's.
+     */
+    private static int wrenchPlan(Minecraft mc, List<Step> s, int t) {
+        s.add(new Step(t += 2, () -> {
+            mc.options.hideGui = false;
+            onServer(mc, sp -> {
+                if (!(sp.serverLevel().getEntity(trailerId) instanceof Vehicle trailer)) {
+                    LOG.error("booth: FAIL the trailer is in the level for the wrench row");
+                    return;
+                }
+                sp.setGameMode(GameType.SURVIVAL);
+                sp.getAbilities().flying = false;
+                sp.onUpdateAbilities();
+                // Low on the side wall, under the cows' heads: a cow aboard is not the trailer.
+                sp.teleportTo(sp.serverLevel(), trailer.getX() + 0.3, trailer.getY(), trailer.getZ() - 2.6, 0.0f, 25.0f);
+            });
+        }));
+        s.add(new Step(t += SETTLE / 2, () -> {
+            redBeforeHit = count(mc, PhotoBooth::red);
+            int row = hudSteel(mc, 0);
+            shoot(mc, "booth-wrenches-look-full");
+            verdict("the crosshair is on the trailer or a cow aboard it", () -> mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit
+                    && (hit.getEntity().getUUID().equals(trailerId) || hit.getEntity() instanceof Vehicle.Part part && part.getParent().getUUID().equals(trailerId)
+                        || hit.getEntity().getVehicle() != null && hit.getEntity().getVehicle().getUUID().equals(trailerId))
+                    ? null : "looking at " + (mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit ? hit.getEntity() : mc.hitResult));
+            verdict("looking at a vehicle shows its wrench row, full", () -> row > 600 ? null : "steel pixels " + row);
+            onServer(mc, sp -> {
+                if (sp.serverLevel().getEntity(trailerId) instanceof Vehicle trailer) {
+                    trailer.hurt(sp.serverLevel().damageSources().generic(), 1.0f);
+                }
+            });
+        }));
+        s.add(new Step(t += 3, () -> {
+            int red = count(mc, PhotoBooth::red);
+            shoot(mc, "booth-wrenches-hurt-a");
+            verdict("a hurt vehicle takes no red tint", () -> red < redBeforeHit + 200 ? null : "red pixels " + redBeforeHit + " before, " + red + " hurt");
+        }));
+        s.add(new Step(t += 3, () -> shoot(mc, "booth-wrenches-hurt-b")));
+        s.add(new Step(t += 3, () -> shoot(mc, "booth-wrenches-hurt-c")));
+        s.add(new Step(t += 30, () -> {
+            shoot(mc, "booth-wrenches-worn");
+            onServer(mc, sp -> {
+                if (sp.serverLevel().getEntity(trailerId) instanceof Vehicle trailer) {
+                    trailer.setCondition(1_000);
+                }
+            });
+        }));
+        s.add(new Step(t += 30, () -> {
+            shoot(mc, "booth-wrenches-low-a");
+        }));
+        s.add(new Step(t += 1, () -> shoot(mc, "booth-wrenches-low-b")));
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            if (sp.serverLevel().getEntity(trailerId) instanceof Vehicle trailer && trailer.tower() != null) {
+                trailer.tower().setCondition(6_500);
+                sp.startRiding(trailer.tower(), true);
+            } else {
+                LOG.error("booth: FAIL the trailer is hitched for the driving rows");
+            }
+        })));
+        s.add(new Step(t += SETTLE / 2, () -> {
+            int car = hudSteel(mc, 0);
+            int trailer = hudSteel(mc, 1);
+            shoot(mc, "booth-wrenches-driving");
+            verdict("driving shows the car's row", () -> car > 300 ? null : "steel pixels " + car);
+            verdict("and above it the trailer's", () -> trailer > 30 ? null : "steel pixels " + trailer);
+            onServer(mc, sp -> {
+                sp.stopRiding();
+                sp.getInventory().selected = 0;
+                sp.getInventory().setItem(0, new ItemStack(ModContent.CROWBAR.get()));
+                sp.containerMenu.broadcastChanges();
+            });
+        }));
+        s.add(new Step(t += SETTLE / 2, () -> {
+            shoot(mc, "booth-crowbar-held");
+            verdict("the crowbar reaches the client's hand", () -> mc.player != null && mc.player.getMainHandItem().is(ModContent.CROWBAR.get()) ? null : "held " + (mc.player == null ? null : mc.player.getMainHandItem()));
+            onServer(mc, sp -> sp.setGameMode(GameType.CREATIVE));
+            mc.options.hideGui = true;
+        }));
+        return t;
+    }
+
+    /** The wrench sprites' steel, lit or shaded, drawn exactly: nothing else on the HUD or in the world matches it this closely. */
+    private static boolean wrenchSteel(int rgb) {
+        int r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
+        return Math.abs(r - 200) <= 4 && Math.abs(g - 208) <= 4 && Math.abs(b - 222) <= 4
+                || Math.abs(r - 140) <= 4 && Math.abs(g - 150) <= 4 && Math.abs(b - 168) <= 4
+                || Math.abs(r - 92) <= 4 && Math.abs(g - 100) <= 4 && Math.abs(b - 116) <= 4;
+    }
+
+    /** effects: returns the count of wrench-steel pixels in row {@code row} (0 lowest) of the HUD's right column above the hunger bar */
+    private static int hudSteel(Minecraft mc, int row) {
+        double k = mc.getWindow().getGuiScale();
+        int gw = mc.getWindow().getGuiScaledWidth(), gh = mc.getWindow().getGuiScaledHeight();
+        int top = gh - 49 - 10 * row;
+        try (NativeImage image = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
+            int n = 0;
+            for (int y = (int) (top * k); y < (int) ((top + 10) * k) && y < image.getHeight(); y++) {
+                for (int x = (int) ((gw / 2 + 5) * k); x < (int) ((gw / 2 + 91) * k) && x < image.getWidth(); x++) {
+                    int abgr = image.getPixelRGBA(x, y);
+                    int rgb = (abgr & 0xFF) << 16 | (abgr >> 8 & 0xFF) << 8 | (abgr >> 16 & 0xFF);
+                    if (wrenchSteel(rgb)) {
+                        n++;
+                    }
+                }
+            }
+            return n;
+        }
     }
 
     private static BlockPos garagePos = BlockPos.ZERO;

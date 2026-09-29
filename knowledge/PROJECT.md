@@ -22,8 +22,22 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   faces drawn twice, 12 ghost tailgate faces. No other shipped element matched two roles, so
   nothing else changes. The trailer booth's doors-open frames show the doorway empty (before and
   after compared at 3×).
-- Still to come: the wrench row (D-0021), the crowbar (D-0020), cow loading (Bobandy_'s report,
-  cause not yet found), the unhitch roll-back, and each vehicle's own crowbar.
+- **The wrench row, no red tint** (done, D-0021). `domain/WrenchRow` (JUnit: fills, the jiggle,
+  and a blink pattern identical to the game's hearts) and `client/WrenchBar` above the hunger bar.
+  The booth's `wrenchPlan` photographs it, and its checks read the HUD's exact steel pixels. On
+  foot looking at the trailer, a full row: the crosshair met a cow aboard first, so a rider's
+  vehicle counts too. Hurt, it blinks with the lost part pale, and no red tint, the trailer's red
+  count unchanged. Worn to a tenth, it jiggles. Driving, two rows. Under software rendering a
+  screenshot can repeat the last frame drawn, so the first two hurt frames still show the row
+  before the hit.
+- **The crowbar; a player's blow does nothing** (done, D-0020). The wrench is renamed and its
+  id aliased. The `pries_vehicles` tag takes Automobility's crowbar too. Its icon is drawn by
+  `build.py` and was judged in hand in the booth. The gametests: an uncrouched pry keeps the
+  cargo, paint, fuel and wear; an old `vanillawheels:wrench` stack loads as a crowbar; six sword
+  blows (survival and creative) leave a car unworn while a zombie's and a player's arrow wear it.
+  With the rule removed, that test failed at 7498.
+- Still to come: cow loading (Bobandy_'s report, cause not yet found), the unhitch roll-back
+  (D-0022), and each vehicle's own crowbar.
 
 ## Carried — 1.9.5, released 2026-09-29 in pack 1.68.0
 

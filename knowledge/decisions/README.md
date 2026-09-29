@@ -38,3 +38,7 @@ tags: [index]
 - [D-0018](D-0018.md): The suspension takes seven blocks of a fall; riders feel the rest.
 
 - [D-0019](D-0019.md): What a vehicle hands back (a disc, a lead, a repair ingredient) goes where a give goes, a carried bag included, through Carried.
+
+- [D-0020](D-0020.md): A crowbar (the wrench, renamed and aliased) pries a vehicle loose, crouching or not; a player's own blow does nothing to a vehicle.
+
+- [D-0021](D-0021.md): A vehicle's condition is a row of wrenches above the hunger bar, blinking and jiggling as hearts do; no red hurt tint.

@@ -145,7 +145,8 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         poseStack.mulPose(Axis.XP.rotation((float) pose.pitch()));
         poseStack.mulPose(Axis.ZP.rotation((float) pose.roll()));
 
-        int overlay = vehicle.getHurtTime() > 0 ? OverlayTexture.pack(0, true) : OverlayTexture.NO_OVERLAY;
+        // No hurt tint: a vehicle is not a mob. Its condition shows as the wrench row (WrenchBar).
+        int overlay = OverlayTexture.NO_OVERLAY;
         VertexConsumer solid = buffers.getBuffer(RenderType.entityCutoutNoCull(a.texture));
         MeshDrawer.draw(a.rest, poseStack.last(), solid, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
         if (a.cockpit.quadCount() > 0 && !throughOwnEyes(vehicle)) {

@@ -116,8 +116,13 @@ public final class ModContent {
     public static final DeferredItem<Item> WHEEL = ITEMS.registerSimpleItem("wheel");
     /** An engine. */
     public static final DeferredItem<Item> ENGINE = ITEMS.registerSimpleItem("engine");
-    /** Takes a vehicle back into the hand. */
-    public static final DeferredItem<Item> WRENCH = ITEMS.registerItem("wrench", WrenchItem::new, new Item.Properties().stacksTo(1));
+    /** Pries a vehicle loose into the hand (D-0020). The wrench it replaced loads as one: the id is aliased. */
+    public static final DeferredItem<Item> CROWBAR = ITEMS.registerItem("crowbar", CrowbarItem::new, new Item.Properties().stacksTo(1));
+    static {
+        ITEMS.addAlias(VanillaWheels.id("wrench"), VanillaWheels.id("crowbar"));
+    }
+    /** What pries a vehicle loose: the crowbar, and Automobility's where that mod is installed. */
+    public static final net.minecraft.tags.TagKey<Item> PRIES_VEHICLES = net.minecraft.tags.ItemTags.create(VanillaWheels.id("pries_vehicles"));
     public static final DeferredItem<KeyFobItem> KEY_FOB = ITEMS.registerItem("key_fob", KeyFobItem::new, new Item.Properties().stacksTo(1));
     /** A tank's worth of fuel: hold use at a vehicle to pour. Full when crafted. */
     public static final DeferredItem<GasCanItem> GAS_CAN = ITEMS.registerItem("gas_can",
@@ -155,7 +160,8 @@ public final class ModContent {
     public static final DeferredHolder<SoundEvent, SoundEvent> ENGINE_PETROL = sound("engine.petrol");
     public static final DeferredHolder<SoundEvent, SoundEvent> SKID = sound("skid");
     public static final DeferredHolder<SoundEvent, SoundEvent> THUD = sound("thud");
-    public static final DeferredHolder<SoundEvent, SoundEvent> WRENCH_CLANK = sound("wrench");
+    /** Metal on metal: a vehicle set down, or pried loose. Its id stays the wrench's, the sound it was cut for. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> CLANK = sound("wrench");
     public static final DeferredHolder<SoundEvent, SoundEvent> FUEL_POUR = sound("fuel");
 
     private static DeferredHolder<SoundEvent, SoundEvent> sound(String path) {
@@ -189,7 +195,7 @@ public final class ModContent {
     }
 
     /**
-     * effects: puts the parts in Ingredients, the wrench in Tools, the lift in Functional Blocks, and one vehicle
+     * effects: puts the parts in Ingredients, the crowbar in Tools, the lift in Functional Blocks, and one vehicle
      * item and one chassis per registered profile in Tools & Utilities, so a
      * vehicle mod's creative presence is automatic
      */
@@ -198,7 +204,7 @@ public final class ModContent {
             event.accept(WHEEL);
             event.accept(ENGINE);
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(WRENCH);
+            event.accept(CROWBAR);
             event.accept(KEY_FOB);
             event.accept(GAS_CAN);
             event.accept(EMPTY_GAS_CAN);
@@ -225,7 +231,7 @@ public final class ModContent {
                 profiles.forEach(id -> output.accept(chassisStack(id)));
                 output.accept(LIFT_ITEM.get());
                 output.accept(GARAGE_DOOR_ITEM.get());
-                output.accept(WRENCH.get());
+                output.accept(CROWBAR.get());
                 output.accept(KEY_FOB.get());
                 output.accept(WHEEL.get());
                 output.accept(ENGINE.get());

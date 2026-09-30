@@ -114,6 +114,8 @@ public final class PhotoBooth {
     private static UUID car;
     private static BlockPos liftPos = BlockPos.ZERO;
     private static UUID trailerId;
+    /** The box car the trailer is hitched to, repaired and punched up at the end of the wrench scene. */
+    private static UUID carId;
     private static double groundDark = -1.0;
     private static int stockBlue = 0;
 
@@ -129,6 +131,8 @@ public final class PhotoBooth {
         if (!muted) {
             // Silent from the first tick, before the title music: Rusty listens to music while these run.
             mc.options.getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.MASTER).set(0.0);
+            // Iconified beside Rusty's own client, the window never has focus: the world must not pause for it.
+            mc.options.pauseOnLostFocus = false;
             muted = true;
         }
         switch (phase) {
@@ -611,7 +615,10 @@ public final class PhotoBooth {
      * on foot beside the hitched trailer with the crosshair on it, a full row;
      * hurt, the row blinks and the body takes no red tint; worn to a tenth,
      * the row jiggles; aboard the car, two rows -- the car's and, above it,
-     * its trailer's.
+     * its trailer's. Then on foot at the car (D-0025, D-0026): three clicks
+     * repair it three steps with the row showing, a blank key paired at it is
+     * named for it and banded in its paint, five punches in a row rock it and
+     * leave it standing, and the sixth packs it at its condition.
      */
     private static int wrenchPlan(Minecraft mc, List<Step> s, int t) {
         s.add(new Step(t += 2, () -> {
@@ -677,52 +684,113 @@ public final class PhotoBooth {
             verdict("driving shows the car's row", () -> car > 300 ? null : "steel pixels " + car);
             verdict("and above it the trailer's", () -> trailer > 30 ? null : "steel pixels " + trailer);
             onServer(mc, sp -> {
+                // On foot beside the car, square to its side, empty-handed: the repair and the punches (D-0025).
+                Vehicle ridden = sp.getVehicle() instanceof Vehicle v ? v : null;
                 sp.stopRiding();
+                if (ridden == null) {
+                    LOG.error("booth: FAIL the player was aboard the car for the repair");
+                    return;
+                }
+                carId = ridden.getUUID();
                 sp.getInventory().selected = 0;
-                sp.getInventory().setItem(0, new ItemStack(ModContent.CROWBAR.get()));
+                sp.getInventory().setItem(0, ItemStack.EMPTY);
+                float yaw = ridden.getYRot() * net.minecraft.util.Mth.DEG_TO_RAD;
+                double px = ridden.getX() + Math.cos(yaw) * 3.2, pz = ridden.getZ() + Math.sin(yaw) * 3.2;
+                // Looking at the middle of the nearest hit box: the box car's are its hood and its tail,
+                // not its cabin, and the crosshair must be on one for the wrench row to show.
+                Vec3 eye = new Vec3(px, ridden.getY() + sp.getEyeHeight(), pz);
+                Vec3 aim = java.util.Arrays.stream(ridden.getParts()).map(part -> part.getBoundingBox().getCenter())
+                        .min(java.util.Comparator.comparingDouble(eye::distanceToSqr)).orElse(ridden.position());
+                Vec3 d = aim.subtract(eye);
+                float look = (float) (net.minecraft.util.Mth.atan2(d.z, d.x) * net.minecraft.util.Mth.RAD_TO_DEG) - 90.0f;
+                float pitch = (float) (-net.minecraft.util.Mth.atan2(d.y, Math.sqrt(d.x * d.x + d.z * d.z)) * net.minecraft.util.Mth.RAD_TO_DEG);
+                sp.teleportTo(sp.serverLevel(), px, ridden.getY(), pz, look, pitch);
                 sp.containerMenu.broadcastChanges();
             });
         }));
-        s.add(new Step(t += SETTLE / 2, () -> {
-            shoot(mc, "booth-crowbar-held");
-            verdict("the crowbar reaches the client's hand", () -> mc.player != null && mc.player.getMainHandItem().is(ModContent.CROWBAR.get()) ? null : "held " + (mc.player == null ? null : mc.player.getMainHandItem()));
-        }));
-        // The car's toolbox (D-0023), opened by a crouching empty hand: its own crowbar in the slot,
-        // then out in the inventory, the slot showing the crowbar's outline and its help.
-        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
-            if (sp.serverLevel().getEntity(trailerId) instanceof Vehicle trailer && trailer.tower() != null) {
-                sp.getInventory().setItem(0, ItemStack.EMPTY);
-                sp.setShiftKeyDown(true);
-                trailer.tower().interactAt(sp, Vec3.ZERO, InteractionHand.MAIN_HAND);
-                sp.setShiftKeyDown(false);
+        s.add(new Step(t += SETTLE / 2, () -> onServer(mc, sp -> {
+            if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
+                for (int i = 0; i < 3; i++) {
+                    sp.interactOn(car, InteractionHand.MAIN_HAND);
+                }
             }
         })));
-        s.add(new Step(t += 20, () -> {
-            shoot(mc, "booth-toolbox-full");
-            verdict("the toolbox opens with the car's own crowbar in it", () -> mc.player != null
-                    && mc.player.containerMenu instanceof com.chunkworks.vanillawheels.ToolboxMenu m
-                    && com.chunkworks.vanillawheels.OwnCrowbars.isOwn(m.getSlot(com.chunkworks.vanillawheels.ToolboxMenu.SLOT).getItem())
-                    ? null : "menu " + (mc.player == null ? null : mc.player.containerMenu));
+        s.add(new Step(t += 4, () -> {
+            int condition = clientCondition(mc, carId);
+            shoot(mc, "booth-repair");
+            int row = hudSteel(mc, 0);
+            verdict("three clicks repair the car three steps, 65% to 72.5%", () -> condition == 7_250 ? null : "condition " + condition);
+            verdict("and the crosshair on it shows its wrench row", () -> row > 300 ? null : "steel pixels " + row);
+            // Its key (D-0026): a blank paired at the car, held; a second blank beside it for the grey band.
             onServer(mc, sp -> {
-                if (sp.containerMenu instanceof com.chunkworks.vanillawheels.ToolboxMenu m) {
-                    m.quickMoveStack(sp, com.chunkworks.vanillawheels.ToolboxMenu.SLOT);
-                    m.broadcastChanges();
+                if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
+                    sp.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.KEY_FOB.get()));
+                    car.interactAt(sp, Vec3.ZERO, InteractionHand.MAIN_HAND);
+                    sp.getInventory().setItem(1, new ItemStack(ModContent.KEY_FOB.get()));
+                    sp.containerMenu.broadcastChanges();
                 }
             });
         }));
-        s.add(new Step(t += 12, () -> pointAt(mc, (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 88, (mc.getWindow().getGuiScaledHeight() - 133) / 2 + 28)));
-        s.add(new Step(t += 12, () -> {
-            shoot(mc, "booth-toolbox-empty");
-            verdict("taken out, the slot is empty and the crowbar is in the inventory", () -> mc.player != null
-                    && mc.player.containerMenu instanceof com.chunkworks.vanillawheels.ToolboxMenu m
-                    && m.getSlot(com.chunkworks.vanillawheels.ToolboxMenu.SLOT).getItem().isEmpty()
-                    && mc.player.getInventory().items.stream().anyMatch(com.chunkworks.vanillawheels.OwnCrowbars::isOwn)
-                    ? null : "slot " + (mc.player == null ? null : mc.player.containerMenu.getSlot(0).getItem()));
-            if (mc.player != null) mc.player.closeContainer();
+        s.add(new Step(t += 8, () -> {
+            ItemStack held = mc.player == null ? ItemStack.EMPTY : mc.player.getMainHandItem();
+            shoot(mc, "booth-key-held");
+            verdict("the paired key is named for its car", () -> held.getHoverName().getString().startsWith("Key to") ? null : "named " + held.getHoverName().getString());
+            verdict("and banded in its paint", () -> held.has(ModContent.KEY_COLOUR.get()) ? null : "no band colour on " + held);
+            onServer(mc, sp -> {
+                if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
+                    sp.attack(car);
+                    sp.resetAttackStrengthTicker();
+                }
+            });
+        }));
+        s.add(new Step(t += 2, () -> shoot(mc, "booth-knock-a")));
+        s.add(new Step(t += 2, () -> shoot(mc, "booth-knock-b")));
+        s.add(new Step(t += 2, () -> shoot(mc, "booth-knock-c")));
+        for (int i = 2; i <= 5; i++) {
+            int punch = i;
+            s.add(new Step(t += 6, () -> onServer(mc, sp -> {
+                if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
+                    sp.attack(car);
+                    sp.resetAttackStrengthTicker();
+                } else {
+                    LOG.error("booth: FAIL punch {} found the car gone", punch);
+                }
+            })));
+        }
+        s.add(new Step(t += 2, () -> {
+            shoot(mc, "booth-knock-five");
+            onServer(mc, sp -> {
+                verdict("five punches in a row leave it standing", () -> sp.serverLevel().getEntity(carId) instanceof Vehicle car && !car.isRemoved() ? null : "the car is gone");
+                if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
+                    sp.attack(car);
+                    sp.resetAttackStrengthTicker();
+                }
+            });
+        }));
+        s.add(new Step(t += 6, () -> {
+            shoot(mc, "booth-packed");
+            onServer(mc, sp -> {
+                verdict("the sixth packs it", () -> sp.serverLevel().getEntity(carId) == null ? null : "the car still stands");
+                verdict("into the hand, at its condition", () -> sp.getInventory().items.stream()
+                        .anyMatch(st -> st.is(ModContent.VEHICLE_ITEM.get()) && Integer.valueOf(7_250).equals(st.get(ModContent.CONDITION.get())))
+                        ? null : "inventory " + sp.getInventory().items.stream().filter(st -> !st.isEmpty()).toList());
+            });
             onServer(mc, sp -> sp.setGameMode(GameType.CREATIVE));
             mc.options.hideGui = true;
         }));
         return t;
+    }
+
+    /** effects: the condition the client sees for vehicle {@code id}, -1 when it sees no such vehicle */
+    private static int clientCondition(Minecraft mc, UUID id) {
+        if (mc.level != null) {
+            for (var e : mc.level.entitiesForRendering()) {
+                if (e instanceof Vehicle v && e.getUUID().equals(id)) {
+                    return v.condition();
+                }
+            }
+        }
+        return -1;
     }
 
     /** The wrench sprites' steel, lit or shaded, drawn exactly: nothing else on the HUD or in the world matches it this closely. */

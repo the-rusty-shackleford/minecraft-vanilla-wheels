@@ -340,19 +340,17 @@ public final class VehicleGameTests {
     }
 
     @GameTest(template = "runway", timeoutTicks = 20)
-    public void aPlayersBlowLeavesAVehicleAsItWasWhileAZombieAndAPlayersArrowWearIt(GameTestHelper helper) {
+    public void aPlayersBlowIsAKnockNotWearWhileAZombieAndAPlayersArrowWearIt(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 4.5, 7.5, true);
-        for (GameType mode : List.of(GameType.SURVIVAL, GameType.CREATIVE)) {
-            Player p = helper.makeMockPlayer(mode);
-            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
-            for (int i = 0; i < 6; i++) {
-                p.attack(v);
-                p.resetAttackStrengthTicker();
-            }
-            helper.assertTrue(!v.isRemoved(), mode + ": six sword blows leave it standing");
-            helper.assertValueEqual(v.condition(), com.chunkworks.vanillawheels.domain.Condition.MAX, mode + ": and unworn");
+        Player p = helper.makeMockPlayer(GameType.SURVIVAL);
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_SWORD));
+        for (int i = 0; i < com.chunkworks.vanillawheels.domain.Knocks.TO_PACK - 1; i++) {
+            p.attack(v);
+            p.resetAttackStrengthTicker();
         }
+        helper.assertTrue(!v.isRemoved(), "five sword blows leave it standing");
+        helper.assertValueEqual(v.condition(), com.chunkworks.vanillawheels.domain.Condition.MAX, "and unworn: a blow is a knock (D-0025)");
         net.minecraft.world.entity.monster.Zombie zombie = EntityType.ZOMBIE.create(helper.getLevel());
         helper.assertTrue(zombie != null, "a zombie");
         helper.assertTrue(v.hurt(helper.getLevel().damageSources().mobAttack(zombie), 1.0f), "a zombie's blow lands");
@@ -365,19 +363,17 @@ public final class VehicleGameTests {
     }
 
     @GameTest(template = "runway", timeoutTicks = 20)
-    public void anOldWrenchLoadsAsACrowbarAndAutomobilitysMayPry(GameTestHelper helper) {
+    public void anOldWrenchLoadsAsAnIronIngot(GameTestHelper helper) {
         net.minecraft.nbt.CompoundTag old = new net.minecraft.nbt.CompoundTag();
         old.putString("id", "vanillawheels:wrench");
         old.putInt("count", 1);
         ItemStack loaded = ItemStack.parseOptional(helper.getLevel().registryAccess(), old);
-        helper.assertTrue(loaded.is(ModContent.CROWBAR.get()), "a saved wrench loads as a crowbar: " + loaded);
-        helper.assertTrue(loaded.is(ModContent.PRIES_VEHICLES), "and pries");
-        helper.assertTrue(new ItemStack(ModContent.CROWBAR.get()).is(ModContent.PRIES_VEHICLES), "the crowbar is in the pry tag");
+        helper.assertTrue(loaded.is(Items.IRON_INGOT), "a saved 1.9.5 wrench loads as an iron ingot: " + loaded);
         helper.succeed();
     }
 
     @GameTest(template = "runway", timeoutTicks = 100)
-    public void aCrowbarUnCrouchedPacksCargoPaintFuelAndDamageWithoutLooseDrops(GameTestHelper helper) {
+    public void punchesPackCargoPaintFuelAndDamageWithoutLooseDrops(GameTestHelper helper) {
         layFloor(helper);
         Vehicle v = car(helper, 4.5, 7.5, true);
         helper.assertValueEqual(v.getContainerSize(), 54, "two chests of three rows");
@@ -387,10 +383,11 @@ public final class VehicleGameTests {
         v.hurt(helper.getLevel().damageSources().generic(), 1);
         int fuel = v.tank().ticks();
         Player p = helper.makeMockPlayer(GameType.SURVIVAL);
-        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.CROWBAR.get()));
-        // A plain right-click: the crowbar pries crouching or not (D-0020); the recovery suite crouches.
-        helper.assertTrue(v.interactAt(p, Vec3.ZERO, InteractionHand.MAIN_HAND).consumesAction(), "the crowbar's click is taken");
-        helper.assertTrue(v.isRemoved(), "the vehicle is gone");
+        for (int i = 0; i < com.chunkworks.vanillawheels.domain.Knocks.TO_PACK; i++) {
+            p.attack(v);
+            p.resetAttackStrengthTicker();
+        }
+        helper.assertTrue(v.isRemoved(), "six punches in a row pack the vehicle (D-0025)");
         int atOnce = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4.0)).stream().filter(e -> e.getItem().is(Items.APPLE)).mapToInt(e -> e.getItem().getCount()).sum();
         helper.assertValueEqual(atOnce, 0, "no apples spilled");
         ItemStack held = null;

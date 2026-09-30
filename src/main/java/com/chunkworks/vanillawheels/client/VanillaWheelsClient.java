@@ -59,13 +59,19 @@ public final class VanillaWheelsClient {
     @SubscribeEvent
     public static void onScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
         event.register(ModContent.LIFT_MENU.get(), com.chunkworks.vanillawheels.client.lift.LiftScreen::new);
-        event.register(ModContent.TOOLBOX_MENU.get(), ToolboxScreen::new);
     }
 
     @SubscribeEvent
     public static void onGuiLayers(net.neoforged.neoforge.client.event.RegisterGuiLayersEvent event) {
         event.registerAbove(net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, com.chunkworks.vanillawheels.api.VanillaWheels.id("lights"), LightsIndicator::draw);
         event.registerAbove(net.neoforged.neoforge.client.gui.VanillaGuiLayers.AIR_LEVEL, com.chunkworks.vanillawheels.api.VanillaWheels.id("wrenches"), WrenchBar::draw);
+    }
+
+    /** A key's band (tint 0) shows its vehicle's paint; a blank key's is plain grey (D-0026). */
+    @SubscribeEvent
+    public static void onItemColours(net.neoforged.neoforge.client.event.RegisterColorHandlersEvent.Item event) {
+        event.register((stack, tint) -> tint == 0 ? 0xFF000000 | stack.getOrDefault(ModContent.KEY_COLOUR.get(), 0x8A8A8A) : -1,
+                ModContent.KEY_FOB.get());
     }
 
     @SubscribeEvent

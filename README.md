@@ -19,7 +19,7 @@ Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-lumi
 ## Creative inventory
 
 The **Vanilla Wheels** tab contains every installed vehicle and its chassis, followed
-by the Mechanic Lift, Rolling Garage Door panels, crowbar, wheels, engine and full/empty gas cans. Trailblazer,
+by the Mechanic Lift, Rolling Garage Door panels, key fob, wheels, engine and full/empty gas cans. Trailblazer,
 Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
 The ordinary vanilla categories and Creative search remain available too.
 Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
@@ -178,7 +178,7 @@ presses its copy down before every move and can always step, while the reported 
 a step leaves the server's copy airborne and unable to -- without which a ramp of slabs
 at speed had the server refuse every tick and snap the vehicle back.
 
-## Fuel, storage, records, the crowbar
+## Fuel, storage, records
 
 - **Fuel**: the gas can. An empty can is eight iron ingots in a can's shape (a handle top
   left over a square body); four coal or charcoal with it fill it, a tank's worth (24 000
@@ -194,35 +194,52 @@ at speed had the server refuse every tick and snap the vehicle back.
   and at the size the profile says, each its own inventory of its own rows. Right-click a
   chest to open it, crouching or not, as a chest block -- aim at it from anywhere: the
   click's line is followed on from the hull into the bed, so a chest sunk in a bed opens
-  from outside; right-click anywhere else on the body and you board. A rider presses the inventory key for the first chest, since
+  from outside; right-click anywhere else on the body and you board (a damaged vehicle is
+  repaired a step instead, below). A rider presses the inventory key for the first chest, since
   crouching dismounts. A chest's lid is up, with the chest's sounds, while anyone has it
-  open. Contents stay inside the packed vehicle when it is pried loose or destroyed,
+  open. Contents stay inside the packed vehicle when it is packed up or destroyed,
   including item names, enchantments and other components.
 - **Records**: crouch and right-click a vehicle that has a radio while holding a music
   disc, and it plays for everyone in range the way a jukebox does, with the now-playing
   toast; crouch and right-click the radio empty-handed to eject it. The disc stays until
   ejected, as in a jukebox.
-- **Crowbar** (two steel, two iron; D-0020): right-click a vehicle with it, crouching or not,
-  to pry it loose into the inventory with its paint, fuel, disc, damage and all chest
-  contents. A full inventory leaves a packed drop, including in creative. Right-click the
-  ground to place it. The crowbar replaced the wrench: a wrench in a world loads as a crowbar.
-  Automobility's crowbar (item tag `vanillawheels:pries_vehicles`) works too.
-- **Its own crowbar** (D-0023): every vehicle is built with a crowbar of its own, and one built
-  before 1.10.0 gets one the first time it loads. Crouch and right-click the body empty-handed,
-  anywhere but a door, the tongue or the radio, to open its toolbox, whose one slot holds that
-  crowbar. It may be in its slot, in your inventory, or in a bag you carry. Drop it, die with
-  it, or leave it in a chest, an ender chest or a decorated pot, and it goes back to its
-  toolbox, even while the vehicle is packed away (it is there when the vehicle is set down
-  again). Pried loose with its own crowbar, a vehicle packs the crowbar inside. Spare crowbars
-  have none of this. Deleting it in the creative inventory, or `/clear`, loses it.
+
+## Punch to pack, right-click to repair (1.10.0)
+
+1.10.0 packs and repairs a vehicle as Immersive Aircraft does an aircraft (D-0025), with one
+difference: Vanilla Wheels keeps a vehicle's condition in the packed item, so a punch here is a
+knock, not wear -- punching a car up must not hand you a wreck.
+
+- **Punch it six times in a row** and it packs into your inventory as it is: condition, cargo,
+  fuel, paint, disc, name and key pairing kept (a full inventory leaves a packed drop). Each punch
+  rocks it; stop for more than a second and the count starts again, so a stray swing does
+  nothing. Any item in hand counts. In creative one punch packs it. Nobody can pack a vehicle
+  while anyone rides it, and a vehicle paired to a key -- or hitched behind one that is -- packs
+  only for the key's owner, or for a creative player (cleanup).
+- **Right-click a damaged vehicle** where you would board it and it is repaired 2.5% a click
+  (hold the button and it repeats), with a coloured "N% repaired" and a clank; once it is whole,
+  the same click boards. Chests, doors, the radio, the gas can, the hitch and the key still work
+  on a damaged vehicle. Repair costs hunger, not materials, scaled by the vehicle's job: its
+  profile's `repair.full_cost` in exhaustion for a full rebuild from a wreck (forty clicks), a
+  food point per four. A player with an empty hunger bar is too hungry to work. In creative one
+  click makes it whole and costs nothing.
+
+  | Vehicle | Full rebuild |
+  |---|---|
+  | Trailblazer (`full_cost` 20) | 5 food points, 2½ drumsticks (Immersive Aircraft's) |
+  | Farmer's Pickup (18) | 4.5 food points |
+  | Trailer (12) | 3 food points |
+
+- The Mechanic Lift still repairs whole at once for material (below). The 1.9.5 wrench is gone,
+  and a wrench left in an inventory loads as an iron ingot.
 
 ## Damage, repairs and recovery keys (1.8.0)
 
 Vehicles have persistent condition. Mobs, arrows and bullets, explosions, fire and crashes
-wear it; a player's own blow does nothing, in creative too, since the crowbar is how a vehicle
-comes up (D-0020). Worn to nothing, a vehicle drops as a packed wreck with its cargo intact.
-Place this wreck on a Mechanic Lift; its engine cannot run until repaired. Older vehicles and
-items start at full condition.
+wear it; a player's own blow is a knock toward packing it, not wear (D-0025). Worn to nothing, a
+vehicle drops as a packed wreck with its cargo intact. Set it down and right-click it back up, or
+repair it on a Mechanic Lift; its engine cannot run until it has some condition. Older vehicles
+and items start at full condition.
 
 Condition shows as a row of ten wrenches above the hunger bar (D-0021), each a tenth, in
 halves: the vehicle you ride, with the trailer it tows above it, or on foot the vehicle under
@@ -236,10 +253,21 @@ up to whole ingots; repair restores full condition without changing fuel or carg
 Full repairs cost 20 steel for Trailblazer, 18 iron for Farmer's Pickup and 12 steel
 for Trailer. Creative repairs require and consume no materials.
 
-Craft a Vehicle Key Fob from two iron ingots, redstone and an ender pearl. Use it on
-a motor vehicle to pair it. Each player has one active pairing; pairing another
-vehicle or replacing a lost fob invalidates the previous key. Use a blank fob in
-air to replace a lost key for your existing vehicle.
+Craft a Vehicle Key Fob from two iron ingots, redstone and an ender pearl. Use a blank one
+on a motor vehicle to pair it: one key per vehicle, as many vehicles as you like (D-0026; before
+1.10.0 a player had one pairing, and a second replaced the first). A key is named for its
+vehicle ("Key to Hauler") and banded in its paint; a blank key's band is grey. Click the vehicle
+with its own key to refresh the mark after a rename or a repaint; recall refreshes it too. A key
+at another vehicle is refused. A blank used on a vehicle you already hold the key to issues a
+new key, and the old one stops working and becomes an ordinary item.
+
+**A paired key is never lost.** It lives on you: your inventory, or a bag you carry. Tossed,
+dropped at a death, put in a chest (or an ender chest, a frame, a pot), dropped inside a bag or a
+shulker box, or found on anyone else, it comes straight back to you -- at your respawn if you
+died, at your login if you were away, and within a second of making room if your inventory and
+bags were full. Only a `/clear` or the creative inventory's bin can take one; for that, use a
+blank key in the air: it becomes the first of your keys that is neither on you nor on its way
+back, marked, and the lost one stops working.
 
 Hold use with the paired fob to locate the vehicle and preview its cost. Continue
 holding for one second to bring it and its currently hitched trailer into inventory,
@@ -264,7 +292,7 @@ A paired broken drop does not despawn or take ordinary damage and can be recalle
 Recall loads only a temporary area around the saved location and transfers the actual
 entity or drop. If someone has already collected the item, the fob cannot produce
 another copy. Keys do not retrieve items from someone else's inventory or a container.
-Breaking or prying loose detaches a trailer; only a currently hitched trailer accompanies
+Breaking or packing up detaches a trailer; only a currently hitched trailer accompanies
 a deployed vehicle's recall. Unload animals before recalling a livestock trailer.
 
 Packed items are transferred when placed even in creative, so their cargo is not
@@ -343,7 +371,7 @@ material; `texture` may then be left out and the embedded texture is used. Paint
 are drawn with the dye as the vertex colour, lifted a quarter of the way toward white
 so a grey swatch reads as paint and not wool; a profile may name a `factory` colour, an
 exact `#rrggbb` no dye is, which an undyed vehicle wears until a dye replaces it and
-which a crowbar and a lift leave alone. `assets/<ns>/lang/en_us.json` names the
+which packing and a lift leave alone. `assets/<ns>/lang/en_us.json` names the
 vehicle under `vehicle.<ns>.<name>`. Keep every texture coordinate inside its swatch:
 the body is drawn through the cutout shader, and a coordinate on a swatch's edge samples
 the neighbour or the atlas's empty padding, whose alpha is zero, which drops the whole
@@ -397,7 +425,7 @@ swing about their hinges when open. Loaded animals lean with the floor as riders
 A vehicle is built from a **chassis** (the vehicle mod's own recipe; the item names the
 vehicle), one **wheel** per wheel position, and an **engine** if the profile has one -- no
 more, no less. Wheels are eight leather around a steel ingot; an engine is two redstone, a
-redstone torch, a diamond and five steel; the crowbar two steel and two iron; the lift two
+redstone torch, a diamond and five steel; the lift two
 pistons, three iron blocks, a redstone block and three smooth stone. Steel is Metals and
 Materials'. Install that required mod separately on both client and server;
 Mod Hub includes the shared version in our pack.
@@ -465,7 +493,7 @@ the fall past ten blocks, hurts and shoves a cow at speed and
 nothing at a walk, pours from a gas can held at it until the can is an empty can, fuels
 nothing from coal and refuses a throttle with an empty tank, crafts the empty can from
 iron and fills it with four coals,
-keeps its chest across a crowbar and a placement, drives a creative driver on an empty tank
+keeps its chest across packing and a placement, drives a creative driver on an empty tank
 and burns for a survival one, takes and ejects a disc, cycles its lamps
 and lights them by itself at night, and its profile round-trips through the codec; a
 lift is placed through its item facing each way and refused over a blocked cell, a hole
@@ -476,7 +504,11 @@ catches the trailer's tongue, tows it straight and through a turn with the tongu
 hitch, lets go on a click, rolls back clear and stays behind as the car drives off (against a
 wall too) and hitches again when the car backs onto it; a lead loads a cow and two calves through open doors and no
 more, shut doors refuse, a lead click with no led animal near says so, the door click shuts them in and a lead at the open door unloads
-them behind; the tow link survives a save.
+them behind; the tow link survives a save; six punches in a row pack a car as it is and a
+pause starts the count again, a rider or another player's key stops them, a damaged car
+repairs a step a click for hunger and then seats; a key per car is named for it, refused at
+another car, and comes back from a toss, a chest, a dropped bag, a stranger, a death and a
+logout.
 The booth photographs the stock car, a red one, the dash from the driver's seat, the lamps at
 night from behind (the beam on the ground, through Luminance) and from the front (the
 faces aglow), and the lift: placed, its menu, the deck up with the car just built on it,

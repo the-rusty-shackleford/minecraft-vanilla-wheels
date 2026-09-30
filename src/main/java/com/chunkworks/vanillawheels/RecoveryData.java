@@ -5,6 +5,7 @@ import com.chunkworks.vanillawheels.domain.Condition;
 import com.chunkworks.vanillawheels.domain.RecallCost;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,27 +35,37 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
- * One active vehicle and fob per player, indexed in overworld SavedData.
- * AF: each entry names the actual deployed vehicle, physical drop, or already-held
- * item. There are no cached cargo copies from which recall could manufacture property.
- * RI: owner/binding indexes agree; one owner per binding; a packed token can deploy
- * only once. Server thread only. Pending requests are transient, bounded to 200 ticks,
- * and release their temporary chunk ticket on every completion/cancellation path.
+ * Every motor vehicle paired to a key, as many per player as they pair, one key per vehicle
+ * (D-0026; D-0014 had one per player), indexed in overworld SavedData.
+ * AF: each entry names the actual deployed vehicle, physical drop, or already-held item, its
+ * owner, its one current key token, and the mark that key wears (the vehicle's name and paint).
+ * There are no cached cargo copies from which recall could manufacture property.
+ * RI: binding/key/located indexes agree; one entry per binding, one per key token; a packed
+ * token can deploy only once. Server thread only. Pending requests are transient, bounded to
+ * 200 ticks, and release their temporary chunk ticket on every completion/cancellation path.
  */
 public final class RecoveryData extends SavedData {
     private enum Place { VEHICLE, DROP, HELD }
     private record Entry(UUID owner, UUID binding, UUID key, Place place, ResourceLocation dimension,
-                         BlockPos position, UUID entity, UUID packed) {}
+                         BlockPos position, UUID entity, UUID packed, KeyFobs.Mark mark) {
+        Entry at(Place place, ResourceLocation dimension, BlockPos position, UUID entity, UUID packed) {
+            return new Entry(owner, binding, key, place, dimension, position, entity, packed, mark);
+        }
+        Entry keyed(UUID key) { return new Entry(owner, binding, key, place, dimension, position, entity, packed, mark); }
+        Entry marked(KeyFobs.Mark mark) { return new Entry(owner, binding, key, place, dimension, position, entity, packed, mark); }
+    }
     private static final UUID NONE = new UUID(0, 0);
     private static final Factory<RecoveryData> FACTORY = new Factory<>(RecoveryData::new, RecoveryData::load);
     private static final TicketType<UUID> TICKET = TicketType.create("vanillawheels_recall", UUID::compareTo, 220);
-    private final Map<UUID, Entry> owners = new HashMap<>();
-    private final Map<UUID, Entry> bindings = new HashMap<>();
+    /** By binding, in pairing order: the order a replacement key looks for a lost one in. */
+    private final Map<UUID, Entry> bindings = new LinkedHashMap<>();
+    private final Map<UUID, Entry> keys = new HashMap<>();
     private final Map<UUID, Entry> located = new HashMap<>();
     private final Map<UUID, Request> requests = new HashMap<>();
 
     private static final class Request {
         final ServerPlayer player;
+        final UUID binding;
         final UUID key;
         final ServerLevel level;
         final ChunkPos chunk;
@@ -62,7 +73,7 @@ public final class RecoveryData extends SavedData {
         long quotedAt = -1;
         @Nullable RecallCost quote;
         Request(ServerPlayer player, Entry entry, ServerLevel level, long started) {
-            this.player = player; this.key = entry.key(); this.level = level;
+            this.player = player; this.binding = entry.binding(); this.key = entry.key(); this.level = level;
             this.chunk = new ChunkPos(entry.position()); this.started = started;
         }
     }
@@ -73,9 +84,9 @@ public final class RecoveryData extends SavedData {
     }
 
     private void put(Entry entry) {
-        Entry old = owners.put(entry.owner(), entry);
-        if (old != null) { bindings.remove(old.binding()); located.remove(old.entity()); }
-        bindings.put(entry.binding(), entry);
+        Entry old = bindings.put(entry.binding(), entry);
+        if (old != null) { keys.remove(old.key()); located.remove(old.entity()); }
+        keys.put(entry.key(), entry);
         if (entry.place() != Place.HELD) located.put(entry.entity(), entry);
         setDirty();
     }
@@ -89,8 +100,10 @@ public final class RecoveryData extends SavedData {
             if (dimension == null || !value.hasUUID("Owner") || !value.hasUUID("Binding") || !value.hasUUID("Key")) continue;
             int place = value.getInt("Place");
             if (place < 0 || place >= Place.values().length) continue;
+            // Before 1.10.0 a pairing had no mark: its key shows it from the next click at its vehicle or recall.
+            KeyFobs.Mark mark = value.contains("Mark") ? KeyFobs.Mark.load(value.getCompound("Mark"), registries) : KeyFobs.Mark.NONE;
             result.put(new Entry(value.getUUID("Owner"), value.getUUID("Binding"), value.getUUID("Key"), Place.values()[place],
-                    dimension, BlockPos.of(value.getLong("Position")), value.getUUID("Entity"), value.getUUID("Packed")));
+                    dimension, BlockPos.of(value.getLong("Position")), value.getUUID("Entity"), value.getUUID("Packed"), mark));
         }
         return result;
     }
@@ -98,54 +111,97 @@ public final class RecoveryData extends SavedData {
     /** requires: server thread; effects: serializes indexes without cargo snapshots; throws: none. */
     @Override public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         ListTag list = new ListTag();
-        for (Entry entry : owners.values()) {
+        for (Entry entry : bindings.values()) {
             CompoundTag row = new CompoundTag();
             row.putUUID("Owner", entry.owner()); row.putUUID("Binding", entry.binding()); row.putUUID("Key", entry.key());
             row.putInt("Place", entry.place().ordinal()); row.putString("Dimension", entry.dimension().toString());
             row.putLong("Position", entry.position().asLong()); row.putUUID("Entity", entry.entity()); row.putUUID("Packed", entry.packed());
+            if (!KeyFobs.Mark.NONE.equals(entry.mark())) row.put("Mark", entry.mark().save(registries));
             list.add(row);
         }
         tag.put("Bindings", list);
         return tag;
     }
 
-    /** requires: real server interaction; effects: inserts/pairs the key, replacing this owner's previous pairing; throws: none. */
+    /** requires: server thread; effects: the player whose key {@code binding} is paired to; null for none or an unknown pairing; throws: none. */
+    @Nullable public UUID ownerOf(@Nullable UUID binding) {
+        Entry entry = binding == null ? null : bindings.get(binding);
+        return entry == null ? null : entry.owner();
+    }
+
+    /** requires: none; effects: whether {@code token} is some vehicle's current key: a key that is never lost (KeyFobs); throws: none. */
+    public boolean isCurrent(@Nullable UUID token) { return token != null && keys.containsKey(token); }
+
+    /**
+     * requires: real server interaction.
+     * effects: a key clicked at a motor vehicle (D-0026). A blank key -- or one whose pairing has
+     *     moved on -- pairs it: a new pairing, or for the vehicle's own owner a fresh key that
+     *     retires the old one. The vehicle's current key refreshes its mark (its name and paint).
+     *     Another vehicle's key is refused, as is a vehicle another player holds the key to.
+     *     Pairing leaves the player's other pairings be.
+     * throws: none.
+     */
     public boolean bind(ServerPlayer player, Vehicle vehicle, ItemStack key) {
         if (vehicle.tank().capacity() == 0) return fail(player, "motor_vehicle");
         Entry existing = bindings.get(vehicle.binding());
+        Entry keyed = keys.get(key.get(ModContent.KEY_TOKEN.get()));
+        KeyFobs.Mark mark = KeyFobs.Mark.of(vehicle);
+        if (keyed != null && existing != null && keyed.binding().equals(existing.binding())) {
+            put(existing.marked(mark));
+            KeyFobs.mark(key, mark);
+            tell(player, "marked", vehicle.getName());
+            return true;
+        }
+        if (keyed != null) return fail(player, "other_vehicle", KeyFobs.Mark.NONE.equals(keyed.mark())
+                ? Component.translatable("vanillawheels.key.another_vehicle") : keyed.mark().name());
         if (existing != null && !existing.owner().equals(player.getUUID())) return fail(player, "other_owner");
         cancel(player.getUUID());
         UUID binding = existing == null ? UUID.randomUUID() : existing.binding();
         UUID token = UUID.randomUUID();
         put(new Entry(player.getUUID(), binding, token, Place.VEHICLE, vehicle.level().dimension().location(),
-                vehicle.blockPosition(), vehicle.getUUID(), NONE));
+                vehicle.blockPosition(), vehicle.getUUID(), NONE, mark));
         vehicle.binding(binding);
         key.set(ModContent.KEY_OWNER.get(), player.getUUID()); key.set(ModContent.KEY_TOKEN.get(), token);
         key.set(ModContent.VEHICLE.get(), vehicle.profileId());
+        KeyFobs.mark(key, mark);
         tell(player, "paired", vehicle.getName());
         return true;
     }
 
-    /** requires: unpaired key; effects: replaces a lost fob for the owner's existing pairing; throws: none. */
+    /**
+     * requires: a blank key used in the air.
+     * effects: replaces a key of the player's that is gone -- not on them and not on its way home
+     *     (KeyFobs), as a /clear leaves one -- the first such in pairing order: the blank becomes it,
+     *     marked, and the lost one stops working. Says so when every key of theirs is with them.
+     * throws: none.
+     */
     public boolean replacement(ServerPlayer player, ItemStack key) {
-        Entry old = owners.get(player.getUUID());
-        if (old == null) return fail(player, "unpaired");
-        UUID token = UUID.randomUUID();
-        put(new Entry(old.owner(), old.binding(), token, old.place(), old.dimension(), old.position(), old.entity(), old.packed()));
-        key.set(ModContent.KEY_OWNER.get(), player.getUUID()); key.set(ModContent.KEY_TOKEN.get(), token);
-        tell(player, "replacement");
-        return true;
+        boolean paired = false;
+        KeyFobs fobs = KeyFobs.get(player.server);
+        for (Entry entry : bindings.values()) {
+            if (!entry.owner().equals(player.getUUID())) continue;
+            paired = true;
+            if (KeyFobs.onPerson(player, entry.key()) || fobs.waitingFor(entry.key())) continue;
+            UUID token = UUID.randomUUID();
+            put(entry.keyed(token));
+            key.set(ModContent.KEY_OWNER.get(), player.getUUID()); key.set(ModContent.KEY_TOKEN.get(), token);
+            KeyFobs.mark(key, entry.mark());
+            tell(player, "replacement", KeyFobs.Mark.NONE.equals(entry.mark()) ? Component.translatable("vanillawheels.key.another_vehicle") : entry.mark().name());
+            return true;
+        }
+        return fail(player, paired ? "all_here" : "unpaired");
     }
 
-    private boolean validKey(ServerPlayer player, ItemStack key, @Nullable Entry entry) {
+    @Nullable private Entry entryOf(ServerPlayer player, ItemStack key) {
+        Entry entry = keys.get(key.get(ModContent.KEY_TOKEN.get()));
         return entry != null && key.is(ModContent.KEY_FOB.get()) && player.getUUID().equals(key.get(ModContent.KEY_OWNER.get()))
-                && entry.key().equals(key.get(ModContent.KEY_TOKEN.get()));
+                && entry.owner().equals(player.getUUID()) ? entry : null;
     }
 
-    /** requires: server thread, key in hand; effects: starts a cancellable hold-to-recall, temporarily loading only the target area; throws: none. */
+    /** requires: server thread, key in hand; effects: starts a cancellable hold-to-recall of the key's vehicle, temporarily loading only the target area; throws: none. */
     public boolean begin(ServerPlayer player, ItemStack key) {
-        Entry entry = owners.get(player.getUUID());
-        if (!validKey(player, key, entry)) return fail(player, "stale");
+        Entry entry = entryOf(player, key);
+        if (entry == null) return fail(player, "stale");
         if (entry.place() == Place.HELD) return fail(player, "collected");
         ServerLevel level = player.server.getLevel(ResourceKey.create(Registries.DIMENSION, entry.dimension()));
         if (level == null) return fail(player, "missing");
@@ -171,8 +227,7 @@ public final class RecoveryData extends SavedData {
         if (entry == null || entry.place() != place || !entry.entity().equals(entity.getUUID())) return;
         if (entry.position().getX() >> 4 != entity.getBlockX() >> 4 || entry.position().getZ() >> 4 != entity.getBlockZ() >> 4
                 || !entry.dimension().equals(entity.level().dimension().location()))
-            put(new Entry(entry.owner(), entry.binding(), entry.key(), place, entity.level().dimension().location(),
-                    entity.blockPosition(), entry.entity(), entry.packed()));
+            put(entry.at(place, entity.level().dimension().location(), entity.blockPosition(), entry.entity(), entry.packed()));
     }
 
     /** requires: server thread; effects: marks the exact packed stack as held, invalidating earlier incarnations; throws: none. */
@@ -180,7 +235,7 @@ public final class RecoveryData extends SavedData {
         Entry entry = bindings.get(stack.get(ModContent.BINDING.get()));
         UUID token = stack.get(ModContent.PACKED_TOKEN.get());
         if (entry != null && token != null)
-            put(new Entry(entry.owner(), entry.binding(), entry.key(), Place.HELD, entry.dimension(), entry.position(), entry.entity(), token));
+            put(entry.at(Place.HELD, entry.dimension(), entry.position(), entry.entity(), token));
     }
 
     /** requires: server thread and an actual drop; effects: protects a recoverable drop and records its location; throws: none. */
@@ -190,8 +245,7 @@ public final class RecoveryData extends SavedData {
         UUID token = stack.get(ModContent.PACKED_TOKEN.get());
         if (entry == null || token == null) return;
         drop.setInvulnerable(true); drop.setUnlimitedLifetime();
-        put(new Entry(entry.owner(), entry.binding(), entry.key(), Place.DROP, drop.level().dimension().location(),
-                drop.blockPosition(), drop.getUUID(), token));
+        put(entry.at(Place.DROP, drop.level().dimension().location(), drop.blockPosition(), drop.getUUID(), token));
     }
 
     /** requires: server thread; effects: rejects a copied/stale packed incarnation; an old unpaired vehicle remains usable; throws: none. */
@@ -210,8 +264,7 @@ public final class RecoveryData extends SavedData {
                 oldDrop.setItem(ItemStack.EMPTY); oldDrop.discard();
             }
         }
-        put(new Entry(entry.owner(), entry.binding(), entry.key(), Place.VEHICLE, vehicle.level().dimension().location(),
-                vehicle.blockPosition(), vehicle.getUUID(), NONE));
+        put(entry.at(Place.VEHICLE, vehicle.level().dimension().location(), vehicle.blockPosition(), vehicle.getUUID(), NONE));
     }
 
     /** requires: server event; effects: refuses stale world copies and tracks legitimate dropped packed vehicles; throws: none. */
@@ -241,7 +294,7 @@ public final class RecoveryData extends SavedData {
         // The stack may already be empty after pickup. Resolve by entity id in constant time.
         Entry entry = data.located.get(item.getUUID());
         if (entry != null && entry.place() == Place.DROP)
-            data.put(new Entry(entry.owner(), entry.binding(), entry.key(), Place.HELD, entry.dimension(), entry.position(), entry.entity(), entry.packed()));
+            data.put(entry.at(Place.HELD, entry.dimension(), entry.position(), entry.entity(), entry.packed()));
     }
 
     /** requires: server event; effects: updates a bound drop's locator only on crossing a chunk boundary; throws: none. */
@@ -260,8 +313,8 @@ public final class RecoveryData extends SavedData {
         long now = server.overworld().getGameTime();
         for (Request request : List.copyOf(requests.values())) {
             ServerPlayer player = request.player;
-            Entry entry = owners.get(player.getUUID());
-            if (!player.isAlive() || !player.isUsingItem() || !validKey(player, player.getUseItem(), entry) || !request.key.equals(entry.key())) {
+            Entry entry = bindings.get(request.binding);
+            if (!player.isAlive() || !player.isUsingItem() || entry == null || entryOf(player, player.getUseItem()) != entry || !request.key.equals(entry.key())) {
                 cancel(player.getUUID()); continue;
             }
             if (now - request.started > 200) { finish(request, "missing"); continue; }
@@ -313,6 +366,11 @@ public final class RecoveryData extends SavedData {
         RecallCost cost = quote(request, vehicle, vehicle.tank().capacity(), vehicle.tank().ticks(), vehicle.condition());
         if (!confirmed(request, cost, vehicle.condition(), vehicle.tank().capacity(), now)) return;
         vehicle.setFuel(cost.fuelAfter()); vehicle.setCondition(cost.conditionAfter().remaining());
+        // The key names and bands itself for the vehicle as it is now: renamed or repainted since.
+        KeyFobs.Mark mark = KeyFobs.Mark.of(vehicle);
+        Entry entry = bindings.get(request.binding);
+        if (entry != null) put(entry.marked(mark));
+        KeyFobs.mark(request.player.getUseItem(), mark);
         List<ItemStack> packed = chain.stream().map(Vehicle::toItem).toList();
         for (int i = 0; i < chain.size(); i++) {
             held(packed.get(i));
@@ -325,8 +383,8 @@ public final class RecoveryData extends SavedData {
 
     private void recallDrop(Request request, ItemEntity item, long now) {
         ItemStack stack = item.getItem();
-        Entry entry = owners.get(request.player.getUUID());
-        if (!stack.is(ModContent.VEHICLE_ITEM.get()) || !entry.binding().equals(stack.get(ModContent.BINDING.get()))
+        Entry entry = bindings.get(request.binding);
+        if (entry == null || !stack.is(ModContent.VEHICLE_ITEM.get()) || !entry.binding().equals(stack.get(ModContent.BINDING.get()))
                 || !entry.packed().equals(stack.get(ModContent.PACKED_TOKEN.get()))) { finish(request, "missing"); return; }
         var profile = com.chunkworks.vanillawheels.api.VanillaWheels.vehicleOf(stack)
                 .flatMap(id -> com.chunkworks.vanillawheels.api.VanillaWheels.profile(request.level.registryAccess(), id));
@@ -350,7 +408,7 @@ public final class RecoveryData extends SavedData {
     private void finish(Request request, String message) {
         cancel(request.player.getUUID()); request.player.stopUsingItem(); tell(request.player, message);
     }
-    private static boolean fail(ServerPlayer player, String message) { tell(player, message); return false; }
+    private static boolean fail(ServerPlayer player, String message, Object... args) { tell(player, message, args); return false; }
     private static void tell(ServerPlayer player, String key, Object... args) {
         player.displayClientMessage(Component.translatable("vanillawheels.key." + key, args), true);
     }

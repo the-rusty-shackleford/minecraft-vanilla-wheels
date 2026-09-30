@@ -144,6 +144,12 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         poseStack.mulPose(Axis.YP.rotationDegrees(-yaw));
         poseStack.mulPose(Axis.XP.rotation((float) pose.pitch()));
         poseStack.mulPose(Axis.ZP.rotation((float) pose.roll()));
+        // A blow rocks it side to side as one rocks a boat, harder the more knocks it has to shake off (D-0025).
+        float rocking = vehicle.getHurtTime() - partialTick;
+        if (rocking > 0.0f) {
+            float weight = Math.max(0.0f, vehicle.getDamage() - partialTick);
+            poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.sin(rocking) * rocking * weight / 20.0f * vehicle.getHurtDir()));
+        }
 
         // No hurt tint: a vehicle is not a mob. Its condition shows as the wrench row (WrenchBar).
         int overlay = OverlayTexture.NO_OVERLAY;
@@ -229,11 +235,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
     }
 
     static int colourOf(@Nullable DyeColor dye, VehicleProfile p) {
-        if (dye != null) {
-            return 0xFF000000 | Paint.lift(dye.getTextureDiffuseColor());
-        }
-        return p.paint().map(pp -> pp.factory().map(rgb -> 0xFF000000 | rgb)
-                .orElseGet(() -> 0xFF000000 | Paint.lift(pp.defaultColor().getTextureDiffuseColor()))).orElse(MeshDrawer.WHITE);
+        return Vehicle.colourOf(dye, p);
     }
 
     /** effects: applies {@code r} to the pose stack: a turn about its axis through its pivot */

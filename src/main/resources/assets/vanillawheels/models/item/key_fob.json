@@ -4,7 +4,8 @@
     "plastic": "minecraft:block/black_concrete",
     "steel": "minecraft:block/iron_block",
     "button": "minecraft:block/redstone_block",
-    "particle": "minecraft:block/iron_block"
+    "particle": "minecraft:block/iron_block",
+    "band": "minecraft:block/white_concrete"
   },
   "elements": [
     {
@@ -72,6 +73,80 @@
             16,
             16
           ]
+        }
+      }
+    },
+    {
+      "from": [
+        4.75,
+        13.25,
+        6.75
+      ],
+      "to": [
+        11.25,
+        14.25,
+        9.25
+      ],
+      "faces": {
+        "north": {
+          "texture": "#band",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "tintindex": 0
+        },
+        "south": {
+          "texture": "#band",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "tintindex": 0
+        },
+        "east": {
+          "texture": "#band",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "tintindex": 0
+        },
+        "west": {
+          "texture": "#band",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "tintindex": 0
+        },
+        "up": {
+          "texture": "#band",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "tintindex": 0
+        },
+        "down": {
+          "texture": "#band",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "tintindex": 0
         }
       }
     },

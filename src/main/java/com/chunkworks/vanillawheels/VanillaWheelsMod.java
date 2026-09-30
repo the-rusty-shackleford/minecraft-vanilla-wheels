@@ -51,12 +51,15 @@ public final class VanillaWheelsMod {
         NeoForge.EVENT_BUS.addListener(RecoveryData::onLeave);
         NeoForge.EVENT_BUS.addListener(RecoveryData::onEntityTick);
         NeoForge.EVENT_BUS.addListener(RecoveryData::onTick);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onEntityJoin);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onOpen);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onClose);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onEntityInteract);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onEntityInteractSpecific);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onRightClickBlock);
-        NeoForge.EVENT_BUS.addListener(OwnCrowbars::onServerTick);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onEntityJoin);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onDeath);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onLoggedIn);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onRespawn);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onOpen);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onClose);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onEntityInteract);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onEntityInteractSpecific);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onServerTick);
     }
 }

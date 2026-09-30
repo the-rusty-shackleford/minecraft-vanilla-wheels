@@ -181,12 +181,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     @Nullable private UUID trailerUuid;
     /** The tower this trailer was let go from by hand, which does not catch it again until they part (D-0022); never saved. */
     @Nullable private UUID releasedFrom;
-    /** This vehicle's own id, kept through packing, placing and recall: what its own crowbar is marked with (D-0023). */
-    @Nullable private UUID vehicleId;
-    /** The toolbox's one slot: this vehicle's own crowbar, or empty while someone carries it (D-0023). */
-    private ItemStack ownCrowbar = ItemStack.EMPTY;
-    /** How many players have this vehicle's toolbox open; the server's count, like a chest's openers. */
-    private int toolboxOpeners;
+    /** Players' punches in a row toward packing it up (D-0025); the server's, never saved. */
+    private com.chunkworks.vanillawheels.domain.Knocks knocks = com.chunkworks.vanillawheels.domain.Knocks.NONE;
     /** The doors' swing on the client, 0 shut to 1 open, eased toward the synced state. */
     private float doorSwing;
     private float doorSwingO;
@@ -1195,6 +1191,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     @Override
     public void tick() {
         super.tick();
+        // A blow's rock fades as a boat's does (VehicleRenderer draws it).
+        if (getHurtTime() > 0) setHurtTime(getHurtTime() - 1);
+        if (getDamage() > 0.0f) setDamage(Math.max(0.0f, getDamage() - 1.0f));
         if (recoveryBinding != null && level() instanceof ServerLevel server) RecoveryData.get(server.getServer()).track(this);
         VehicleProfile p = profile();
         tickLerp();
@@ -2008,14 +2007,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, held);
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
-        // A crowbar pries the vehicle loose, crouching or not: it means nothing else at a vehicle,
-        // so it goes before a chest or a door (D-0020).
-        if (held.is(ModContent.PRIES_VEHICLES)) {
-            if (!level().isClientSide()) {
-                pickUp(player, hand);
-            }
-            return InteractionResult.sidedSuccess(level().isClientSide());
-        }
         // A chest the click lands in: opens, crouching or not, before anything else the click could
         // mean. A chest further along the click's line waits its turn, after every other gesture,
         // so a click on the radio ejects the disc even with a chest behind it.
@@ -2036,7 +2027,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return InteractionResult.PASS;
     }
 
-    /** effects: the crouching gestures at {@code hit}: the tongue, a door, unloading, the radio, else the toolbox; PASS for none */
+    /** effects: the crouching gestures at {@code hit}: the tongue, a door, unloading, the radio; PASS for none */
     private InteractionResult gestureAt(VehicleProfile p, Player player, ItemStack held, Vec3 hit) {
         if (player.isSecondaryUseActive()) {
             // The tongue, when hitched: let go.
@@ -2074,13 +2065,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 if (!level().isClientSide()) {
                     Carried.giveOrDrop(player, disc());
                     entityData.set(DATA_DISC, ItemStack.EMPTY);
-                }
-                return InteractionResult.sidedSuccess(level().isClientSide());
-            }
-            // Anywhere else on the body, empty-handed: the toolbox, its own crowbar's slot (D-0023).
-            if (held.isEmpty()) {
-                if (player instanceof ServerPlayer server) {
-                    openToolbox(server);
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }
@@ -2122,6 +2106,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         // can's use and it pours while held (GasCanItem). Coal in hand is only coal now.
         if (held.is(ModContent.GAS_CAN.get()) || held.is(ModContent.EMPTY_GAS_CAN.get())) {
             return InteractionResult.PASS;
+        }
+        // Damaged, the click that would seat the player repairs it a step instead, until it is
+        // whole; then the same click gets in (D-0025, as Immersive Aircraft does).
+        if (condition() < com.chunkworks.vanillawheels.domain.Condition.MAX && !hasPassenger(player)) {
+            if (!level().isClientSide()) {
+                handRepair(player, p);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide());
         }
         if (!level().isClientSide()) {
             if (canAddPassenger(player)) {
@@ -2230,19 +2222,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return where.distanceTo(hit) <= radius;
     }
 
-    /**
-     * effects: transfers this vehicle and every chest slot into a single packed item; pried with
-     * its own crowbar, the crowbar goes back into its slot and travels inside (D-0023)
-     */
-    private void pickUp(Player player, InteractionHand hand) {
+    /** effects: transfers this vehicle and every chest slot into a single packed item, into the player's inventory, else dropped where it stood */
+    private void pickUp(Player player) {
         if (storageOpen()) {
             player.displayClientMessage(Component.translatable("vanillawheels.key.occupied"), true);
             return;
-        }
-        ItemStack pry = player.getItemInHand(hand);
-        if (ownCrowbar.isEmpty() && OwnCrowbars.belongsTo(pry, vehicleId)) {
-            ownCrowbar = pry.copyWithCount(1);
-            player.setItemInHand(hand, ItemStack.EMPTY);
         }
         ItemStack item = toItem();
         RecoveryData data = RecoveryData.get(((ServerLevel) level()).getServer());
@@ -2280,8 +2264,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         stack.set(ModContent.CONDITION.get(), condition());
         stack.set(ModContent.CARGO.get(), VehicleCargo.capture(items));
         stack.set(ModContent.PACKED_TOKEN.get(), java.util.UUID.randomUUID());
-        if (vehicleId != null) stack.set(ModContent.VEHICLE_ID.get(), vehicleId);
-        if (!ownCrowbar.isEmpty()) stack.set(ModContent.OWN_CROWBAR.get(), new HeldStack(ownCrowbar));
         if (recoveryBinding != null) stack.set(ModContent.BINDING.get(), recoveryBinding);
         if (getCustomName() != null) stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, getCustomName());
         if (!disc().isEmpty()) {
@@ -2298,9 +2280,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         for (int i = 0; i < items.size(); i++) items.set(i, i < unpacked.size() ? unpacked.get(i) : ItemStack.EMPTY);
         setCondition(stack.getOrDefault(ModContent.CONDITION.get(), com.chunkworks.vanillawheels.domain.Condition.MAX));
         recoveryBinding = stack.get(ModContent.BINDING.get());
-        vehicleId = stack.get(ModContent.VEHICLE_ID.get());
-        HeldStack crowbar = stack.get(ModContent.OWN_CROWBAR.get());
-        ownCrowbar = crowbar == null ? ItemStack.EMPTY : crowbar.copy();
         setCustomName(stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME));
         DyeColor paint = stack.get(ModContent.PAINT.get());
         if (paint != null) {
@@ -2322,7 +2301,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         packedRemoval = true;
         for (int i = 0; i < items.size(); i++) items.set(i, ItemStack.EMPTY);
         entityData.set(DATA_DISC, ItemStack.EMPTY);
-        ownCrowbar = ItemStack.EMPTY;
         ejectPassengers();
         discard();
     }
@@ -2332,50 +2310,99 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** effects: returns this client's watch on the condition, told once a tick, for the wrench row's blink */
     public com.chunkworks.vanillawheels.domain.WrenchRow.Watch wrenchWatch() { return wrenchWatch; }
 
-    // --- its own crowbar (D-0023) -------------------------------------------
+    /** effects: the colour a vehicle of profile {@code p} painted {@code dye} shows, ARGB: the dye lifted, else the profile's factory colour or default dye (VehicleRenderer, a key's band) */
+    public static int colourOf(@Nullable DyeColor dye, VehicleProfile p) {
+        if (dye != null) {
+            return 0xFF000000 | com.chunkworks.vanillawheels.domain.Paint.lift(dye.getTextureDiffuseColor());
+        }
+        return p.paint().map(pp -> pp.factory().map(rgb -> 0xFF000000 | rgb)
+                .orElseGet(() -> 0xFF000000 | com.chunkworks.vanillawheels.domain.Paint.lift(pp.defaultColor().getTextureDiffuseColor()))).orElse(0xFFFFFFFF);
+    }
 
-    /** effects: returns this vehicle's own id; null only before it first enters a server level */
-    @Nullable public UUID vehicleId() { return vehicleId; }
-    /** effects: returns what the toolbox holds: this vehicle's own crowbar, or empty */
-    public ItemStack ownCrowbar() { return ownCrowbar; }
-    /** requires: {@code crowbar} empty or this vehicle's own crowbar; effects: puts it in the toolbox */
-    public void setOwnCrowbar(ItemStack crowbar) { ownCrowbar = crowbar; }
+    /** effects: rocks the vehicle as a blow rocks a boat, the harder the more {@code weight} it has left to shake off */
+    private void rock(float weight) {
+        setHurtDir(-getHurtDir());
+        setHurtTime(10);
+        setDamage(Math.min(20.0f, getDamage() + weight));
+    }
 
     /**
-     * effects: on the server, a vehicle entering a level without an id -- just built, placed from a
-     * catalogue item, or saved before 1.10.0 -- gets one and its own crowbar; then it is indexed and
-     * handed any crowbar that went home while it was packed or unloaded
+     * requires: server thread; {@code player}'s own blow has landed.
+     * effects: a knock toward packing the vehicle up (D-0025): it rocks, and the sixth punch in a row
+     *     ({@link com.chunkworks.vanillawheels.domain.Knocks}) packs it into the player's hands as it
+     *     is -- condition, cargo, fuel, paint, disc, name and key kept ({@link #pickUp}); in creative
+     *     the first does. Nobody packs a vehicle while anyone rides it, and one paired to a key -- or
+     *     hitched behind one that is -- packs only for the key's owner, or for a creative player.
+     *     Refused, it says why and counts nothing.
      */
-    @Override
-    public void onAddedToLevel() {
-        super.onAddedToLevel();
-        if (level() instanceof ServerLevel server) {
-            if (vehicleId == null) {
-                vehicleId = UUID.randomUUID();
-                ownCrowbar = OwnCrowbars.mint(vehicleId, profileId);
+    private void knock(Player player) {
+        if (!getPassengers().isEmpty()) {
+            player.displayClientMessage(Component.translatable("vanillawheels.pack.aboard"), true);
+            return;
+        }
+        if (!mayPack(player)) {
+            player.displayClientMessage(Component.translatable("vanillawheels.pack.not_yours"), true);
+            return;
+        }
+        rock(10.0f);
+        knocks = player.hasInfiniteMaterials()
+                ? new com.chunkworks.vanillawheels.domain.Knocks(com.chunkworks.vanillawheels.domain.Knocks.TO_PACK, level().getGameTime())
+                : knocks.knocked(level().getGameTime());
+        if (knocks.packs()) {
+            knocks = com.chunkworks.vanillawheels.domain.Knocks.NONE;
+            pickUp(player);
+        }
+    }
+
+    /** requires: server thread; effects: whether {@code player} may pack this vehicle: anyone, unless it is paired, then its key's owner or a creative player */
+    private boolean mayPack(Player player) {
+        if (player.hasInfiniteMaterials() || !(level() instanceof ServerLevel server)) {
+            return true;
+        }
+        UUID owner = RecoveryData.get(server.getServer()).ownerOf(pairedBinding());
+        return owner == null || owner.equals(player.getUUID());
+    }
+
+    /** effects: the pairing this vehicle packs under: its own, else the nearest one up its tow chain; null for none */
+    @Nullable private UUID pairedBinding() {
+        Vehicle v = this;
+        for (int i = 0; v != null && i < 8; i++, v = v.tower()) {
+            if (v.binding() != null) {
+                return v.binding();
             }
-            OwnCrowbars.get(server.getServer()).arrived(this);
         }
+        return null;
     }
 
-    @Override
-    public void onRemovedFromLevel() {
-        super.onRemovedFromLevel();
+    /**
+     * requires: server thread; a damaged vehicle, {@code player} not aboard it.
+     * effects: a repair by hand (D-0025, after Immersive Aircraft): the condition rises a step
+     *     ({@link com.chunkworks.vanillawheels.domain.HandRepair#STEP}) and the player tires in
+     *     proportion to the vehicle's repair job; in creative it is whole at once and costs nothing.
+     *     Says how far along it is, or that the player is too hungry to work.
+     */
+    private void handRepair(Player player, VehicleProfile p) {
+        boolean creative = player.hasInfiniteMaterials();
+        if (!creative && player.getFoodData().getFoodLevel() <= 0) {
+            player.displayClientMessage(Component.translatable("vanillawheels.repair.too_hungry"), true);
+            return;
+        }
+        int after = creative ? com.chunkworks.vanillawheels.domain.Condition.MAX
+                : com.chunkworks.vanillawheels.domain.HandRepair.clicked(new com.chunkworks.vanillawheels.domain.Condition(condition())).remaining();
+        if (!creative) {
+            player.causeFoodExhaustion(com.chunkworks.vanillawheels.domain.HandRepair.exhaustion(p.repair().fullCost()));
+        }
+        setCondition(after);
+        int percent = after / 100;
+        player.displayClientMessage(Component.translatable("vanillawheels.repaired", percent).withStyle(
+                percent < 33 ? net.minecraft.ChatFormatting.RED : percent < 66 ? net.minecraft.ChatFormatting.GOLD : net.minecraft.ChatFormatting.GREEN), true);
+        level().playSound(null, getX(), getY(), getZ(), ModContent.CLANK.get(), SoundSource.PLAYERS, 0.6f, 0.9f + random.nextFloat() * 0.3f);
         if (level() instanceof ServerLevel server) {
-            OwnCrowbars.get(server.getServer()).left(this);
+            server.sendParticles(net.minecraft.core.particles.ParticleTypes.WAX_OFF, getX(), getY() + p.body().height() * 0.6, getZ(),
+                    6, p.body().width() * 0.4, p.body().height() * 0.3, p.body().length() * 0.3, 0.0);
         }
     }
 
-    /** effects: opens this vehicle's toolbox, its one slot, to {@code player} */
-    private void openToolbox(ServerPlayer player) {
-        player.openMenu(new net.minecraft.world.SimpleMenuProvider((id, inventory, p) -> new ToolboxMenu(id, inventory, this),
-                Component.translatable("vanillawheels.toolbox", getName())));
-    }
-
-    /** effects: counts a player in or out at the toolbox; an open toolbox holds the vehicle as an open chest does */
-    void toolboxOpened(boolean open) {
-        toolboxOpeners = Math.max(0, toolboxOpeners + (open ? 1 : -1));
-    }
     /** requires: none; effects: clamps and syncs condition; a wreck cannot power its engine; throws: none. */
     public void setCondition(int remaining) { entityData.set(DATA_CONDITION, Math.max(0, Math.min(10000, remaining))); }
     /** requires: none; effects: returns the optional server recovery identity; throws: none. */
@@ -2387,7 +2414,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** requires: server thread; effects: marks the bounded addFreshEntity placement transaction; throws: none. */
     public void placingFromItem(boolean value) { placingFromItem = value; }
     /** requires: none; effects: reports whether any chest is currently open; throws: none. */
-    public boolean storageOpen() { if (toolboxOpeners > 0) return true; for (int count : openers) if (count > 0) return true; return false; }
+    public boolean storageOpen() { for (int count : openers) if (count > 0) return true; return false; }
     /** requires: none; effects: reports a saved tow link, including one still loading; throws: none. */
     public boolean hasSavedTrailer() { return trailerUuid != null; }
     /** requires: server thread; effects: resolves saved links and returns the trailer if loaded; throws: none. */
@@ -2513,14 +2540,18 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /**
      * Persistent wear replaces vanilla's transient boat hit counter; five points of damage break a pristine vehicle.
-     * A player's own blow does nothing -- the crowbar is how a vehicle comes up (D-0020) -- while mobs, arrows,
+     * A player's own blow is a knock, not wear: six in a row pack the vehicle up (D-0025) -- while mobs, arrows,
      * bullets, explosions, fire and crashes still wear it.
      */
     @Override public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (level().isClientSide() || isRemoved()) return true;
-        if (source.isDirect() && source.getEntity() instanceof Player) return false;
+        if (source.isDirect() && source.getEntity() instanceof Player player) {
+            knock(player);
+            return true;
+        }
         if (isInvulnerableTo(source) || !Float.isFinite(amount) || amount <= 0) return false;
-        setHurtDir(-getHurtDir()); setHurtTime(10); markHurt();
+        rock(10.0f);
+        markHurt();
         setCondition(condition() - (int) Math.min(10000, Math.ceil(amount * 2000.0)));
         gameEvent(GameEvent.ENTITY_DAMAGE, source.getEntity());
         if (condition() == 0) destroy(source);
@@ -2584,8 +2615,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             tag.putUUID("Trailer", trailerUuid);
         }
         tag.putBoolean("DoorsOpen", doorsOpen());
-        if (vehicleId != null) tag.putUUID("VehicleId", vehicleId);
-        if (!ownCrowbar.isEmpty()) tag.put("OwnCrowbar", ownCrowbar.save(registryAccess()));
         addChestVehicleSaveData(tag, registryAccess());
         // Preserve slots above 255 too; the old ContainerEntity format uses a byte slot index.
         tag.remove("Items");
@@ -2606,8 +2635,6 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         towerUuid = tag.hasUUID("Tower") ? tag.getUUID("Tower") : null;
         trailerUuid = tag.hasUUID("Trailer") ? tag.getUUID("Trailer") : null;
         entityData.set(DATA_DOORS, tag.getBoolean("DoorsOpen"));
-        vehicleId = tag.hasUUID("VehicleId") ? tag.getUUID("VehicleId") : null;
-        ownCrowbar = tag.contains("OwnCrowbar") ? ItemStack.parse(registryAccess(), tag.getCompound("OwnCrowbar")).orElse(ItemStack.EMPTY) : ItemStack.EMPTY;
         doorSwing = doorsOpen() ? 1.0f : 0.0f;
         doorSwingO = doorSwing;
         if (id != null) {

@@ -15,8 +15,10 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 
 /**
- * A paired key and fob. Use on a motor vehicle to pair; hold in air to quote and
- * recall. A blank replacement used in air invalidates the owner's old fob.
+ * A key and fob, one per vehicle (D-0026). A blank key used on a motor vehicle pairs it and
+ * takes its mark (its name, and a band in its paint); held in the air, a paired key quotes
+ * and recalls its vehicle; a blank used in the air replaces a key of the owner's that is gone.
+ * A paired key is never lost (KeyFobs).
  * AF/RI: item components are claims only; RecoveryData verifies server ownership.
  */
 public final class KeyFobItem extends Item {
@@ -45,8 +47,11 @@ public final class KeyFobItem extends Item {
     }
 
     @Override public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable(stack.has(ModContent.KEY_TOKEN.get()) ? "vanillawheels.key.hold" : "vanillawheels.key.bind_help")
-                .withStyle(ChatFormatting.GRAY));
+        boolean paired = stack.has(ModContent.KEY_TOKEN.get());
+        tooltip.add(Component.translatable(paired ? "vanillawheels.key.hold" : "vanillawheels.key.bind_help").withStyle(ChatFormatting.GRAY));
+        if (paired) {
+            tooltip.add(Component.translatable("vanillawheels.key.keeps").withStyle(ChatFormatting.GRAY));
+        }
         tooltip.add(Component.translatable("vanillawheels.key.cost_help").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

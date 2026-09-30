@@ -102,14 +102,9 @@ public final class ModContent {
     /** The owner and current active fob token. Replacing a key invalidates older tokens. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> KEY_OWNER = uuidComponent("key_owner");
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> KEY_TOKEN = uuidComponent("key_token");
-    /** A packed vehicle's own id, which its own crowbar is marked with (D-0023). */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> VEHICLE_ID = uuidComponent("vehicle_id");
-    /** What a packed vehicle's toolbox holds: its own crowbar, if it is aboard (D-0023). */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<HeldStack>> OWN_CROWBAR = COMPONENTS.register("own_crowbar",
-            () -> DataComponentType.<HeldStack>builder().persistent(HeldStack.CODEC).networkSynchronized(HeldStack.STREAM_CODEC).build());
-    /** The mark on a vehicle's own crowbar: which vehicle it belongs to (D-0023). A spare crowbar has none. */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<OwnCrowbars.Owner>> CROWBAR_OF = COMPONENTS.register("crowbar_of",
-            () -> DataComponentType.<OwnCrowbars.Owner>builder().persistent(OwnCrowbars.Owner.CODEC).networkSynchronized(OwnCrowbars.Owner.STREAM_CODEC).build());
+    /** A key's band: its vehicle's paint, as RGB (D-0026). Its name is the stack's item name. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> KEY_COLOUR = COMPONENTS.register("key_colour",
+            () -> DataComponentType.<Integer>builder().persistent(Codec.intRange(0, 0xFFFFFF)).networkSynchronized(ByteBufCodecs.VAR_INT).build());
 
     private static DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> uuidComponent(String name) {
         return COMPONENTS.register(name, () -> DataComponentType.<java.util.UUID>builder()
@@ -124,13 +119,11 @@ public final class ModContent {
     public static final DeferredItem<Item> WHEEL = ITEMS.registerSimpleItem("wheel");
     /** An engine. */
     public static final DeferredItem<Item> ENGINE = ITEMS.registerSimpleItem("engine");
-    /** Pries a vehicle loose into the hand (D-0020). The wrench it replaced loads as one: the id is aliased. */
-    public static final DeferredItem<Item> CROWBAR = ITEMS.registerItem("crowbar", CrowbarItem::new, new Item.Properties().stacksTo(1));
     static {
-        ITEMS.addAlias(VanillaWheels.id("wrench"), VanillaWheels.id("crowbar"));
+        // 1.9.5's wrench packed a vehicle; punches do that now (D-0025). A wrench still in someone's
+        // inventory loads as an iron ingot rather than vanishing.
+        ITEMS.addAlias(VanillaWheels.id("wrench"), ResourceLocation.withDefaultNamespace("iron_ingot"));
     }
-    /** What pries a vehicle loose: the crowbar, and Automobility's where that mod is installed. */
-    public static final net.minecraft.tags.TagKey<Item> PRIES_VEHICLES = net.minecraft.tags.ItemTags.create(VanillaWheels.id("pries_vehicles"));
     public static final DeferredItem<KeyFobItem> KEY_FOB = ITEMS.registerItem("key_fob", KeyFobItem::new, new Item.Properties().stacksTo(1));
     /** A tank's worth of fuel: hold use at a vehicle to pour. Full when crafted. */
     public static final DeferredItem<GasCanItem> GAS_CAN = ITEMS.registerItem("gas_can",
@@ -149,9 +142,6 @@ public final class ModContent {
     /** The client's copy needs no position: it reads the server's verdicts from the data slots. */
     public static final DeferredHolder<MenuType<?>, MenuType<LiftMenu>> LIFT_MENU = MENUS.register("mechanic_lift",
             () -> new MenuType<>((id, inventory) -> new LiftMenu(id, inventory, net.minecraft.world.inventory.ContainerLevelAccess.NULL), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
-    /** A vehicle's toolbox: its own crowbar's one slot. A plain menu: the vehicle's id rides its data slots. */
-    public static final DeferredHolder<MenuType<?>, MenuType<ToolboxMenu>> TOOLBOX_MENU = MENUS.register("toolbox",
-            () -> new MenuType<>(ToolboxMenu::client, net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
 
     /** Individually craftable sections joining into one redstone shutter. */
     public static final DeferredBlock<com.chunkworks.vanillawheels.garage.GarageDoorBlock> GARAGE_DOOR =
@@ -215,7 +205,6 @@ public final class ModContent {
             event.accept(WHEEL);
             event.accept(ENGINE);
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(CROWBAR);
             event.accept(KEY_FOB);
             event.accept(GAS_CAN);
             event.accept(EMPTY_GAS_CAN);
@@ -242,7 +231,6 @@ public final class ModContent {
                 profiles.forEach(id -> output.accept(chassisStack(id)));
                 output.accept(LIFT_ITEM.get());
                 output.accept(GARAGE_DOOR_ITEM.get());
-                output.accept(CROWBAR.get());
                 output.accept(KEY_FOB.get());
                 output.accept(WHEEL.get());
                 output.accept(ENGINE.get());

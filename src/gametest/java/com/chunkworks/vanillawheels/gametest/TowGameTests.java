@@ -379,13 +379,13 @@ public final class TowGameTests {
     }
 
     @GameTest(template = "runway", timeoutTicks = 20)
-    public void aFactoryColourLeavesATrailerUndyedUntilADyeAndACrowbarKeepsIt(GameTestHelper helper) {
+    public void aFactoryColourLeavesATrailerUndyedUntilADyeAndPackingKeepsIt(GameTestHelper helper) {
         layFloor(helper);
         Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
         helper.assertTrue(trailer.paint() == null, "a factory colour is no dye: the trailer is undyed");
         helper.assertValueEqual(trailer.profile().paint().orElseThrow().factory().orElseThrow(), 0xc8a060, "the profile's factory colour");
         net.minecraft.world.item.ItemStack item = trailer.toItem();
-        helper.assertTrue(item.get(ModContent.PAINT.get()) == null, "pried loose, it carries no dye");
+        helper.assertTrue(item.get(ModContent.PAINT.get()) == null, "packed, it carries no dye");
         Vehicle again = Vehicle.create(helper.getLevel(), BOX_TRAILER, trailer.position(), trailer.getYRot());
         again.loadFromItem(item);
         helper.assertTrue(again.paint() == null, "placed again, still undyed");

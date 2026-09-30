@@ -173,13 +173,12 @@ public final class RecoveryGameTests {
     }
 
     @GameTest(template = "arena", timeoutTicks = 100)
-    public void creativeCrowbarWithFullInventoryDropsCargoInsteadOfDeletingIt(GameTestHelper helper) {
+    public void creativePunchWithFullInventoryDropsCargoInsteadOfDeletingIt(GameTestHelper helper) {
         Vehicle vehicle = car(helper); vehicle.setItem(0, namedCargo());
         ServerPlayer player = player(helper); player.setGameMode(GameType.CREATIVE);
         for (int slot = 0; slot < 36; slot++) player.getInventory().setItem(slot, new ItemStack(Items.STONE, 64));
-        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.CROWBAR.get()));
-        player.setShiftKeyDown(true); vehicle.interactAt(player, Vec3.ZERO, InteractionHand.MAIN_HAND);
-        helper.assertTrue(vehicle.isRemoved(), "the crowbar, crouching, removed the vehicle");
+        player.attack(vehicle);
+        helper.assertTrue(vehicle.isRemoved(), "a creative punch packed the vehicle");
         var drops = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds());
         helper.assertValueEqual(drops.size(), 1, "one packed drop despite creative overflow");
         helper.assertTrue(ItemStack.matches(VehicleCargo.unpack(drops.getFirst().getItem().get(ModContent.CARGO.get())).getFirst(), namedCargo()), "cargo survives");

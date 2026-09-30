@@ -39,10 +39,14 @@ tags: [index]
 
 - [D-0019](D-0019.md): What a vehicle hands back (a disc, a lead, a repair ingredient) goes where a give goes, a carried bag included, through Carried.
 
-- [D-0020](D-0020.md): A crowbar (the wrench, renamed and aliased) pries a vehicle loose, crouching or not; a player's own blow does nothing to a vehicle.
+- [D-0020](D-0020.md): *Superseded by D-0025.* A crowbar (the wrench, renamed and aliased) pries a vehicle loose, crouching or not; a player's own blow does nothing to a vehicle.
 
 - [D-0021](D-0021.md): A vehicle's condition is a row of wrenches above the hunger bar, blinking and jiggling as hearts do; no red hurt tint.
 
 - [D-0022](D-0022.md): A trailer let go by hand rolls back a hair, and the vehicle it left cannot catch it again until the two have parted.
 
-- [D-0023](D-0023.md): Every vehicle has its own crowbar in a one-slot toolbox; lost, dropped or left anywhere but on a person, it goes home. Stack components go through `HeldStack`.
+- [D-0023](D-0023.md): *Superseded by D-0025.* Every vehicle has its own crowbar in a one-slot toolbox; lost, dropped or left anywhere but on a person, it goes home. Stack components go through `HeldStack`.
+
+- [D-0025](D-0025.md): Punch a vehicle six times in a row to pack it as it is (knocks, not wear); right-click a damaged one to repair it 2.5% a click for hunger scaled by its repair job, then board. After Immersive Aircraft; the crowbar and toolbox go.
+
+- [D-0026](D-0026.md): One key per vehicle, named for it and banded in its paint; a paired key never leaves its owner (goes home from anywhere, waits for a respawn or a login); a blank in the air replaces one that is gone.

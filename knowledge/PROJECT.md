@@ -12,6 +12,23 @@ tags: [overview]
 Rusty's notes on the trailer, some met by Bobandy_. The plan is
 `~/.claude/plans/some-changes-needed-to-zazzy-whale.md`; nothing ships until Rusty says so.
 
+- **Punch to pack, right-click to repair** (done, D-0025; 2026-09-29, Rusty: his friends hated
+  the crowbar and the breakdown; "more like Immersive Aircraft"). Immersive Aircraft's 1.21.1
+  source was read first (the decision records what it does). Six punches in a row pack a vehicle
+  as it is (`domain/Knocks`); a click that would board repairs a damaged one 2.5% for hunger
+  scaled by its profile's `repair.full_cost` (`domain/HandRepair`), then boards; a blow rocks it.
+  A paired vehicle, or one hitched behind it, packs only for its key's owner or a creative
+  player. The crowbar, its tag and recipe, and the own-crowbar toolbox are gone (never shipped);
+  the 1.9.5 wrench id loads as an iron ingot. JUnit 9, gametests 5 (`PunchAndRepairGameTests`),
+  the older suites punch where they pried. The D-0024 field patches (crouching crowbar, steel
+  from a bag, a lowered ceiling) were built, then shelved unreleased in `git stash` when Rusty
+  changed course.
+- **One key per vehicle, marked, never lost** (done, D-0026). `RecoveryData` by binding, not by
+  player; a key named for its vehicle and banded in its paint (`key_colour`, a tinted band on the
+  fob's model); `KeyFobs` (from `OwnCrowbars`) sends a live key home to its owner from the ground,
+  any container, a dropped bag, a stranger, a frame, a pot and a death, and holds it for a login
+  or a respawn. Gametests 5 (`KeyFobGameTests`).
+
 - **Door lamps drawn once** (done). The trailer's rear reflectors were drawn twice since 1.6.0:
   once swinging with the door, and once standing in the doorway where the shut door was. The
   Farmer's Pickup left a painted ghost tailgate the same way. `Appearance` cut the body's lamps,
@@ -30,7 +47,7 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   count unchanged. Worn to a tenth, it jiggles. Driving, two rows. Under software rendering a
   screenshot can repeat the last frame drawn, so the first two hurt frames still show the row
   before the hit.
-- **The crowbar; a player's blow does nothing** (done, D-0020). The wrench is renamed and its
+- **The crowbar; a player's blow does nothing** (done, D-0020; superseded before release by D-0025). The wrench is renamed and its
   id aliased. The `pries_vehicles` tag takes Automobility's crowbar too. Its icon is drawn by
   `build.py` and was judged in hand in the booth. The gametests: an uncrouched pry keeps the
   cargo, paint, fuel and wear; an old `vanillawheels:wrench` stack loads as a crowbar; six sword
@@ -56,7 +73,7 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   (2026-09-29): stop digging and make the click say why when it does nothing. A lead click with
   no led animal within ten blocks now says so, like "Open the doors first" (gametest; it failed
   with the message removed). Shut doors, the likeliest cause, already had a message.
-- **Every vehicle's own crowbar** (D-0023). `OwnCrowbars` (the mark, the waiting record, the
+- **Every vehicle's own crowbar** (D-0023; superseded before release by D-0025, its guard reused for the keys). `OwnCrowbars` (the mark, the waiting record, the
   guard), `ToolboxMenu`/`ToolboxScreen` (a plain menu, the id in four data slots), `HeldStack` for
   the stack components (the radio's `disc` one failed the dev check once a disc was packed).
   Eight gametests (`OwnCrowbarGameTests`): birth and first load, the toolbox's slot rules and

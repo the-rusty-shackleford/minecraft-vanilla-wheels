@@ -204,6 +204,36 @@ class TerrainTest {
     }
 
     @Test
+    void alongAWallItsWheelOverhangsTheBodyStaysLevelButACurbStillTiltsIt() {
+        // The Trailblazer's wheels stand 0.13 outside its box. Driven along a wall at x 0..1 with the
+        // box just clear of it (x 1.08..2.92), the left wheel track runs inside the wall's column. A
+        // wall three high is out of the climb's reach and no ground to a wheel: the body stays level,
+        // where the walks that began in the column unchecked rolled it toward the wall (D-0028). A
+        // curb one high is within the climb, so the same wheel still rides it and the body tilts.
+        Terrain.Shape truck = new Terrain.Shape(0.55, 1.0, 4.64, 2.1,
+                new double[] {-1.05, 1.05, -1.05, 1.05}, new double[] {1.3125, 1.3125, -1.3125, -1.3125});
+        for (double side : new double[] {3.0, 1.0}) {
+            Terrain.Columns alongside = (x, z, lo, hi) -> {
+                double top = Math.floor(x) == 0 ? side : 0.0;
+                return top >= lo - 1.0 && top <= hi + 1.0 ? top : Double.NEGATIVE_INFINITY;
+            };
+            Terrain.Pose pose = Terrain.Pose.level(0.0);
+            double worstRoll = 0.0, worstLift = 0.0;
+            for (double z = 0.0; z <= 12.0; z += 0.2) {
+                pose = Terrain.step(alongside, new Terrain.Frame(2.0, z, 0.0), truck, 0.0, pose);
+                worstRoll = Math.max(worstRoll, Math.abs(pose.roll()));
+                worstLift = Math.max(worstLift, Math.abs(pose.height()));
+            }
+            if (side > truck.climb() + 0.2) {
+                assertEquals(0.0, worstRoll, Math.toRadians(1), "level beside a wall: " + Math.toDegrees(worstRoll));
+                assertEquals(0.0, worstLift, 0.05, "and on the floor");
+            } else {
+                assertTrue(worstRoll > Math.toRadians(5), "tilted by a curb a wheel rides: " + Math.toDegrees(worstRoll));
+            }
+        }
+    }
+
+    @Test
     void downAStaircaseALongBodyKeepsOneAngleAndItsHeightRunsSmooth() {
         // A 1:1 staircase down from z = 4: the body's tail samples reach more than 2.5 blocks over the
         // body's y as it descends (the box is on the lower step, the tail's ground far above), and its

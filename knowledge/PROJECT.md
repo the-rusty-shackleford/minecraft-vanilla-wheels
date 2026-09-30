@@ -28,7 +28,11 @@ protocol is still 6, and a 1.10.0 client keeps the old footprint and pose for it
   a 3- or 4-wide open door rises 1.24 to 1.45 blocks and pitches up to 7 degrees. Walks now start
   from the body's own ground. `TerrainTest` has the doorway, and the drive-through gametest
   asserts on its wheels and level. It also levels a body whose wheels overhang a wall it runs
-  along (it rolled toward the wall); not yet looked at in the booth.
+  along: `TerrainTest.alongAWallItsWheelOverhangsTheBodyStaysLevelButACurbStillTiltsIt` (added
+  2026-09-30 before the release) has the Trailblazer's shape beside a wall three high, its left
+  wheel track in the wall's column, and rolls 35 degrees toward the wall on 1.10.0's `Terrain`,
+  level on 1.10.1's; a curb one high under the same wheel still tilts it. Pinned in the pose model,
+  not looked at in a render.
 - Not run: the Trailblazer's `TrailblazerPlaytest`. It needs a display and resolves Vanilla Wheels
   1.8.0 from mavenLocal.
 

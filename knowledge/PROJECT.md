@@ -7,10 +7,14 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.10.0 — in progress, unreleased (Rusty's notes of 2026-09-28)
+## 1.10.0 — released 2026-09-30 in pack 1.69.0 (Rusty's notes of 2026-09-28)
 
 Rusty's notes on the trailer, some met by Bobandy_. The plan is
-`~/.claude/plans/some-changes-needed-to-zazzy-whale.md`; nothing ships until Rusty says so.
+`~/.claude/plans/some-changes-needed-to-zazzy-whale.md`. Released on Rusty's "After that, go to
+release" once the garage fix below was verified: 115 JUnit, 80 GameTests and the booth in the
+release gate; deployed with Backpacks+ 0.7.0 and Ranged Weapons Mod 2.10.0, sha1 `ab3ed58d` on the
+server (the server repo's `knowledge/releases/pack-1.69.0.md`). Keys paired under 1.9.5 keep their
+pairing and stay unmarked until clicked at their vehicle or used to recall it. Not yet seen in play.
 
 - **Punch to pack, right-click to repair** (done, D-0025; 2026-09-29, Rusty: his friends hated
   the crowbar and the breakdown; "more like Immersive Aircraft"). Immersive Aircraft's 1.21.1

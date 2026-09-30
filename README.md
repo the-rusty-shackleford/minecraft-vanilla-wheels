@@ -1,8 +1,8 @@
 # Vanilla Wheels
 
-**[Version 1.9.4](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.9.4)**
-is published and deployed in shared pack **1.67.1**. Install matching client and
-server versions; shared-pack players can use **Update Pack** in Prism.
+**[Version 1.10.0](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.10.0)**
+is published and deployed in shared pack **1.69.0**. Its network protocol is 6, so the client
+and server must both run 1.10.0; shared-pack players can use **Update Pack** in Prism.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,

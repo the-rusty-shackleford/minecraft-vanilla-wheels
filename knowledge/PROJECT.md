@@ -29,6 +29,17 @@ Rusty's notes on the trailer, some met by Bobandy_. The plan is
   any container, a dropped bag, a stranger, a frame, a pot and a death, and holds it for a login
   or a respawn. Gametests 5 (`KeyFobGameTests`).
 
+- **Vehicles drive through an open garage door** (done, D-0027; 2026-09-29, Rusty: his buddy
+  "cannot drive his trailblazer through an open garage door"). The door had no `dynamicShape()`,
+  so its cached per-state collision shape was the closed fallback panel. The vehicle's footprint
+  and terrain pose read that cache, and every vehicle driven at a driver's pace stopped at the
+  doorway (the Trailblazer-sized truck and the box car alike, nose at z 10.37). The old checks
+  read the block entity's shape or jumped six blocks in one move. Gametest
+  `aTruckDrivesThroughAnOpenDoorAtDrivingSpeed` (namespace `vanillawheels_garage_drive`,
+  `box_truck` = the Trailblazer's body) failed without the fix. The booth drives through in
+  fifth-of-a-block steps now. Open for Rusty: a door's top row counts as a wall to a vehicle
+  whose climb reaches it (door under climb + 2 high). No shipped vehicle can meet it; fixing it
+  changes the footprint at fences and stairs.
 - **Door lamps drawn once** (done). The trailer's rear reflectors were drawn twice since 1.6.0:
   once swinging with the door, and once standing in the doorway where the shut door was. The
   Farmer's Pickup left a painted ghost tailgate the same way. `Appearance` cut the body's lamps,

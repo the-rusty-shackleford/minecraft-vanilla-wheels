@@ -876,7 +876,9 @@ public final class PhotoBooth {
                 var door=(com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity)sp.serverLevel().getBlockEntity(garagePos);
                 verdict("garage pauses closure for a real vehicle",()->door.lift()==36 ? null : "door closed onto vehicle");
                 var v=(Vehicle)sp.serverLevel().getEntity(garageVehicle);
-                v.move(net.minecraft.world.entity.MoverType.SELF,new Vec3(0,0,6));
+                // At a driver's pace: one six-block move tested the footprint only at its end, clear of
+                // the door, and passed over the shut panel a cached shape put in every open cell (D-0027).
+                for(int i=0;i<30;i++)v.move(net.minecraft.world.entity.MoverType.SELF,new Vec3(0,0,.2));
                 verdict("vehicle moves through open garage without a hidden barrier",()->v.getZ()>13 ? null : "vehicle stopped at "+v.getZ());
             });
         }));

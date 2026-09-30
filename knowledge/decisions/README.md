@@ -50,3 +50,5 @@ tags: [index]
 - [D-0025](D-0025.md): Punch a vehicle six times in a row to pack it as it is (knocks, not wear); right-click a damaged one to repair it 2.5% a click for hunger scaled by its repair job, then board. After Immersive Aircraft; the crowbar and toolbox go.
 
 - [D-0026](D-0026.md): One key per vehicle, named for it and banded in its paint; a paired key never leaves its owner (goes home from anywhere, waits for a respawn or a login); a blank in the air replaces one that is gone.
+
+- [D-0027](D-0027.md): The garage door declares a dynamic shape. The cached per-state shape was the closed panel, and a vehicle's footprint read it, so no vehicle could drive through an open door at a driver's pace.

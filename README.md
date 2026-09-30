@@ -66,6 +66,16 @@ works. Closing pauses while a player, mob, vehicle, boat or minecart occupies th
 opening, then resumes when it clears. The top housing occupies half a block;
 a four-block-high door leaves three and a half blocks of vertical clearance.
 
+**Since 1.10.0, vehicles drive through an open door** (D-0027). Before, a phantom closed panel
+stood in every open door cell for a vehicle's nose and tail, and a driven vehicle stopped at the
+doorway. That happened on client and server alike, so the log showed no "moved wrongly". The door
+now declares its shape dynamic, so everything that reads a block's collision shape sees it open.
+Size the door to the vehicle. The side tracks take a tenth of a block on each side, so a 3-wide
+door leaves 2.8. The housing takes the top half-block, so the Trailblazer (1.73 tall) needs a
+3-high door and the Trailer and Farmer's Pickup (2.79 and 2.99) a 4-high one. For profile authors:
+a door must be at least the profile's `climb` + 2 blocks high. Lower, the top row's edge cells
+count as a wall to the footprint (D-0027 has the detail). Every shipped vehicle's climb is 1.
+
 Breaking a section returns one panel. An incomplete rectangle stops moving and
 keeps its existing clearance until repaired; it cannot be powered as a door.
 Assemblies crossing unloaded chunks suspend without loading those chunks.

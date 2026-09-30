@@ -97,7 +97,7 @@ neoForge {
         gameTestServer {
             type = "gameTestServer"
             sourceSet = sourceSets.gametest
-            systemProperty 'neoforge.enabledGameTestNamespaces', providers.gradleProperty('gameTestNamespaces').getOrElse("${mod_id},vanillawheels_chaining,vanillawheels_falls")
+            systemProperty 'neoforge.enabledGameTestNamespaces', providers.gradleProperty('gameTestNamespaces').getOrElse("${mod_id},vanillawheels_chaining,vanillawheels_falls,vanillawheels_garage_drive")
             taskBefore copyGameTestStructures
         }
         // Eyes for the art: a client that makes a flat world, puts the test

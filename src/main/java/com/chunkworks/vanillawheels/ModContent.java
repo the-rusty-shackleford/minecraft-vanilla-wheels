@@ -143,11 +143,13 @@ public final class ModContent {
     public static final DeferredHolder<MenuType<?>, MenuType<LiftMenu>> LIFT_MENU = MENUS.register("mechanic_lift",
             () -> new MenuType<>((id, inventory) -> new LiftMenu(id, inventory, net.minecraft.world.inventory.ContainerLevelAccess.NULL), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
 
-    /** Individually craftable sections joining into one redstone shutter. */
+    /** Individually craftable sections joining into one redstone shutter. Its shape is the block
+     * entity's travel, so it is dynamic: a cached per-state shape would be the entity-less closed
+     * panel, and every reader of the cache (a vehicle's footprint, pathfinding) saw a shut door (D-0027). */
     public static final DeferredBlock<com.chunkworks.vanillawheels.garage.GarageDoorBlock> GARAGE_DOOR =
             BLOCKS.registerBlock("garage_door", com.chunkworks.vanillawheels.garage.GarageDoorBlock::new,
                     BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3,6).sound(SoundType.METAL)
-                            .noOcclusion().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
+                            .noOcclusion().dynamicShape().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
     public static final DeferredItem<net.minecraft.world.item.BlockItem> GARAGE_DOOR_ITEM = ITEMS.registerSimpleBlockItem(GARAGE_DOOR);
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity>> GARAGE_DOOR_BE =
             BLOCK_ENTITIES.register("garage_door", () -> BlockEntityType.Builder.of(

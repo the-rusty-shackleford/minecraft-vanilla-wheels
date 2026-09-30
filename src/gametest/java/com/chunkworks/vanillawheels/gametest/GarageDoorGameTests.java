@@ -182,4 +182,51 @@ public final class GarageDoorGameTests {
         });
     }
 
+    private static final ResourceLocation TRUCK = ResourceLocation.parse("vanillawheels_gametest:box_truck");
+
+    /** Open doors of the sizes players build for a Trailblazer (its profile's body as {@code box_truck}),
+     * driven through a fifth of a block a tick as a driver's moves arrive, not in one jump; the box car
+     * beside, under a door tall enough for its climb of 2 (D-0027 records why a 3-high one is not). */
+    @GameTest(template="garage_arena",templateNamespace="vanillawheels_garage_drive",timeoutTicks=140)
+    public void aTruckDrivesThroughAnOpenDoorAtDrivingSpeed(GameTestHelper h) {
+        var p=prepare(h);
+        record Run(String name,ResourceLocation vehicle,int left,int width,int height){}
+        var runs=List.of(new Run("truck, 3x3 door",TRUCK,2,3,3),new Run("box car, 3x4 door",CAR,9,3,4),
+                new Run("truck, 4x4 door",TRUCK,16,4,4));
+        for(var r:runs)for(int y=0;y<r.height;y++)for(int x=0;x<r.width;x++)
+            h.assertTrue(place(h,p,new BlockPos(r.left+x,2+y,10)),"real item places "+r.name+" panel "+x+","+y);
+        h.runAtTickTime(2,()->{for(var r:runs)h.setBlock(new BlockPos(r.left-1,2,10),Blocks.REDSTONE_BLOCK);});
+        var vehicles=new Vehicle[runs.size()];
+        h.runAtTickTime(40,()->{
+            for(int i=0;i<runs.size();i++){
+                var r=runs.get(i);
+                var root=(GarageDoorBlockEntity)h.getBlockEntity(new BlockPos(r.left,2,10));
+                h.assertTrue(root.formed()&&root.lift()==r.height*Shutter.UNITS-4,r.name+" open");
+                // The state's own collision shape, which a vehicle's footprint and pathfinding read,
+                // is the panel's travel, not a shape cached for the state with no panel behind it.
+                for(int y=0;y<r.height;y++)for(int x=0;x<r.width;x++){
+                    var pos=h.absolutePos(new BlockPos(r.left+x,2+y,10));
+                    var panel=(GarageDoorBlockEntity)h.getLevel().getBlockEntity(pos);
+                    h.assertFalse(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(
+                            h.getLevel().getBlockState(pos).getCollisionShape(h.getLevel(),pos),panel.shape(),
+                            net.minecraft.world.phys.shapes.BooleanOp.NOT_SAME),r.name+" cell "+x+","+y+" reads its open shape");
+                }
+                vehicles[i]=Vehicle.create(h.getLevel(),r.vehicle,h.absoluteVec(new Vec3(r.left+r.width/2.0,2,5.5)),0);
+                h.getLevel().addFreshEntity(vehicles[i]);
+            }
+        });
+        for(int t=42;t<102;t++)h.runAtTickTime(t,()->{
+            for(var v:vehicles)v.move(MoverType.SELF,new Vec3(0,0,.2));
+        });
+        h.runAtTickTime(104,()->{
+            var stopped=new StringBuilder();
+            for(int i=0;i<runs.size();i++){
+                double z=vehicles[i].getZ()-h.absoluteVec(Vec3.ZERO).z;
+                if(z<15)stopped.append(runs.get(i).name).append(" stopped at z ").append(String.format("%.2f",z)).append("; ");
+            }
+            h.assertTrue(stopped.isEmpty(),"through the open door: "+stopped);
+            h.succeed();
+        });
+    }
+
 }

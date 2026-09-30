@@ -7,10 +7,13 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.10.1 — built and verified, not released (Rusty, 2026-09-29: "I want that second garage door wall bug fixed")
+## 1.10.1 — released 2026-09-30 in pack 1.70.0 (Rusty, 2026-09-29: "I want that second garage door wall bug fixed")
 
-Waits on Rusty's go. Released, it is pack 1.69.1 on the usual flow, and every player updates: the
-protocol is still 6, and a 1.10.0 client keeps the old footprint and pose for its own vehicle.
+Released on Rusty's "release this and the other shit from a previous session that isnt released
+yet", with Warehouse Manager 0.8.0 as pack 1.70.0: 124 JUnit, 89 GameTests and the booth (47
+checks) green in the release gate, sha1 `5c9a4ea3` on the server (the server repo's
+`knowledge/releases/pack-1.70.0.md`). The protocol is still 6; a 1.10.0 client keeps the old
+footprint and pose for its own vehicle until it updates.
 
 - **A door's top row is no wall** (D-0028, superseding D-0027's "Not fixed"). The footprint read a
   block as the bounds of its boxes; a door's housing and side track bound its whole top row. Now

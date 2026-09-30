@@ -186,12 +186,13 @@ public final class GarageDoorGameTests {
 
     /** Open doors of the sizes players build for a Trailblazer (its profile's body as {@code box_truck}),
      * driven through a fifth of a block a tick as a driver's moves arrive, not in one jump; the box car
-     * beside, under a door tall enough for its climb of 2 (D-0027 records why a 3-high one is not). */
+     * beside through a 3x3 door, whose top row its climb of 2 reaches: the housing over its climb line
+     * and the side track under it are no wall across the doorway (D-0028). */
     @GameTest(template="garage_arena",templateNamespace="vanillawheels_garage_drive",timeoutTicks=140)
     public void aTruckDrivesThroughAnOpenDoorAtDrivingSpeed(GameTestHelper h) {
         var p=prepare(h);
         record Run(String name,ResourceLocation vehicle,int left,int width,int height){}
-        var runs=List.of(new Run("truck, 3x3 door",TRUCK,2,3,3),new Run("box car, 3x4 door",CAR,9,3,4),
+        var runs=List.of(new Run("truck, 3x3 door",TRUCK,2,3,3),new Run("box car, 3x3 door",CAR,9,3,3),
                 new Run("truck, 4x4 door",TRUCK,16,4,4));
         for(var r:runs)for(int y=0;y<r.height;y++)for(int x=0;x<r.width;x++)
             h.assertTrue(place(h,p,new BlockPos(r.left+x,2+y,10)),"real item places "+r.name+" panel "+x+","+y);
@@ -215,14 +216,26 @@ public final class GarageDoorGameTests {
                 h.getLevel().addFreshEntity(vehicles[i]);
             }
         });
+        // The terrain pose reads a door's edge cells as a column of track to its top, a wall to the fit,
+        // and its middle cells as a ceiling over the floor; on a level floor the body stays on its wheels
+        // and level through. The fit once took the track column as ground three blocks up (D-0028).
+        var tilt=new double[runs.size()];
+        var lift=new double[runs.size()];
         for(int t=42;t<102;t++)h.runAtTickTime(t,()->{
-            for(var v:vehicles)v.move(MoverType.SELF,new Vec3(0,0,.2));
+            for(int i=0;i<vehicles.length;i++){
+                vehicles[i].move(MoverType.SELF,new Vec3(0,0,.2));
+                var s=vehicles[i].suspension(1.0f);
+                tilt[i]=Math.max(tilt[i],Math.max(Math.abs(s.pitch()),Math.abs(s.roll())));
+                lift[i]=Math.max(lift[i],Math.abs(s.lift()));
+            }
         });
         h.runAtTickTime(104,()->{
             var stopped=new StringBuilder();
             for(int i=0;i<runs.size();i++){
                 double z=vehicles[i].getZ()-h.absoluteVec(Vec3.ZERO).z;
                 if(z<15)stopped.append(runs.get(i).name).append(" stopped at z ").append(String.format("%.2f",z)).append("; ");
+                h.assertTrue(tilt[i]<Math.toRadians(1),runs.get(i).name+" kept level through the door: tilted "+String.format("%.2f",Math.toDegrees(tilt[i]))+" degrees");
+                h.assertTrue(lift[i]<0.05,runs.get(i).name+" kept on its wheels through the door: lifted "+String.format("%.3f",lift[i]));
             }
             h.assertTrue(stopped.isEmpty(),"through the open door: "+stopped);
             h.succeed();

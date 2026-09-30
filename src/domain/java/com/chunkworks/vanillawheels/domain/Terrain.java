@@ -246,14 +246,17 @@ public final class Terrain {
         double trackHalf = s.track() / 2.0;
         for (double x : new double[] {-trackHalf, trackHalf}) {
             for (int dir = -1; dir <= 1; dir += 2) {
-                double prev = Double.NaN, reach = dir < 0 ? back : front;
+                // A walk starts from the ground the body stands on, its y: a first sample more than the
+                // climb over that is a wall face too. Taken unchecked, the column of a door's side track
+                // under a wheel track (a column is read whole) was ground three blocks up (D-0028).
+                double prev = 0.0, reach = dir < 0 ? back : front;
                 for (double d = 0.0; d <= reach + 1.0E-9; d += SPACING) {
                     if (dir < 0 && d == 0.0) {
                         continue;   // the centre sample belongs to the forward walk
                     }
                     double z = fromZ + dir * d;
                     double h = sample(ground, frame, s, frame.worldX(x, z), frame.worldZ(x, z));
-                    if (!Double.isNaN(prev) && h - prev > s.climb() + 0.2) {
+                    if (h - prev > s.climb() + 0.2) {
                         break;
                     }
                     prev = h;

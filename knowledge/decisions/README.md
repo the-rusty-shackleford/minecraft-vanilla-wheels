@@ -51,4 +51,6 @@ tags: [index]
 
 - [D-0026](D-0026.md): One key per vehicle, named for it and banded in its paint; a paired key never leaves its owner (goes home from anywhere, waits for a respawn or a login); a blank in the air replaces one that is gone.
 
-- [D-0027](D-0027.md): The garage door declares a dynamic shape. The cached per-state shape was the closed panel, and a vehicle's footprint read it, so no vehicle could drive through an open door at a driver's pace.
+- [D-0027](D-0027.md): The garage door declares a dynamic shape. The cached per-state shape was the closed panel, and a vehicle's footprint read it, so no vehicle could drive through an open door at a driver's pace. Its "Not fixed" section is superseded by D-0028.
+
+- [D-0028](D-0028.md): A block is a wall to the footprint where its cross-section at the climb line (the rectangle bounding its boxes that span the line) holds the point, not its whole bounds: a garage door's housing no longer walls its doorway, and fences, walls and stairs stop exactly where they did. The terrain fit's walks start from the body's own ground, so a door's track column is no longer ground three blocks up under a passing wheel.

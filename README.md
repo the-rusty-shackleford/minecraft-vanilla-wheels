@@ -4,6 +4,11 @@
 is published and deployed in shared pack **1.69.0**. Its network protocol is 6, so the client
 and server must both run 1.10.0; shared-pack players can use **Update Pack** in Prism.
 
+**1.10.1** is built and verified but not released (D-0028). A vehicle drives through a garage door
+whose top row its climb reaches, and its body stays on its wheels and level through any open
+door. The protocol is still 6, so a 1.10.0 client can join a 1.10.1 server, but its own vehicle
+keeps 1.10.0's footprint and pose until the player updates.
+
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
 burns fuel, shows its gauges on a physical dash, lights the road, honks, plays records,
@@ -72,9 +77,12 @@ doorway. That happened on client and server alike, so the log showed no "moved w
 now declares its shape dynamic, so everything that reads a block's collision shape sees it open.
 Size the door to the vehicle. The side tracks take a tenth of a block on each side, so a 3-wide
 door leaves 2.8. The housing takes the top half-block, so the Trailblazer (1.73 tall) needs a
-3-high door and the Trailer and Farmer's Pickup (2.79 and 2.99) a 4-high one. For profile authors:
-a door must be at least the profile's `climb` + 2 blocks high. Lower, the top row's edge cells
-count as a wall to the footprint (D-0027 has the detail). Every shipped vehicle's climb is 1.
+3-high door and the Trailer and Farmer's Pickup (2.79 and 2.99) a 4-high one. **Since 1.10.1**
+(D-0028) the hull's height is the only rule: the housing over a vehicle's climb line no longer
+makes the side track under it a wall across the doorway, whatever the profile's `climb`. The body
+also stays on its wheels and level through the doorway. In 1.10.0 the drawn pose took a side
+track under a wheel for ground three blocks up, and a Trailblazer in a 3- or 4-wide door rose over
+a block and nodded.
 
 Breaking a section returns one panel. An incomplete rectangle stops moving and
 keeps its existing clearance until repaired; it cannot be powered as a door.
@@ -108,7 +116,9 @@ the game steps a player up a slab. What is drawn is posed on the ground nfx's wa
 (`domain/Terrain`): every wheel is probed as a disc, which starts riding up a step one
 radius early along a quarter circle; one plane is fitted through the terrain along both
 wheel tracks over the whole footprint, a block past each end, with the walk along a track
-ending at a wall face, so a staircase is one steady angle and a wall flattens the fit;
+ending at a wall face, so a staircase is one steady angle and a wall flattens the fit (a walk
+starts from the ground the body stands on, so a column the box does not stand on, such as a door's
+side track under a wheel or a wall the wheels overhang, is a wall face from its first sample, D-0028);
 pitch and roll are critically damped springs toward the plane (a first-order filter
 stutters at 20 Hz in first person); the height follows the plane directly, since a spring
 cannot track a ramp, bounded so no wheel sits more than a block under its ground; and the
@@ -137,7 +147,12 @@ from the body's centre that follows the ground a block at a time, and a move tha
 put one against a wall -- a block rising more than the climb over the ground just before
 it, which the box could never step onto -- is cut short at the wall's face, on both sides
 alike so the server's re-run agrees. A hillside of one-block risers is no wall however
-many the nose overhangs; a two-block riser is. A wall met at a slant is slid along, as the
+many the nose overhangs; a two-block riser is. A block is a wall where it stands across the
+climb line at the point: the rectangle bounding those of its boxes that span the line
+(`domain/CrossSection`, D-0028). So a fence corner's L fills its bounds, as every block's did
+before 1.10.1, while a garage door's housing over the line and its side track under it are the
+track alone. Each shape's boxes are unpacked once and kept by the shape (`ShapeBoxes`), so the
+check allocates nothing. A wall met at a slant is slid along, as the
 game slides a box, rather than stopping the body at a corner's graze. The speed the world
 refuses is gone, not spent spinning the wheels: most of it at a wall met square with a restrained rebound on hard impacts, a little
 scraped along one.
@@ -474,17 +489,18 @@ in `devtools/art/sounds/SOURCES.md`. These changes leave driving physics unchang
 ## Layout
 
 `src/domain` (JDK-only, plain JUnit): `Drive` (the step: throttle, drag, rolling,
-steering by the bicycle rule, grip, drift), `Suspension`, `Impact`, `Tank`, `Tow` (the
+steering by the bicycle rule, grip, drift), `Suspension`, `Terrain` (the drawn pose),
+`CrossSection` (what of a block the vehicle footprint meets), `Impact`, `Tank`, `Tow` (the
 trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
 `LiftMotion`, `LiftStatus` and `Assembly`, `Paint`, and the mesh library (`Obj`,
 `BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
 `WheelSpin`, `BodyPose`, `BakedMesh`).
 `src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`), the `Vehicle` entity
-and its parts, the items, `net/Payloads`, `WheelsConfig`, `lift` (the two blocks, the
+and its parts, `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `lift` (the two blocks, the
 block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary`,
 `Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
 the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,
-texture and profile generated by `devtools/art/build.py`) and a box trailer, nineteen
+texture and profile generated by `devtools/art/build.py`) and a box trailer, 89
 gametests and the photo booth -- a mod of its own, never shipped.
 
 ## Building and looking at it
@@ -518,7 +534,13 @@ them behind; the tow link survives a save; six punches in a row pack a car as it
 pause starts the count again, a rider or another player's key stops them, a damaged car
 repairs a step a click for hunger and then seats; a key per car is named for it, refused at
 another car, and comes back from a toss, a chest, a dropped bag, a stranger, a death and a
-logout.
+logout. The footprint's course (`FootprintGameTests`) drives the Trailblazer-bodied box truck,
+climb 1, both at speed and creeping from a standstill: up a flight of stairs and a flight whose
+top step is the landing, up half slabs, down stairs and under a lintel; its nose stops at a
+riser two high, a fence line's post, a wall's post and a fence corner's cell, and each stop is
+logged as a `FOOTPRINT` line. The truck and the box car drive through open 3x3 and 4x4 garage
+doors on their wheels and level. `devtools/footprint/compare_rules.py` models the check and
+compares the wall rules D-0028 chose between.
 The booth photographs the stock car, a red one, the dash from the driver's seat, the lamps at
 night from behind (the beam on the ground, through Luminance) and from the front (the
 faces aglow), and the lift: placed, its menu, the deck up with the car just built on it,

@@ -21,6 +21,7 @@ import com.chunkworks.carried.api.Carried;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.client.Controls;
+import com.chunkworks.vanillawheels.domain.CrossSection;
 import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
@@ -1770,28 +1771,36 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The ground is followed down at most this far per sample; a deeper hole is no ground at all. */
     private static final int DROP = 2;
 
+    /** The footprint's walk reads blocks through this, so a check allocates nothing; one per body, on one thread. */
+    private final BlockPos.MutableBlockPos footprintPos = new BlockPos.MutableBlockPos();
+
     /**
      * effects: returns whether any of the footprint's points, with the body's origin at (x, z), meets a
      * wall. Each point is reached by a walk from the origin in samples at most a block apart, the
      * ground followed under each -- the top of the highest solid block within the climb of the
-     * ground before it, up or down -- and a wall is a solid block that spans the climb line over
-     * that ground: its bottom at or under it, its top above it. So a hillside of risers each within
-     * the climb of the last is no wall, however many the nose overhangs (a riser every block once
-     * stopped a truck whose nose reached the second riser before its box had climbed the first),
-     * while a riser taller than the climb is one; and a lintel the hull passes under or a canopy over
-     * it is none, since only a block spanning the line counts.
+     * ground before it, up or down -- and a wall is a block standing across the climb line over that
+     * ground at the point: the point lies in its {@link CrossSection} there, the rectangle bounding
+     * its boxes that span the line (D-0028). So a hillside of risers each within the climb of the
+     * last is no wall, however many the nose overhangs (a riser every block once stopped a truck
+     * whose nose reached the second riser before its box had climbed the first), while a riser
+     * taller than the climb is one; a lintel the hull passes under or a canopy over it is none, since
+     * only a block spanning the line counts; and a garage door's housing over the line does not make
+     * its side track under it a wall across the doorway. The ground is still a block's full bounds,
+     * as the box that climbs onto it meets them.
      */
     private boolean footprintBlockedAt(VehicleProfile p, double x, double z) {
         double hw = p.body().width() / 2.0, hl = p.body().length() / 2.0;
         double yaw = Math.toRadians(getYRot());
         double c = Math.cos(yaw), s = Math.sin(yaw);
-        double[][] points = {{-hw, hl}, {hw, hl}, {0.0, hl}, {-hw, -hl}, {hw, -hl}, {0.0, -hl}};
         double climb = Math.max(0.0, p.climb()) + OVER_CLIMB;
         double height = p.body().height();
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (double[] pt : points) {
-            double dx = pt[0] * c - pt[1] * s;
-            double dz = pt[1] * c + pt[0] * s;
+        BlockPos.MutableBlockPos pos = footprintPos;
+        // The nose's corners and centre, then the tail's.
+        for (int point = 0; point < 6; point++) {
+            double px = point % 3 == 0 ? -hw : point % 3 == 1 ? hw : 0.0;
+            double pz = point < 3 ? hl : -hl;
+            double dx = px * c - pz * s;
+            double dz = pz * c + px * s;
             int steps = Math.max(1, Mth.ceil(Math.sqrt(dx * dx + dz * dz) / WALK));
             double ground = getY();
             for (int i = 1; i <= steps; i++) {
@@ -1800,19 +1809,16 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 int bx = Mth.floor(sx), bz = Mth.floor(sz);
                 double top = Double.NEGATIVE_INFINITY;
                 for (int by = Mth.floor(line + height); by >= Mth.floor(ground) - DROP; by--) {
-                    net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(pos.set(bx, by, bz)).getCollisionShape(level(), pos);
-                    if (shape.isEmpty()) {
+                    ShapeBoxes.Entry shape = ShapeBoxes.of(level().getBlockState(pos.set(bx, by, bz)).getCollisionShape(level(), pos));
+                    if (shape == null) {
                         continue;
                     }
-                    net.minecraft.world.phys.AABB bounds = shape.bounds().move(bx, by, bz);
-                    if (!(bounds.minX <= sx && sx <= bounds.maxX && bounds.minZ <= sz && sz <= bounds.maxZ)) {
-                        continue;
-                    }
-                    if (bounds.maxY > line && bounds.minY <= line) {
+                    if (CrossSection.holds(shape.boxes(), bx, by, bz, sx, line, sz)) {
                         return true;
                     }
-                    if (bounds.maxY <= line) {
-                        top = Math.max(top, bounds.maxY);
+                    if (shape.maxY() + by <= line && shape.minX() + bx <= sx && sx <= shape.maxX() + bx
+                            && shape.minZ() + bz <= sz && sz <= shape.maxZ() + bz) {
+                        top = Math.max(top, shape.maxY() + by);
                     }
                 }
                 if (top > Double.NEGATIVE_INFINITY) {

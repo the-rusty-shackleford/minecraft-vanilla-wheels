@@ -171,6 +171,39 @@ class TerrainTest {
     }
 
     @Test
+    void throughAnOpenDoorwayWhoseEdgeColumnsAreItsTracksTheBodyStaysLevel() {
+        // A 3-wide open garage door over cells x 0..2 at z 10, as Vehicle.columns reads it: each edge
+        // cell a column of side track three high, standing on the floor, since a column is read whole;
+        // the middle cell open (its housing a ceiling). The box truck's wheels, 1.05 either side of
+        // x 1.5, run through the edge cells; its box, 1.84 wide, clears the tracks and stays on the
+        // floor. The walks of the fit began inside the track column, unchecked: the body rose over a
+        // block in the doorway and nodded.
+        Terrain.Shape truck = new Terrain.Shape(0.55, 1.0, 4.64, 2.1,
+                new double[] {-1.05, 1.05, -1.05, 1.05}, new double[] {1.3125, 1.3125, -1.3125, -1.3125});
+        Terrain.Columns doorway = (x, z, lo, hi) -> {
+            boolean track = Math.floor(z) == 10 && (Math.floor(x) == 0 || Math.floor(x) == 2);
+            for (int row = (int) Math.floor(hi); row >= Math.floor(lo); row--) {
+                if (track && row >= 0 && row <= 2) {
+                    return row + 1.0;
+                }
+                if (row == -1) {
+                    return 0.0;
+                }
+            }
+            return Double.NEGATIVE_INFINITY;
+        };
+        Terrain.Pose pose = Terrain.Pose.level(0.0);
+        double worstLift = 0.0, worstPitch = 0.0;
+        for (double z = 5.0; z <= 16.0; z += 0.2) {
+            pose = Terrain.step(doorway, new Terrain.Frame(1.5, z, 0.0), truck, 0.0, pose);
+            worstLift = Math.max(worstLift, Math.abs(pose.height()));
+            worstPitch = Math.max(worstPitch, Math.abs(pose.pitch()));
+        }
+        assertEquals(0.0, worstLift, 0.05, "on the floor through the doorway");
+        assertEquals(0.0, worstPitch, Math.toRadians(1), "and level: " + Math.toDegrees(worstPitch));
+    }
+
+    @Test
     void downAStaircaseALongBodyKeepsOneAngleAndItsHeightRunsSmooth() {
         // A 1:1 staircase down from z = 4: the body's tail samples reach more than 2.5 blocks over the
         // body's y as it descends (the box is on the lower step, the tail's ground far above), and its

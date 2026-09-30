@@ -7,6 +7,31 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.10.1 — built and verified, not released (Rusty, 2026-09-29: "I want that second garage door wall bug fixed")
+
+Waits on Rusty's go. Released, it is pack 1.69.1 on the usual flow, and every player updates: the
+protocol is still 6, and a 1.10.0 client keeps the old footprint and pose for its own vehicle.
+
+- **A door's top row is no wall** (D-0028, superseding D-0027's "Not fixed"). The footprint read a
+  block as the bounds of its boxes; a door's housing and side track bound its whole top row. Now
+  a block is a wall where its cross-section at the climb line holds the point
+  (`domain/CrossSection`); ground is still the bounds. Fences, walls, slabs and full blocks are
+  unchanged by construction, and `FootprintGameTests` (namespace `vanillawheels_footprint`, 9
+  tests, the Trailblazer-bodied truck at speed and creeping) logs the same stops as 1.10.0 to four
+  decimals. Each test was run against the rule it guards: per-box and per-column walls, no
+  footprint, a lintel counted, the climb ignored. The per-column rule stops a creeping truck at
+  a flight whose top step is the landing, which is the stair hazard D-0027 foresaw. The box car
+  goes through a 3x3 door. `ShapeBoxes` makes the check allocation-free.
+- **The body stays on its wheels in a doorway** (found while checking `columns()` for the brief).
+  `Terrain.fit` took each walk's first sample unchecked, and `columns()` reads a door's edge cell
+  whole, so a side track under a wheel was ground three blocks up. In pack 1.69.0 a Trailblazer in
+  a 3- or 4-wide open door rises 1.24 to 1.45 blocks and pitches up to 7 degrees. Walks now start
+  from the body's own ground. `TerrainTest` has the doorway, and the drive-through gametest
+  asserts on its wheels and level. It also levels a body whose wheels overhang a wall it runs
+  along (it rolled toward the wall); not yet looked at in the booth.
+- Not run: the Trailblazer's `TrailblazerPlaytest`. It needs a display and resolves Vanilla Wheels
+  1.8.0 from mavenLocal.
+
 ## 1.10.0 — released 2026-09-30 in pack 1.69.0 (Rusty's notes of 2026-09-28)
 
 Rusty's notes on the trailer, some met by Bobandy_. The plan is
@@ -41,9 +66,9 @@ pairing and stay unmarked until clicked at their vehicle or used to recall it. N
   read the block entity's shape or jumped six blocks in one move. Gametest
   `aTruckDrivesThroughAnOpenDoorAtDrivingSpeed` (namespace `vanillawheels_garage_drive`,
   `box_truck` = the Trailblazer's body) failed without the fix. The booth drives through in
-  fifth-of-a-block steps now. Open for Rusty: a door's top row counts as a wall to a vehicle
-  whose climb reaches it (door under climb + 2 high). No shipped vehicle can meet it; fixing it
-  changes the footprint at fences and stairs.
+  fifth-of-a-block steps now. A door's top row still counted as a wall to a vehicle whose climb
+  reached it (door under climb + 2 high); fixed in 1.10.1 (D-0028) without changing the footprint
+  at fences or stairs.
 - **Door lamps drawn once** (done). The trailer's rear reflectors were drawn twice since 1.6.0:
   once swinging with the door, and once standing in the doorway where the shut door was. The
   Farmer's Pickup left a painted ghost tailgate the same way. `Appearance` cut the body's lamps,

@@ -18,6 +18,7 @@
 package com.chunkworks.vanillawheels;
 
 import com.chunkworks.carried.api.Carried;
+import com.chunkworks.vanillawheels.api.CargoRules;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.client.Controls;
@@ -511,15 +512,20 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (p == null) {
             return false;
         }
-        if (passenger instanceof Animal animal) {
-            return p.cargo().isPresent() && doorsOpen() && cargo().accepts(animal.isBaby());
+        if (CargoRules.rides(passenger)) {
+            return p.cargo().isPresent() && doorsOpen() && cargo().accepts(CargoRules.young(passenger));
         }
         return riders().size() < p.seats().size();
     }
 
-    /** effects: returns the passengers in seats, in boarding order: everyone who is not an animal in the cargo */
+    /** effects: returns the passengers in seats, in boarding order: everyone who is not in the cargo */
     private List<Entity> riders() {
-        return getPassengers().stream().filter(e -> !(e instanceof Animal)).toList();
+        return getPassengers().stream().filter(e -> !CargoRules.rides(e)).toList();
+    }
+
+    /** effects: returns what rides in the cargo, in boarding order: animals and whatever another mod's rule admits (D-0029) */
+    public List<Entity> cargoAboard() {
+        return getPassengers().stream().filter(CargoRules::rides).toList();
     }
 
     /** effects: returns the animals aboard, in boarding order */
@@ -535,8 +541,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         VehicleProfile.Cargo room = p.cargo().get();
         int adults = 0, young = 0;
-        for (Animal a : animals()) {
-            if (a.isBaby()) {
+        for (Entity e : cargoAboard()) {
+            if (CargoRules.young(e)) {
                 young++;
             } else {
                 adults++;
@@ -730,10 +736,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return super.getPassengerAttachmentPoint(entity, dimensions, partialTick);
         }
         Vec local;
-        if (entity instanceof Animal && p.cargo().isPresent()) {
-            // Animals stand on the cargo slots in boarding order; past the last slot they double up, a little to the side.
+        if (CargoRules.rides(entity) && p.cargo().isPresent()) {
+            // Cargo stands on the cargo slots in boarding order; past the last slot it doubles up, a little to the side.
             List<Vec> slots = p.cargo().get().slots();
-            int k = Math.max(0, animals().indexOf(entity));
+            int k = Math.max(0, cargoAboard().indexOf(entity));
             Vec slot = p.localBlocks(slots.get(k % slots.size()));
             local = k < slots.size() ? slot : slot.plus(new Vec(-0.35, 0.0, 0.0));
         } else {
@@ -2051,8 +2057,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 }
                 return InteractionResult.sidedSuccess(level().isClientSide());
             }
-            // Crouch with a lead in hand at open doors with animals aboard: set them down behind.
-            if (held.is(Items.LEAD) && p.cargo().isPresent() && doorsOpen() && !animals().isEmpty()) {
+            // Crouch with a lead (or another cargo's lead, D-0029) in hand at open doors with cargo aboard: set it down behind.
+            if (CargoRules.leads(held) && p.cargo().isPresent() && doorsOpen() && !cargoAboard().isEmpty()) {
                 if (!level().isClientSide()) {
                     unload();
                 }
@@ -2101,8 +2107,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             }
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
-        // Animals on a lead board through the open doors.
-        if (p.cargo().isPresent() && held.is(Items.LEAD)) {
+        // What the player leads boards through the open doors: with a lead in hand, or with an empty
+        // hand while they lead anything a cargo rule admits (D-0029: a captive's chain is on the
+        // captive, not in the hand).
+        if (p.cargo().isPresent() && (CargoRules.leads(held) || held.isEmpty() && !led(player).isEmpty())) {
             if (!level().isClientSide()) {
                 load(player);
             }
@@ -2169,52 +2177,62 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /**
-     * effects: every animal {@code player} holds on a lead within ten
-     * blocks boards, nearest first, one by one, while the cargo has room
-     * and the doors are open; each lead comes back to the player; the
-     * player is told when the doors are shut, when no animal on their leads
-     * is near, or when the trailer is full -- a lead click never fails in
-     * silence (Bobandy_'s cows, 2026-09-28)
+     * effects: returns what {@code player} leads within ten blocks that a
+     * cargo rule lets them load now, nearest first (the level hands
+     * entities back in section order, which is the world's business, and
+     * who fits depends on who comes first)
+     */
+    private List<Entity> led(Player player) {
+        List<Entity> led = level().getEntities(this, player.getBoundingBox().inflate(10.0),
+                e -> e != player && CargoRules.of(e).filter(rule -> rule.loads(e, player)).isPresent());
+        led.sort(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(player)));
+        return led;
+    }
+
+    /**
+     * effects: everything {@code player} leads within ten blocks that a
+     * cargo rule admits boards, nearest first, one by one, while the cargo
+     * has room and the doors are open; each rule undoes its own tether
+     * (an animal's lead comes back to the player); the player is told when
+     * the doors are shut, when nothing they lead is near, or when the
+     * trailer is full -- a load click never fails in silence (Bobandy_'s
+     * cows, 2026-09-28)
      */
     private void load(Player player) {
         if (!doorsOpen()) {
             player.displayClientMessage(Component.translatable("vanillawheels.doors_shut"), true);
             return;
         }
-        List<Animal> led = level().getEntitiesOfClass(Animal.class, player.getBoundingBox().inflate(10.0), a -> a.getLeashHolder() == player);
-        // Nearest first: the level hands them back in entity-section order, which is the
-        // world's business, and who fits depends on who comes first.
-        led.sort(java.util.Comparator.comparingDouble(a -> a.distanceToSqr(player)));
+        List<Entity> led = led(player);
         if (led.isEmpty()) {
             player.displayClientMessage(Component.translatable("vanillawheels.no_led_animals"), true);
             return;
         }
         int boarded = 0;
-        for (Animal a : led) {
-            if (!canAddPassenger(a)) {
+        for (Entity e : led) {
+            if (!canAddPassenger(e)) {
                 continue;
             }
-            a.dropLeash(true, false);
-            Carried.giveOrDrop(player, new ItemStack(Items.LEAD));
-            if (a.startRiding(this, true)) {
+            CargoRules.of(e).orElseThrow().boarding(e, player);
+            if (e.startRiding(this, true)) {
                 boarded++;
             }
         }
-        if (boarded == 0 && !led.isEmpty()) {
+        if (boarded == 0) {
             player.displayClientMessage(Component.translatable("vanillawheels.trailer_full"), true);
         }
     }
 
-    /** effects: every animal aboard steps off behind the vehicle, spread across its width */
+    /** effects: everything in the cargo steps off behind the vehicle, spread across its width */
     private void unload() {
         VehicleProfile p = profile();
-        List<Animal> aboard = animals();
+        List<Entity> aboard = cargoAboard();
         if (p == null || aboard.isEmpty()) {
             return;
         }
         double back = -(p.body().length() / 2.0 + 1.0);
         for (int i = 0; i < aboard.size(); i++) {
-            Animal a = aboard.get(i);
+            Entity a = aboard.get(i);
             double across = (i - (aboard.size() - 1) / 2.0) * 0.9;
             Vec3 at = position().add(rotate(new Vec(across, 0.0, back - (i / 3) * 1.2)));
             a.stopRiding();

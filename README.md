@@ -435,15 +435,32 @@ back after a reload. A seatless vehicle's hit boxes are solid to walkers, so nob
 through a trailer's body.
 
 A trailer with `cargo` carries animals: crouch and right-click a door to open it, then
-right-click the trailer holding a lead and every animal on your leads within ten blocks
-boards, nearest to you first, while there is room -- an adult takes a whole share, a
-young one a half, so room for four adults is room for eight calves or two cows and four
+right-click the trailer holding a lead, or with an empty hand, and every animal on your leads
+within ten blocks boards, nearest to you first, while there is room -- an adult takes a whole
+share, a young one a half, so room for four adults is room for eight calves or two cows and four
 calves -- and each lead comes back to you. Crouch and right-click a door, empty-handed,
 anywhere on it, to shut or open it, load or no load. Crouch and right-click the trailer holding a lead with the doors open and
-animals aboard to let them out behind. Animals never board through shut doors. A lead click
-never fails in silence: shut doors, no animal on your leads within ten blocks, and a full
-trailer each say so above the hotbar. `doors`
-swing about their hinges when open. Loaded animals lean with the floor as riders do.
+cargo aboard to let it out behind. Nothing boards through shut doors. A lead click
+never fails in silence: shut doors, nothing on your leads within ten blocks, and a full
+trailer each say so above the hotbar; an empty-handed click with nothing led is no load and
+says nothing. `doors` swing about their hinges when open. Loaded cargo leans with the floor as
+riders do.
+
+**Other mods' cargo** (1.11.0, D-0029). `api/CargoRules` is a registry of what rides in the
+cargo; animals on a vanilla lead are its first, built-in rule. A mod registers a `Rule` from its
+constructor, saying:
+
+- `rides(entity)`: whether the entity, aboard, stands in the cargo rather than a seat. Both
+  sides ask it, so it must be decided by what both sides see;
+- `loads(entity, player)`: whether the player may load it now (theirs to lead, ready to board);
+- `leadsWith(stack)`: the item that leads it: a click with it in hand loads, and a crouch with it
+  at the open doors unloads everything aboard;
+- `boarding(entity, player)`: what becomes of its tether as it boards (an animal's lead comes
+  back to the player).
+
+Rules are asked in the order registered, animals first. Serfdom registers villagers in chains:
+they load while their chain's holder clicks, board still in chains with nobody holding them,
+and step out the same way. Cargo counts by the entity's `isBaby`, as animals always did.
 
 ## Parts, recipes, the Mechanic Lift
 

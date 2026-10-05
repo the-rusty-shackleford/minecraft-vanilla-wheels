@@ -378,6 +378,103 @@ public final class TowGameTests {
         });
     }
 
+    /** effects: a survival player at (x, z) on the floor whose action-bar and chat lines land in {@code told} */
+    private static Player listener(GameTestHelper helper, double x, double z, List<net.minecraft.network.chat.Component> told) {
+        Player p = new Player(helper.getLevel(), helper.absolutePos(new BlockPos((int) Math.floor(x), FLOOR, (int) Math.floor(z))), 0.0f,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "loader")) {
+            @Override public boolean isSpectator() { return false; }
+            @Override public boolean isCreative() { return false; }
+            @Override public void displayClientMessage(net.minecraft.network.chat.Component message, boolean actionBar) { told.add(message); }
+        };
+        Vec3 at = helper.absoluteVec(new Vec3(x, FLOOR, z));
+        p.setPos(at.x, at.y, at.z);
+        return p;
+    }
+
+    private static String key(net.minecraft.network.chat.Component c) {
+        return c.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t ? t.getKey() : c.getString();
+    }
+
+    /** effects: a villager with no AI at (x, z), tagged as the test mod's cargo when {@code cargo} */
+    private static net.minecraft.world.entity.npc.Villager villager(GameTestHelper helper, double x, double z, boolean cargo) {
+        var v = EntityType.VILLAGER.create(helper.getLevel());
+        Vec3 at = helper.absoluteVec(new Vec3(x, FLOOR, z));
+        v.setPos(at.x, at.y, at.z);
+        v.setNoAi(true);
+        if (cargo) {
+            v.addTag(GameTestMod.CARGO_TAG);
+        }
+        helper.getLevel().addFreshEntity(v);
+        return v;
+    }
+
+    /**
+     * D-0029: another mod's cargo (the test mod's tagged villager, as Serfdom's captive is) boards
+     * beside an animal on one empty-handed click, takes an adult's room, keeps no lead back, and
+     * steps out behind on a crouch with its own lead item (a chain) at the open doors. A villager no
+     * rule admits stays on its lead; the full trailer says so.
+     */
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void anotherModsCargoBoardsBesideAnAnimalOnAnEmptyHandAndItsOwnLeadLetsItOut(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
+        trailer.toggleDoors();
+        List<net.minecraft.network.chat.Component> told = new ArrayList<>();
+        Player p = listener(helper, 16.5, 7.5, told);
+        var captive = villager(helper, 15.5, 6.5, true);
+        Cow cow = cow(helper, 15.5, 8.5, false);
+        var stranger = villager(helper, 14.5, 7.5, false);
+        var late = villager(helper, 13.5, 7.5, true);
+        for (var led : List.<net.minecraft.world.entity.Mob>of(captive, cow, stranger, late)) {
+            led.setLeashedTo(p, true);
+        }
+        helper.assertTrue(trailer.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "an empty-handed click with cargo on the player's leads is a load");
+        helper.assertValueEqual(trailer.cargoAboard().size(), 2, "the two nearest that a rule admits boarded: the tagged villager and the cow");
+        helper.assertTrue(captive.getVehicle() == trailer && cow.getVehicle() == trailer, "both aboard");
+        helper.assertTrue(captive.getLeashHolder() == null && cow.getLeashHolder() == null, "both off their leads");
+        helper.assertValueEqual(trailer.cargo().adults(), 2, "each takes an adult's room");
+        helper.assertTrue(stranger.getVehicle() == null && stranger.getLeashHolder() == p, "a villager no rule admits stays on its lead");
+        helper.assertTrue(late.getVehicle() == null && late.getLeashHolder() == p, "the farthest cargo found no room");
+        int leads = 0;
+        for (ItemStack s : p.getInventory().items) {
+            if (s.is(Items.LEAD)) {
+                leads += s.getCount();
+            }
+        }
+        helper.assertValueEqual(leads, 1, "only the cow's lead came back; the villager's rule keeps nothing back");
+        helper.assertTrue(trailer.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "another empty-handed load is taken");
+        helper.assertTrue(!told.isEmpty() && key(told.get(told.size() - 1)).equals("vanillawheels.trailer_full"), "and the full trailer says so: " + told);
+        helper.runAtTickTime(5, () -> {
+            helper.assertTrue(captive.position().distanceTo(trailer.position()) < 1.5, "the villager stands in the cargo: " + captive.position().distanceTo(trailer.position()));
+            p.setShiftKeyDown(true);
+            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.CHAIN));
+            Vec3 door = trailer.rotate(trailer.profile().localBlocks(trailer.profile().doors().get(0).hinge()));
+            helper.assertTrue(trailer.interactAt(p, door, InteractionHand.MAIN_HAND).consumesAction(), "a crouch with the villager's lead item at the doors is taken");
+            helper.assertValueEqual(trailer.cargoAboard().size(), 0, "everyone is off");
+            helper.assertTrue(captive.getVehicle() == null && captive.getX() < trailer.getX() - 1.5, "the villager behind the trailer, which faces east: " + (captive.getX() - trailer.getX()));
+            helper.succeed();
+        });
+    }
+
+    /** D-0029: the empty hand loads only what a rule admits; with nothing led, the click is no load and says nothing. */
+    @GameTest(template = "runway", timeoutTicks = 20)
+    public void anEmptyHandWithNothingLedIsNoLoadAndALedCowStillGetsItsLeadBack(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle trailer = spawn(helper, BOX_TRAILER, 20.5, 7.5, -90.0f);
+        trailer.toggleDoors();
+        List<net.minecraft.network.chat.Component> told = new ArrayList<>();
+        Player p = listener(helper, 16.5, 7.5, told);
+        villager(helper, 15.5, 6.5, true);
+        helper.assertTrue(!trailer.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "cargo nobody leads: the empty hand is no load");
+        helper.assertTrue(told.isEmpty(), "and says nothing: " + told);
+        Cow cow = cow(helper, 15.5, 8.5, false);
+        cow.setLeashedTo(p, true);
+        helper.assertTrue(trailer.interact(p, InteractionHand.MAIN_HAND).consumesAction(), "a led cow makes the empty hand a load");
+        helper.assertTrue(cow.getVehicle() == trailer, "the cow boarded");
+        helper.assertTrue(p.getInventory().countItem(Items.LEAD) == 1, "and its lead came back");
+        helper.succeed();
+    }
+
     @GameTest(template = "runway", timeoutTicks = 20)
     public void aFactoryColourLeavesATrailerUndyedUntilADyeAndPackingKeepsIt(GameTestHelper helper) {
         layFloor(helper);

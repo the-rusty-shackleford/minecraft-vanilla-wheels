@@ -35,7 +35,29 @@ import net.neoforged.fml.common.Mod;
 public final class GameTestMod {
     public static final String MOD_ID = "vanillawheels_gametest";
 
+    /** The scoreboard tag that makes a villager cargo under {@link #CARGO}. */
+    public static final String CARGO_TAG = "vanillawheels_gametest.cargo";
+
+    /**
+     * A second mod's cargo rule (D-0029), as Serfdom's captives are: a villager tagged
+     * {@link #CARGO_TAG} rides as cargo, loads while the player holds its lead, is led by a chain,
+     * and keeps nothing back as it boards. Untagged villagers still take seats.
+     */
+    public static final com.chunkworks.vanillawheels.api.CargoRules.Rule CARGO = new com.chunkworks.vanillawheels.api.CargoRules.Rule() {
+        @Override public boolean rides(net.minecraft.world.entity.Entity e) {
+            return e instanceof net.minecraft.world.entity.npc.Villager && e.getTags().contains(CARGO_TAG);
+        }
+        @Override public boolean loads(net.minecraft.world.entity.Entity e, net.minecraft.world.entity.player.Player p) {
+            return ((net.minecraft.world.entity.npc.Villager) e).getLeashHolder() == p;
+        }
+        @Override public boolean leadsWith(net.minecraft.world.item.ItemStack stack) { return stack.is(Items.CHAIN); }
+        @Override public void boarding(net.minecraft.world.entity.Entity e, net.minecraft.world.entity.player.Player p) {
+            ((net.minecraft.world.entity.npc.Villager) e).dropLeash(true, false);
+        }
+    };
+
     public GameTestMod(IEventBus modBus) {
+        com.chunkworks.vanillawheels.api.CargoRules.register(CARGO);
         // The chest-spill gametest's apples vanished, once in a while, between the wrench and five
         // ticks later, and the taker was found by these two hooks (a mock rider's first-tick pickup
         // sweep from the world's origin, see VehicleGameTests.riderAt). They stay: whoever takes an

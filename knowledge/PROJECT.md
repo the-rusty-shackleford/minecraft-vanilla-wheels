@@ -7,6 +7,24 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.11.0 — built 2026-10-04, not released (Serfdom's captives in the trailer)
+
+For Serfdom's phase 2a (its D-0003): **other mods' cargo** (D-0029). `api/CargoRules` is a
+registry of what rides in a vehicle's cargo; animals on a lead are its first rule and behave as
+before. A rule says what rides as cargo (both sides), what a player may load now, which item leads
+it, and what becomes of its tether as it boards. Every check that asked `instanceof Animal` asks
+the registry (`cargoAboard()`; `animals()` kept for Trailer's tests). An **empty-handed click**
+now loads whatever the player leads that a rule admits, cows included, since a captive's chain is
+on the captive; with nothing led it is no load and says nothing. The message for nothing led
+reads "Nothing on your leads within ten blocks". Two GameTests, with the test mod's own rule (a
+villager tagged as cargo, led by a chain): another mod's cargo boards beside a cow on one empty
+hand, takes an adult's room, keeps no lead back, the full trailer says so, a crouch with its own
+lead item lets it out; and an empty hand with nothing led is no load while a led cow still gets
+its lead back. Gate (`./gradlew clean build`, 2026-10-04): 124 JUnit, 91 GameTests, the booth's
+47 checks, jar sha1 `fbc86b18`. Each new rule was run against a mutation and caught: no
+empty-hand load, only a lead unloading, only animals riding as cargo. Ships with Serfdom 0.3.0
+and Village Law 1.1.0, on Rusty's go.
+
 ## 1.10.1 — released 2026-09-30 in pack 1.70.0 (Rusty, 2026-09-29: "I want that second garage door wall bug fixed")
 
 Released on Rusty's "release this and the other shit from a previous session that isnt released

@@ -66,8 +66,8 @@ public final class RiderPose {
         PoseStack pose = event.getPoseStack();
         float yaw = Mth.rotLerp(event.getPartialTick(), v.yRotO, v.getYRot());
         // The model turns about the point the seat anchors on: a rider's eye (its seat hangs down
-        // from the eye, so the eye is what the body carries), an animal's feet.
-        double about = rider instanceof net.minecraft.world.entity.animal.Animal ? 0.0 : rider.getEyeHeight();
+        // from the eye, so the eye is what the body carries), cargo's feet.
+        double about = com.chunkworks.vanillawheels.api.CargoRules.rides(rider) ? 0.0 : rider.getEyeHeight();
         pose.pushPose();
         // A rider whose entity sits at the seat's eye is drawn back in the seat.
         pose.translate(shift.x, shift.y, shift.z);

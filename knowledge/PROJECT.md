@@ -22,12 +22,17 @@ This version is what Rotorcraft builds on, and changes nothing for a car, a trai
   engine loop (a rotor's note barely climbs; absent, a car's 0.75 to 1.6).
 - `drawExtras` gets the body's buffer asked for again after wheels of their own texture: the
   Chinook's booth crashed every frame without it ("Not building!").
+- A profile's `camera`: how far behind a rider's eye the third-person camera stands (absent, 1.5
+  and 1.5 a block of length, the number a car always had). The length rule put it 20 behind a
+  Huey's pilot, the helicopter a speck; the Huey names 16, the Chinook 22.
 
-Gate (2026-10-07): 126 JUnit, 95 GameTests and the booth (47 checks) green; the Huey's and the Chinook's booths draw the layered vehicles. The three new gametests use the
-tests' own kind, `SkidVehicle`. Each was run against its mutation and caught it. The gametest
-server now loads Backpacks+ 0.7.1, the pack's; it had pinned 0.7.0, which the sibling build no
-longer has, and two bag tests failed for it. The README no longer claims crashes wear a vehicle:
-none ever did.
+Gate (2026-10-07): 126 JUnit, 96 GameTests and the booth (47 checks) green; the Huey's and the
+Chinook's booths draw the layered vehicles. The three new gametests use the tests' own kind,
+`SkidVehicle`. Each was run against its mutation and caught it. The gametest server now loads
+Backpacks+ 0.7.1, the pack's; it had pinned 0.7.0, which the sibling build no longer has, and two
+bag tests failed for it. The README no longer claims crashes wear a vehicle: none ever did. The
+booth's run predates the `camera` commit (496ec4a); a car's distance is the same expression as
+before, and the Huey's and the Chinook's booths film the named one.
 
 ## 1.11.0 — released 2026-10-06 in pack 1.73.0 (Serfdom's captives in the trailer)
 

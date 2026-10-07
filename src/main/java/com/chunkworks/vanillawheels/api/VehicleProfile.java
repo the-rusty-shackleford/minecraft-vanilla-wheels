@@ -244,15 +244,30 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         ).apply(i, Seat::new));
     }
 
-    /** The wheels: one mesh drawn at each position, spinning; the steering ones turn. */
-    public record Wheels(double radius, List<WheelPosition> positions) {
+    /**
+     * The wheels: one mesh drawn at each position, spinning; the steering ones turn. With
+     * {@code drawn} false the positions are only where the vehicle touches the ground -- a
+     * helicopter's skids, a container's feet, drawn with the body -- so no wheel mesh is drawn
+     * at them and the lift builds the vehicle without wheels (D-0030).
+     */
+    public record Wheels(double radius, List<WheelPosition> positions, boolean drawn) {
         public static final Codec<Wheels> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.doubleRange(0.01, 64.0).fieldOf("radius").forGetter(Wheels::radius),
-                WheelPosition.CODEC.listOf(1, 16).fieldOf("positions").forGetter(Wheels::positions)
+                WheelPosition.CODEC.listOf(1, 16).fieldOf("positions").forGetter(Wheels::positions),
+                Codec.BOOL.optionalFieldOf("drawn", true).forGetter(Wheels::drawn)
         ).apply(i, Wheels::new));
 
         public Wheels {
             positions = List.copyOf(positions);
+        }
+
+        public Wheels(double radius, List<WheelPosition> positions) {
+            this(radius, positions, true);
+        }
+
+        /** effects: returns how many wheels the lift builds the vehicle with: one a position, none when they are not drawn */
+        public int parts() {
+            return drawn ? positions.size() : 0;
         }
     }
 

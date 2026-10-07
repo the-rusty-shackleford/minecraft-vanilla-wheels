@@ -33,14 +33,19 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * A profile's meshes, mirrored into the game's frame, oriented, cut into
- * the parts the renderer moves or colours, and baked: the body (paint
- * goes on it), the lamps (lit or not), the glass (drawn last, translucent),
- * each gauge's needle with its dial, each door with its hinge, the rest,
- * and the wheel with where it goes. Built once per profile and kept until
- * the meshes reload; every vehicle of that profile draws the same one.
+ * the parts the renderer moves or colours, and baked: the pieces another
+ * protocol moves (its extras, D-0030: a rotor, a spray boom), the body
+ * (paint goes on it), the lamps (lit or not), the glass (drawn last,
+ * translucent), each gauge's needle with its dial, each door with its
+ * hinge, the rest, and the wheel with where it goes. Built once per
+ * profile and set of extras, and kept until the meshes reload; every
+ * vehicle of that profile draws the same one.
  */
 public final class Appearance {
-    private static final Map<VehicleProfile, Appearance> CACHE = new ConcurrentHashMap<>();
+    /** What an appearance is built from: a profile and the extras another protocol cuts from it first. */
+    private record Key(VehicleProfile profile, List<VehicleProfile.PartSelector> extras) {}
+
+    private static final Map<Key, Appearance> CACHE = new ConcurrentHashMap<>();
 
     /** A needle and the dial it turns on, in blocks. */
     public record Needle(BakedMesh mesh, Dial dial, VehicleProfile.GaugeKind kind) {}
@@ -52,6 +57,8 @@ public final class Appearance {
     public record WheelSlot(Vec at, boolean steers, boolean right) {}
 
     public final ResourceLocation texture;
+    /** The extras' faces, in the order they were asked for, in blocks, unmoved: their owner turns and draws them. */
+    public final List<BakedMesh> extras;
     /** The wheel's texture: its own Blockbench project's if it has one, else the body's. */
     public final ResourceLocation wheelTexture;
     private static final ResourceLocation MISSING = ResourceLocation.withDefaultNamespace("textures/misc/unknown_server.png");
@@ -69,13 +76,14 @@ public final class Appearance {
     public final double cullRadius;
     public final double extent;
 
-    private Appearance(VehicleProfile p, Mesh frame, Mesh wheelMesh) {
+    private Appearance(VehicleProfile p, List<VehicleProfile.PartSelector> extras, Mesh frame, Mesh wheelMesh) {
         Transform t = p.toLocal();
         double scale = p.scale();
         Mesh local = frame.transformed(t).orientedOutward();
         // Each piece is cut from what the pieces before it left (Parts), so a door's lenses and
         // painted panels swing with the door and are not drawn a second time on the body.
         Parts cut = Parts.cut(local,
+                extras.stream().map(sel -> sel.transformed(t).selector()).toList(),
                 p.gauges().stream().map(g -> g.part().transformed(t).selector()).toList(),
                 p.doors().stream().map(d -> d.part().transformed(t).selector()).toList(),
                 p.headlights().flatMap(VehicleProfile.Headlights::part).map(sel -> sel.transformed(t).selector()),
@@ -98,6 +106,7 @@ public final class Appearance {
         }
         this.texture = p.texture().or(() -> MeshLibrary.INSTANCE.embeddedTexture(p.mesh())).orElse(MISSING);
         this.wheelTexture = p.wheelMesh().flatMap(MeshLibrary.INSTANCE::embeddedTexture).orElse(this.texture);
+        this.extras = cut.extras().stream().map(m -> BakedMesh.of(m, scale)).toList();
         this.rest = BakedMesh.of(cut.rest(), scale);
         this.body = BakedMesh.of(cut.body(), scale);
         this.lamps = BakedMesh.of(cut.lamps(), scale);
@@ -108,7 +117,8 @@ public final class Appearance {
         Mesh wheelLocal = wheelMesh.transformed(t).orientedOutward();
         this.wheel = BakedMesh.of(wheelLocal, scale);
         List<WheelSlot> ws = new ArrayList<>();
-        for (VehicleProfile.WheelPosition w : p.wheels().positions()) {
+        // Wheels that are not drawn are skids or feet in the body's own mesh: no wheel at them.
+        for (VehicleProfile.WheelPosition w : p.wheels().drawn() ? p.wheels().positions() : List.<VehicleProfile.WheelPosition>of()) {
             // A wheel's place is given as forward/right, the vehicle's own
             // sense, not as a mesh vector: it needs no mirror. The game's
             // local frame is right-handed with +Z forward, so its +X is the
@@ -122,10 +132,19 @@ public final class Appearance {
         this.cullRadius = Math.hypot(p.body().length() / 2, p.body().width() / 2) + 0.5;
     }
 
-    /** effects: returns the appearance of {@code profile}, building it on first sight */
+    /** effects: returns the appearance of {@code profile} with no extras, building it on first sight */
     public static Appearance of(VehicleProfile profile) {
-        return CACHE.computeIfAbsent(profile, p -> new Appearance(p, MeshLibrary.INSTANCE.get(p.mesh()),
-                MeshLibrary.INSTANCE.get(p.wheelMesh().orElse(p.mesh()))));
+        return of(profile, List.of());
+    }
+
+    /**
+     * effects: returns the appearance of {@code profile} with {@code extras} -- the parts another
+     * protocol moves and draws itself -- cut out first and kept apart in {@link #extras}, in that
+     * order; built on first sight of the pair
+     */
+    public static Appearance of(VehicleProfile profile, List<VehicleProfile.PartSelector> extras) {
+        return CACHE.computeIfAbsent(new Key(profile, List.copyOf(extras)), k -> new Appearance(k.profile(), k.extras(),
+                MeshLibrary.INSTANCE.get(k.profile().mesh()), MeshLibrary.INSTANCE.get(k.profile().wheelMesh().orElse(k.profile().mesh()))));
     }
 
     /** effects: forgets every appearance, so the next draw rebuilds from fresh meshes */

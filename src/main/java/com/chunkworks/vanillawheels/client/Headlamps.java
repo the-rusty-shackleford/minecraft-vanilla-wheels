@@ -20,7 +20,6 @@ package com.chunkworks.vanillawheels.client;
 import com.chunkworks.luminance.api.Luminance;
 import com.chunkworks.luminance.domain.Line;
 import com.chunkworks.luminance.domain.Source;
-import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.domain.Vec;
@@ -38,9 +37,15 @@ import net.minecraft.world.phys.Vec3;
 final class Headlamps {
     private Headlamps() {}
 
-    /** effects: tells Luminance how a vehicle lights the road */
+    /** effects: tells Luminance how a vehicle lights the road, for every entity type a vehicle can be (D-0030) */
     static void register() {
-        Luminance.forEntityInterpolated(ModContent.VEHICLE_ENTITY.get(), Headlamps::beams);
+        for (net.minecraft.world.entity.EntityType<? extends Vehicle> type : com.chunkworks.vanillawheels.api.VehicleKinds.types()) {
+            registerFor(type);
+        }
+    }
+
+    private static <T extends Vehicle> void registerFor(net.minecraft.world.entity.EntityType<T> type) {
+        Luminance.forEntityInterpolated(type, Headlamps::beams);
     }
 
     private static Collection<? extends Source> beams(Vehicle vehicle, float partialTick) {

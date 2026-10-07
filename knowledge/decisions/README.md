@@ -56,3 +56,5 @@ tags: [index]
 - [D-0028](D-0028.md): A block is a wall to the footprint where its cross-section at the climb line (the rectangle bounding its boxes that span the line) holds the point, not its whole bounds: a garage door's housing no longer walls its doorway, and fences, walls and stairs stop exactly where they did. The terrain fit's walks start from the body's own ground, so a door's track column is no longer ground three blocks up under a passing wheel.
 
 - [D-0029](D-0029.md): Cargo is a registry of rules (`api/CargoRules`), animals the first; another mod's rule says what rides, what loads, what leads it and what becomes of its tether. An empty-handed click loads whatever the player leads that a rule admits (a captive's chain is on the captive). Serfdom's captives are the first other rule.
+
+- [D-0030](D-0030.md): A protocol may be layered on this one: `api/VehicleKinds` lets it claim profiles for its own entity types, whose classes extend `Vehicle` and override its hooks (the wheel's tick, towing, policies, the engine loop); the renderer draws its extras; `wheels.drawn: false` is skids or feet. Rotorcraft is the first.

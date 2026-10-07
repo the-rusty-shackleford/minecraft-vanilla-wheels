@@ -25,8 +25,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Partitions. The exact parts; no chassis; too few wheels; too many;
- * a missing engine; an engine where none is wanted (a trailer); zero
- * wheels refused.
+ * a missing engine; an engine where none is wanted (a trailer); no drawn
+ * wheels (a helicopter's skids, a container's feet: D-0030), powered and
+ * not; fewer than no wheels refused.
  */
 final class AssemblyTest {
 
@@ -41,6 +42,17 @@ final class AssemblyTest {
         Assembly trailer = new Assembly(2, false);
         assertTrue(trailer.accepts(true, 2, false));
         assertFalse(trailer.accepts(true, 2, true), "an engine a trailer has no place for");
-        assertThrows(IllegalArgumentException.class, () -> new Assembly(0, true));
+        assertThrows(IllegalArgumentException.class, () -> new Assembly(-1, true));
+    }
+
+    @Test
+    void aVehicleWithNoDrawnWheelsTakesAChassisAndItsEngineOnly() {
+        Assembly helicopter = new Assembly(0, true);
+        assertTrue(helicopter.accepts(true, 0, true));
+        assertFalse(helicopter.accepts(true, 1, true), "a wheel its skids have no place for");
+        assertFalse(helicopter.accepts(true, 0, false), "no engine");
+        Assembly container = new Assembly(0, false);
+        assertTrue(container.accepts(true, 0, false), "a chassis alone");
+        assertFalse(container.accepts(false, 0, false), "nothing at all builds nothing");
     }
 }

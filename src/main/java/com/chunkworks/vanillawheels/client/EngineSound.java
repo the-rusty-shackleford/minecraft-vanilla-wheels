@@ -49,10 +49,16 @@ public final class EngineSound extends AbstractTickableSoundInstance {
         this.z = vehicle.getZ();
     }
 
+    /**
+     * effects: returns the loop the profile names: a registered sound event, or -- since a vehicle
+     * mod is data and registers nothing -- one its own {@code sounds.json} alone defines, which the
+     * sound manager finds by its id all the same (D-0030); the petrol engine when it names none
+     */
     private static SoundEvent soundOf(Vehicle vehicle) {
         VehicleProfile p = vehicle.profile();
-        if (p != null) {
-            return p.sounds().engine().flatMap(BuiltInRegistries.SOUND_EVENT::getOptional).orElse(ModContent.ENGINE_PETROL.get());
+        if (p != null && p.sounds().engine().isPresent()) {
+            net.minecraft.resources.ResourceLocation id = p.sounds().engine().get();
+            return BuiltInRegistries.SOUND_EVENT.getOptional(id).orElseGet(() -> SoundEvent.createVariableRangeEvent(id));
         }
         return ModContent.ENGINE_PETROL.get();
     }
@@ -76,13 +82,11 @@ public final class EngineSound extends AbstractTickableSoundInstance {
         x = vehicle.getX();
         y = vehicle.getY();
         z = vehicle.getZ();
-        VehicleProfile p = vehicle.profile();
-        boolean running = p != null && p.isPowered() && vehicle.getControllingPassenger() != null && vehicle.hasFuel();
-        if (!running) {
+        if (!vehicle.engineRunning()) {
             volume = Math.max(0.0f, volume - 0.05f);
             return;
         }
-        float fraction = Math.min(1.0f, Math.abs(vehicle.speed()) / (float) vehicle.tuning().maxSpeed());
+        float fraction = vehicle.engineLoad();
         // A boost is heard: the engine climbs past its top note by the burn, and a little louder.
         float burn = vehicle.burn();
         // A continuous bed beneath action cues, eased on entry and boost changes.

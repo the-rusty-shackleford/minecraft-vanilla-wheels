@@ -7,6 +7,25 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.12.0 — built, not released (Rotorcraft's helicopters; layering, D-0030)
+
+Rusty asked for a Huey and a Chinook (2026-10-06), and for Rotorcraft to be a protocol of its own
+rather than flight inside this one. The plan is `~/.claude/plans/i-want-to-add-curious-locket.md`.
+This version is what Rotorcraft builds on, and changes nothing for a car, a trailer or the network
+(protocol still 6):
+- `api/VehicleKinds`: a protocol claims profiles for its own entity types, whose classes extend
+  `Vehicle`, and `Vehicle.create` asks it first.
+- Overridable hooks in `Vehicle`, each defaulting to what it always did.
+- `VehicleRenderer`'s `appearance` and `drawExtras` hooks; `Appearance.of(profile, extras)`.
+- `wheels.drawn: false` for skids and feet (the lift asks no wheels).
+- Sounds a data mod's own `sounds.json` defines.
+
+Gate so far (2026-10-06): 126 JUnit and 94 GameTests green. The three new gametests use the
+tests' own kind, `SkidVehicle`. Each was run against its mutation and caught it. The gametest
+server now loads Backpacks+ 0.7.1, the pack's; it had pinned 0.7.0, which the sibling build no
+longer has, and two bag tests failed for it. The README no longer claims crashes wear a vehicle:
+none ever did.
+
 ## 1.11.0 — released 2026-10-06 in pack 1.73.0 (Serfdom's captives in the trailer)
 
 Released with Serfdom 0.8.0 and Village Law 1.1.0 on Rusty's go ("release all three"), from the

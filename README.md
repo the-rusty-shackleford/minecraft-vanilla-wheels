@@ -1,13 +1,12 @@
 # Vanilla Wheels
 
-**[Version 1.10.0](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.10.0)**
-is published and deployed in shared pack **1.69.0**. Its network protocol is 6, so the client
-and server must both run 1.10.0; shared-pack players can use **Update Pack** in Prism.
+**[Version 1.11.0](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.11.0)**
+is published and deployed in shared pack **1.73.0**. Its network protocol is 6, so the client
+and server must both run a 1.10 or later; shared-pack players can use **Update Pack** in Prism.
 
-**1.10.1** is built and verified but not released (D-0028). A vehicle drives through a garage door
-whose top row its climb reaches, and its body stays on its wheels and level through any open
-door. The protocol is still 6, so a 1.10.0 client can join a 1.10.1 server, but its own vehicle
-keeps 1.10.0's footprint and pose until the player updates.
+**1.12.0** is built but not released (D-0030): other protocols can be layered on this one (see
+[Layering](#layering-a-protocol-on-this-one-1120)); Rotorcraft's helicopters are the first. Nothing
+changes for a car, a trailer or the network.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
@@ -260,8 +259,10 @@ knock, not wear -- punching a car up must not hand you a wreck.
 
 ## Damage, repairs and recovery keys (1.8.0)
 
-Vehicles have persistent condition. Mobs, arrows and bullets, explosions, fire and crashes
-wear it; a player's own blow is a knock toward packing it, not wear (D-0025). Worn to nothing, a
+Vehicles have persistent condition. Mobs, arrows and bullets, explosions and fire wear it; a
+player's own blow is a knock toward packing it, not wear (D-0025). Driving into a wall or landing
+hard does not: a car's crash costs it speed, not condition (this said "crashes" until 1.12.0, which
+no version did). Worn to nothing, a
 vehicle drops as a packed wreck with its cargo intact. Set it down and right-click it back up, or
 repair it on a Mechanic Lift; its engine cannot run until it has some condition. Older vehicles
 and items start at full condition.
@@ -361,7 +362,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "body": {"width": 2.75, "length": 5.4, "height": 1.9,
            "parts": [{"at": [0, 3, 21], "width": 2.75, "height": 1.55}]},   // hit boxes
   "seats": [{"at": [-8, 10, 10], "driver": true, "eye": [0, 22, 14]}, {"at": [8, 10, 10]}],   // eye: where the rider's eye goes, the body still drawn at "at" (optional)
-  "wheels": {"radius": 12, "positions": [{"forward": 24, "right": -16, "steers": true}, {"forward": -23, "right": 16}]},   // "up" defaults to the radius: a wheel on the ground
+  "wheels": {"radius": 12, "positions": [{"forward": 24, "right": -16, "steers": true}, {"forward": -23, "right": 16}]},   // "up" defaults to the radius: a wheel on the ground; "drawn": false makes them skids or feet (1.12.0)
   "engine": {"max_speed": 0.9, "acceleration": 0.02, "reverse_speed": 0.3, "brake": 0.05, "drag": 0.01},
   "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
   "climb": 2.0, "mass": 1.45,
@@ -407,6 +408,34 @@ The optional `repair` field names a normal ingredient and the whole-vehicle cost
 `"repair": {"ingredient": {"tag": "c:ingots/steel"}, "full_cost": 20}`.
 The count must be 1–64; omitted policies default to 20 steel. Vehicle packs can
 select iron or other ingredients independently of their chassis crafting recipe.
+
+## Layering a protocol on this one (1.12.0)
+
+A protocol can build vehicles of its own on this one (D-0030), as Rotorcraft builds its aircraft:
+
+- **Kinds.** `api/VehicleKinds.register(new Kind(claims, type))` from the mod's constructor. A
+  kind claims profile ids (decided by what both sides see, such as its own synced registry) and
+  names an entity type whose class extends `Vehicle`. Everything that makes a vehicle asks the
+  kinds first: `Vehicle.create`, so the lift's Build, a vehicle item set down, a trailer put on a
+  hitch and a key's recall. The headlamps light the road for every kind.
+- **Hooks.** `Vehicle` defaults each of these to what it always did:
+  - a tick at the wheel: `takeTheWheel`, `stepAtTheWheel`, `poseAtTheWheel`;
+  - towing: `follow`, `poseTowed`;
+  - `footprintClamp`;
+  - the server's policies: `burnsFuel`, `runsOver`, `breaksFragile`;
+  - the engine loop: `engineRunning`, `engineLoad`;
+  - helpers for a subclass: `columns`, `rideTheGround`, `sharePose`, `takeSharedPose`,
+    `playerAtTheHead`, `showSpeed`, `pose`.
+- **Drawing.** Extend `VehicleRenderer`: `appearance` asks for `Appearance.of(profile, extras)`,
+  which cuts the parts the subclass moves out of the body first, and `drawExtras` draws them in
+  the body's frame.
+- **Wheels that are not drawn.** `"wheels": {"drawn": false, ...}`: the positions are where skids
+  or feet touch the ground, drawn with the body. No wheel mesh is drawn there, and the lift builds
+  the vehicle from its chassis (and engine) without wheels.
+- **Sounds a data mod ships.** A profile's `sounds.engine` may name a sound that only the vehicle
+  mod's own `sounds.json` defines; it is played all the same.
+
+The gametests' own `SkidVehicle` is a kind at its smallest.
 
 ## Towing and animals
 
@@ -512,13 +541,14 @@ trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
 `LiftMotion`, `LiftStatus` and `Assembly`, `Paint`, and the mesh library (`Obj`,
 `BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
 `WheelSpin`, `BodyPose`, `BakedMesh`).
-`src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`), the `Vehicle` entity
+`src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`, `CargoRules`, `VehicleKinds`), the `Vehicle` entity
 and its parts, `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `lift` (the two blocks, the
 block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary`,
 `Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
 the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,
-texture and profile generated by `devtools/art/build.py`) and a box trailer, 89
-gametests and the photo booth -- a mod of its own, never shipped.
+texture and profile generated by `devtools/art/build.py`), a box trailer, the box skids made by
+its own vehicle kind (`SkidVehicle`, D-0030), 94 gametests and the photo booth -- a mod of its own,
+never shipped.
 
 ## Building and looking at it
 

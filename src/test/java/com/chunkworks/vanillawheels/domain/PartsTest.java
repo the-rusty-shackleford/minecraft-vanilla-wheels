@@ -34,7 +34,10 @@ import org.junit.jupiter.api.Test;
  * reflectors, lenses nested in its doors: in the doors' lamps and not the
  * body's. The pickup's tailgate panels, paint nested in its door: in the
  * door's paint and not the body's. A small mesh: within a door, a face in
- * both lenses and paint is a lens; an absent selector cuts nothing.
+ * both lenses and paint is a lens; an absent selector cuts nothing; an
+ * extra (another protocol's moving piece, D-0030) is cut before
+ * everything, so a painted blade in it is neither the body's paint nor a
+ * door's, and two extras never share a face.
  */
 final class PartsTest {
 
@@ -74,7 +77,8 @@ final class PartsTest {
 
     /** effects: returns every piece of {@code p}, a door's three pieces each on their own */
     private static List<Mesh> pieces(Parts p) {
-        List<Mesh> all = new ArrayList<>(p.needles());
+        List<Mesh> all = new ArrayList<>(p.extras());
+        all.addAll(p.needles());
         for (Parts.Door d : p.doors()) {
             all.add(d.lamps());
             all.add(d.painted());
@@ -154,6 +158,26 @@ final class PartsTest {
         assertEquals(List.of(), groups(p.lamps()));
         assertEquals(List.of(), groups(p.glass()));
         assertEquals(List.of(), groups(p.cockpit()));
+        assertEquals(List.of(side.group()), groups(p.body()));
+        assertEquals(List.of(), groups(p.rest()));
+    }
+
+    @Test
+    void anExtraIsCutFirstSoItsPaintedBladeTurnsWithItAndTwoExtrasShareNoFace() {
+        List<Vec> positions = List.of(new Vec(0, 0, 0), new Vec(1, 0, 0), new Vec(0, 1, 0));
+        List<Corner> corners = List.of(new Corner(0, 0), new Corner(1, 0), new Corner(2, 0));
+        Face blade = new Face("m", "rotor_main/paint/blade", corners, Vec.Y);
+        Face hub = new Face("m", "rotor_main/hub", corners, Vec.Y);
+        Face tail = new Face("m", "rotor_tail/blade", corners, Vec.Y);
+        Face side = new Face("m", "body/paint/side", corners, Vec.Y);
+        Face door = new Face("m", "body/door/paint/panel", corners, Vec.Y);
+        Mesh mesh = Mesh.of(positions, List.of(new Uv(0, 0)), List.of(blade, hub, tail, side, door));
+        // "blade" names both rotors' blades: the main rotor, first, takes its own; the tail's stays the tail's.
+        Parts p = Parts.cut(mesh, List.of(Selector.group("rotor_main"), Selector.group("blade")), List.of(), List.of(Selector.group("door")),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(Selector.group("paint")));
+        assertEquals(List.of(blade.group(), hub.group()), groups(p.extras().get(0)));
+        assertEquals(List.of(tail.group()), groups(p.extras().get(1)));
+        assertEquals(List.of(door.group()), groups(p.doors().get(0).painted()));
         assertEquals(List.of(side.group()), groups(p.body()));
         assertEquals(List.of(), groups(p.rest()));
     }

@@ -389,6 +389,29 @@ public final class LiftGameTests {
         });
     }
 
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void buildMakesAProfileWhoseWheelsAreNotDrawnFromItsChassisAndEngineAloneAsTheKindThatClaimsIt(GameTestHelper helper) {
+        // The box skids: the box car with its wheels not drawn (skids in the body, D-0030), claimed by the tests' own kind.
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftMenu menu = open(helper, sp, CONTROLLER);
+        menu.getSlot(LiftMenu.CHASSIS).set(ModContent.chassisStack(GameTestMod.BOX_SKIDS));
+        menu.getSlot(LiftMenu.WHEELS).set(new ItemStack(ModContent.WHEEL.get(), 4));
+        menu.getSlot(LiftMenu.ENGINE).set(new ItemStack(ModContent.ENGINE.get()));
+        menu.broadcastChanges();
+        helper.assertValueEqual(menu.buildStatus(), LiftStatus.Build.NO_RECIPE, "four wheels its skids have no place for");
+        menu.getSlot(LiftMenu.WHEELS).set(ItemStack.EMPTY);
+        menu.broadcastChanges();
+        helper.assertValueEqual(menu.buildStatus(), LiftStatus.Build.READY, "a chassis and an engine build it");
+        helper.assertTrue(menu.clickMenuButton(sp, LiftMenu.BUILD_BUTTON), "built");
+        List<Vehicle> built = helper.getLevel().getEntitiesOfClass(Vehicle.class, lift(helper, CONTROLLER).deckBox());
+        helper.assertValueEqual(built.size(), 1, "one vehicle on the deck");
+        helper.assertTrue(built.get(0) instanceof SkidVehicle, "made by the kind that claims it: " + built.get(0));
+        helper.assertTrue(menu.getSlot(LiftMenu.CHASSIS).getItem().isEmpty() && menu.getSlot(LiftMenu.ENGINE).getItem().isEmpty(), "the chassis and the engine were used");
+        helper.succeed();
+    }
+
     @GameTest(template = "arena", timeoutTicks = 120)
     public void paintColoursTheCarOnTheDeckTakesOneDyeAndRefusesAnEmptyDeckACarBesideItAndNoDye(GameTestHelper helper) {
         layFloor(helper);

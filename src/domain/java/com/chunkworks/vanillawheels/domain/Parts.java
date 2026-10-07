@@ -22,7 +22,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A vehicle's mesh cut into the pieces the renderer draws apart: each
+ * A vehicle's mesh cut into the pieces the renderer draws apart: the
+ * pieces another protocol moves (a rotor, a spray boom: D-0030), each
  * needle, each door (its lenses, its painted panels and the rest of it),
  * the body's lenses, glass, cockpit and paint, and what is left. Every cut
  * takes from what the cuts before it left, so each face is in exactly one
@@ -31,25 +32,40 @@ import java.util.Optional;
  * cut from the whole mesh, the trailer's rear reflectors were drawn twice,
  * once swinging with the door and once where the shut door stood.
  */
-public record Parts(List<Mesh> needles, List<Door> doors, Mesh lamps, Mesh glass, Mesh cockpit, Mesh body, Mesh rest) {
+public record Parts(List<Mesh> extras, List<Mesh> needles, List<Door> doors, Mesh lamps, Mesh glass, Mesh cockpit, Mesh body, Mesh rest) {
 
     /** A door's faces: its lenses (lit with the lamps), its painted panels, and the rest of it. */
     public record Door(Mesh lamps, Mesh painted, Mesh rest) {}
 
     public Parts {
+        extras = List.copyOf(extras);
         needles = List.copyOf(needles);
         doors = List.copyOf(doors);
     }
 
+    /** effects: returns {@code mesh} cut with no extra pieces: {@link #cut(Mesh, List, List, List, Optional, Optional, Optional, Optional)} with none */
+    public static Parts cut(Mesh mesh, List<Selector> needles, List<Selector> doors,
+            Optional<Selector> lamps, Optional<Selector> glass, Optional<Selector> cockpit, Optional<Selector> paint) {
+        return cut(mesh, List.of(), needles, doors, lamps, glass, cockpit, paint);
+    }
+
     /**
-     * effects: returns {@code mesh} cut in this order -- the needles, the
+     * effects: returns {@code mesh} cut in this order -- the extras (what
+     * another protocol moves, first, so a rotor's painted blade turns with
+     * the rotor and is not painted on the body as well), the needles, the
      * doors, then the lenses, glass, cockpit and paint -- each from what the
      * cuts before it left; within a door, its lenses before its paint; an
      * absent selector cuts nothing
      */
-    public static Parts cut(Mesh mesh, List<Selector> needles, List<Selector> doors,
+    public static Parts cut(Mesh mesh, List<Selector> extras, List<Selector> needles, List<Selector> doors,
             Optional<Selector> lamps, Optional<Selector> glass, Optional<Selector> cockpit, Optional<Selector> paint) {
         Mesh remaining = mesh;
+        List<Mesh> xs = new ArrayList<>();
+        for (Selector s : extras) {
+            Mesh extra = remaining.part(s);
+            remaining = remaining.without(extra);
+            xs.add(extra);
+        }
         List<Mesh> ns = new ArrayList<>();
         for (Selector s : needles) {
             Mesh needle = remaining.part(s);
@@ -73,7 +89,7 @@ public record Parts(List<Mesh> needles, List<Door> doors, Mesh lamps, Mesh glass
         remaining = remaining.without(cockpitMesh);
         Mesh bodyMesh = pick(remaining, paint);
         remaining = remaining.without(bodyMesh);
-        return new Parts(ns, ds, lampMesh, glassMesh, cockpitMesh, bodyMesh, remaining);
+        return new Parts(xs, ns, ds, lampMesh, glassMesh, cockpitMesh, bodyMesh, remaining);
     }
 
     /** effects: returns the faces of {@code from} that {@code selector} picks, none when it is absent */

@@ -227,13 +227,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /**
      * effects: returns a new vehicle of profile {@code id} at {@code at}
-     * facing {@code yaw} degrees, not yet in the level; null if the level
-     * has no such profile
+     * facing {@code yaw} degrees, not yet in the level, made by the entity
+     * type of the kind that claims the profile ({@link com.chunkworks.vanillawheels.api.VehicleKinds},
+     * D-0030); null if the level has no such profile
      */
     @Nullable
     public static Vehicle create(ServerLevel level, ResourceLocation id, Vec3 at, float yaw) {
-        Vehicle v = ModContent.VEHICLE_ENTITY.get().create(level);
-        if (v == null || VanillaWheels.profile(level.registryAccess(), id).isEmpty()) {
+        if (VanillaWheels.profile(level.registryAccess(), id).isEmpty()) {
+            return null;
+        }
+        Vehicle v = com.chunkworks.vanillawheels.api.VehicleKinds.typeOf(level.registryAccess(), id).create(level);
+        if (v == null) {
             return null;
         }
         v.setProfile(id);
@@ -978,7 +982,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * for the chain it drives, the server for a chain nobody drives. The server moves its copy of a
      * player's trailer but takes the pose the driver's client shares, so the two never fight.
      */
-    private void poseTowed(VehicleProfile p, Vehicle tower) {
+    protected void poseTowed(VehicleProfile p, Vehicle tower) {
         if (!level().isClientSide() && playerAtTheHead()) {
             takeSharedPose();
             return;
@@ -990,7 +994,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /** effects: returns whether a player drives the head of this body's tow chain */
-    private boolean playerAtTheHead() {
+    protected boolean playerAtTheHead() {
         Vehicle head = this;
         for (int i = 0; i < 8 && head.tower() != null; i++) {
             head = head.tower();
@@ -999,7 +1003,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /** effects: draws and seats with the pose the simulating side shared */
-    private void takeSharedPose() {
+    protected void takeSharedPose() {
         suspension = new Suspension(entityData.get(DATA_LIFT), entityData.get(DATA_PITCH), entityData.get(DATA_ROLL));
     }
 
@@ -1011,7 +1015,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * synced data straight, a client tells the server, which sets it for all; only when it moved
      * more than a hair since the last share
      */
-    private void sharePose() {
+    protected void sharePose() {
         float lift = (float) suspension.lift(), pitch = (float) suspension.pitch(), roll = (float) suspension.roll();
         if (!Float.isNaN(sharedLift) && Math.abs(lift - sharedLift) < 0.005f && Math.abs(pitch - sharedPitch) < 0.003f && Math.abs(roll - sharedRoll) < 0.003f) {
             return;
@@ -1050,9 +1054,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * go. Tows its own trailer on in turn. Distances are horizontal: a
      * drawbar is rigid only in the ground plane, each body keeps its own
      * height, and a 3-D test spent the catch radius on the height between a
-     * low coupler and a high ball and broke the chain at a one-block step.
+     * low coupler and a high ball and broke the chain at a one-block step. A protocol built on this
+     * one (D-0030) may hang its loads from their tower some other way: a rope, say.
      */
-    private void follow(Vehicle tower) {
+    protected void follow(Vehicle tower) {
         VehicleProfile p = profile();
         Vec3 hitch = tower.hitchPoint();
         if (p == null || hitch == null || p.hitch().front().isEmpty()) {
@@ -1241,57 +1246,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         // test asks the player, whose test double answers "local" everywhere.)
         boolean atTheWheel = tower == null && (level().isClientSide() ? isControlledByLocalInstance() : !(getControllingPassenger() instanceof Player));
         if (atTheWheel && !wasAtTheWheel) {
-            // Taking the wheel: drive on from where the world has this, not from where this copy was born.
-            // A client boards a copy it may have seen for a single tick, or none, so there is no earlier
-            // tick to have kept the model current.
-            drive = synced();
+            takeTheWheel();
         }
         wasAtTheWheel = atTheWheel;
         if (atTheWheel) {
-            Input in = level().isClientSide() ? Controls.input(this)
-                    : scripted != null ? new Input(scripted.throttle(), scripted.steer(), scripted.drift(), grounded(), hasFuel())
-                    : Input.coasting(grounded(), hasFuel());
-            if (!level().isClientSide()) {
-                throttle = in.throttle();
-            }
-            Drive.Step step = drive.step(in, tuning);
-            drive = step.next();
-            if (level().isClientSide()) {
-                Controls.report(this, drive, in, step.effects());
-            }
-            setYRot((float) Math.toDegrees(drive.heading()));
-            Vec3 motion = getDeltaMovement();
-            double vy = onGround() && motion.y <= 0 ? -0.04 : motion.y - 0.08;
-            setDeltaMovement(drive.velocityX(), vy, drive.velocityZ());
-            move(MoverType.SELF, getDeltaMovement());
-            if (onGround() && getDeltaMovement().y < 0) {
-                setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
-            }
-            if (moveKept < 0.999) {
-                // A wall: the speed the world refused is gone, not spent spinning the wheels against
-                // it -- all of it met square, a little scraped along at a slant.
-                if (!vehicleContact) {
-                    double lostX = getDeltaMovement().x == 0 ? step.next().velocityX() : 0;
-                    double lostZ = getDeltaMovement().z == 0 ? step.next().velocityZ() : 0;
-                    // Footprint collisions can clip without changing deltaMovement. The blocked
-                    // displacement supplies their normal; glancing contacts retain their tangent.
-                    if (Math.hypot(lostX, lostZ) < 1e-7) {
-                        lostX = blockedX; lostZ = blockedZ;
-                    }
-                    if (Math.hypot(lostX, lostZ) > 1e-7) {
-                        drive = drive.impacted(Impact.wall(new Impact.Velocity(step.next().velocityX(), step.next().velocityZ()), lostX, lostZ));
-                    } else drive = drive.slowed(moveKept);
-                }
-            }
-            wheelTravel += drive.speed();
-            if (level().isClientSide()) {
-                entityData.set(DATA_SPEED, (float) drive.speed());
-                entityData.set(DATA_STEER, (float) drive.steer());
-                entityData.set(DATA_DRIFTING, drive.drifting());
-                entityData.set(DATA_BURN, (float) drive.burn(tuning));
-            } else {
-                syncDriveData();
-            }
+            stepAtTheWheel(p);
         } else if (!towedHere) {
             setDeltaMovement(Vec3.ZERO);
             wheelTravel += entityData.get(DATA_SPEED);
@@ -1303,8 +1262,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             }
             // else: the tower ticks later this pass and moves and poses this body then
         } else if (atTheWheel) {
-            rideTheGround(p);
-            sharePose();
+            poseAtTheWheel(p);
         } else {
             takeSharedPose();
         }
@@ -1321,6 +1279,76 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
     }
 
+    /**
+     * effects: this side takes the wheel: drives on from where the world has this, not from where
+     * this copy was born. A client boards a copy it may have seen for a single tick, or none, so
+     * there is no earlier tick to have kept the model current. A protocol built on this one
+     * (D-0030) seeds its own model here.
+     */
+    protected void takeTheWheel() {
+        drive = synced();
+    }
+
+    /**
+     * effects: one tick at the wheel, on the side that holds it: the driver's input (the local
+     * player's keys on a client, the script or nobody on the server) stepped through {@link Drive},
+     * the body turned and moved through the world, a wall's refused speed taken off, and the drive
+     * state shown to everyone. A protocol built on this one (D-0030) moves its vehicles its own way
+     * here; the pose follows in {@link #poseAtTheWheel}.
+     */
+    protected void stepAtTheWheel(VehicleProfile p) {
+        Input in = level().isClientSide() ? Controls.input(this)
+                : scripted != null ? new Input(scripted.throttle(), scripted.steer(), scripted.drift(), grounded(), hasFuel())
+                : Input.coasting(grounded(), hasFuel());
+        if (!level().isClientSide()) {
+            throttle = in.throttle();
+        }
+        Drive.Step step = drive.step(in, tuning);
+        drive = step.next();
+        if (level().isClientSide()) {
+            Controls.report(this, drive, in, step.effects());
+        }
+        setYRot((float) Math.toDegrees(drive.heading()));
+        Vec3 motion = getDeltaMovement();
+        double vy = onGround() && motion.y <= 0 ? -0.04 : motion.y - 0.08;
+        setDeltaMovement(drive.velocityX(), vy, drive.velocityZ());
+        move(MoverType.SELF, getDeltaMovement());
+        if (onGround() && getDeltaMovement().y < 0) {
+            setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
+        }
+        if (moveKept < 0.999) {
+            // A wall: the speed the world refused is gone, not spent spinning the wheels against
+            // it -- all of it met square, a little scraped along at a slant.
+            if (!vehicleContact) {
+                double lostX = getDeltaMovement().x == 0 ? step.next().velocityX() : 0;
+                double lostZ = getDeltaMovement().z == 0 ? step.next().velocityZ() : 0;
+                // Footprint collisions can clip without changing deltaMovement. The blocked
+                // displacement supplies their normal; glancing contacts retain their tangent.
+                if (Math.hypot(lostX, lostZ) < 1e-7) {
+                    lostX = blockedX; lostZ = blockedZ;
+                }
+                if (Math.hypot(lostX, lostZ) > 1e-7) {
+                    drive = drive.impacted(Impact.wall(new Impact.Velocity(step.next().velocityX(), step.next().velocityZ()), lostX, lostZ));
+                } else drive = drive.slowed(moveKept);
+            }
+        }
+        wheelTravel += drive.speed();
+        if (level().isClientSide()) {
+            entityData.set(DATA_SPEED, (float) drive.speed());
+            entityData.set(DATA_STEER, (float) drive.steer());
+            entityData.set(DATA_DRIFTING, drive.drifting());
+            entityData.set(DATA_BURN, (float) drive.burn(tuning));
+        } else {
+            syncDriveData();
+        }
+    }
+
+    /** effects: poses the body after a tick at the wheel: on the ground under it ({@link #rideTheGround}), shared with every other side; a protocol built on this one (D-0030) poses its own */
+    protected void poseAtTheWheel(VehicleProfile p) {
+        rideTheGround(p);
+        sharePose();
+    }
+
     /** effects: returns the drive as the world tells it: the synced speed, steer and drift, on rails along the yaw */
     private Drive synced() {
         float steer = entityData.get(DATA_STEER);
@@ -1335,7 +1363,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * on the plane within the sink and float bounds, the descending end kept clear -- so a
      * staircase is one steady angle, a wall flattens the fit, and a physics step-up never shows
      */
-    void rideTheGround(VehicleProfile p) {
+    protected void rideTheGround(VehicleProfile p) {
         pose = Terrain.step(columns(), frame(), shape(p), getY(), pose == null ? Terrain.Pose.level(getY() + suspension.lift()) : pose);
         suspension = pose.suspension(getY());
     }
@@ -1364,7 +1392,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /** effects: returns the ground as {@link Terrain} reads it: block collision tops in a column, relative to this body's y */
-    private Terrain.Columns columns() {
+    protected Terrain.Columns columns() {
         double y = getY();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         return (x, z, lo, hi) -> {
@@ -1463,7 +1491,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** The server's per-tick duties: fuel, lights, the horn, running things over. */
     private void serverTick(VehicleProfile p) {
-        if (throttle != 0 && (getControllingPassenger() != null || scripted != null) && fuelRequired()) {
+        if (burnsFuel() && fuelRequired()) {
             Tank tank = tank().burn(1);
             entityData.set(DATA_FUEL, tank.ticks());
         }
@@ -1484,11 +1512,55 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         contactWith.removeIf((int id) -> !(level().getEntity(id) instanceof Vehicle other)
                 || !getBoundingBox().inflate(0.25).intersects(other.getBoundingBox()));
-        runOver(p);
+        if (runsOver()) {
+            runOver(p);
+        }
         catchTrailer(p);
         if (tickCount % 20 == 0) {
             relink();
         }
+    }
+
+    // --- what a protocol built on this one may change (D-0030) ------------
+
+    /** effects: returns whether the engine burns fuel this tick: under throttle, with someone or a script at the wheel */
+    protected boolean burnsFuel() {
+        return throttle != 0 && (getControllingPassenger() != null || scripted != null);
+    }
+
+    /** effects: returns whether this body runs over the living in its path */
+    protected boolean runsOver() {
+        return true;
+    }
+
+    /** effects: returns whether this body, driven into them, breaks the blocks tagged fragile */
+    protected boolean breaksFragile() {
+        return true;
+    }
+
+    /** effects: returns whether the engine is heard running: a powered vehicle with someone at the wheel and fuel to run on */
+    public boolean engineRunning() {
+        VehicleProfile p = profile();
+        return p != null && p.isPowered() && getControllingPassenger() != null && hasFuel();
+    }
+
+    /** effects: returns how hard the engine works, 0..1, for its note: the speed as a share of the top speed */
+    public float engineLoad() {
+        return Math.min(1.0f, Math.abs(speed()) / (float) tuning.maxSpeed());
+    }
+
+    /** effects: shows every side the body's speed: what spins the wheels, sounds the engine and turns the speed needle; no steer, drift or burn */
+    protected void showSpeed(float speed) {
+        entityData.set(DATA_SPEED, speed);
+        entityData.set(DATA_STEER, 0.0f);
+        entityData.set(DATA_DRIFTING, false);
+        entityData.set(DATA_BURN, 0.0f);
+    }
+
+    /** effects: sets the body's drawn pose to {@code s}, as {@link #rideTheGround} would have; share it with {@link #sharePose} */
+    protected void pose(Suspension s) {
+        suspension = s;
+        pose = new Terrain.Pose(s.pitch(), s.roll(), getY() + s.lift(), 0.0, 0.0);
     }
 
     /** effects: hurts and shoves every living thing in the body's path this tick, once each per half second */
@@ -1607,7 +1679,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             double approach = type == MoverType.PLAYER ? Math.max(asked, Math.abs(entityData.get(DATA_SPEED))) : asked;
             Vec3 incoming = delta.scale(Math.min(approach, tuning.maxSpeed() * Drive.BOOST_CAP) / asked);
             resolveContacts(incoming);
-            if (!level().isClientSide()) breakFragile(incoming);
+            if (!level().isClientSide() && breaksFragile()) breakFragile(incoming);
         }
     }
 
@@ -1727,7 +1799,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * body can always back out. Both sides run it, so the server's re-run of
      * a driver's move agrees with the client's.
      */
-    private Vec3 footprintClamp(Vec3 delta) {
+    protected Vec3 footprintClamp(Vec3 delta) {
         VehicleProfile p = profile();
         if (p == null || (Math.abs(delta.x) < 1.0E-7 && Math.abs(delta.z) < 1.0E-7) || footprintBlockedAt(p, getX(), getZ())) {
             return delta;

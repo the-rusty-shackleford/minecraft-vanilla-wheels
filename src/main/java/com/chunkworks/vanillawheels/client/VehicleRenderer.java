@@ -55,8 +55,13 @@ import org.joml.Vector3f;
  * the translucent type -- faded to a third of its alpha while the camera
  * rides this vehicle, so a driver sees the road and not the pane. Two
  * draw calls a vehicle.
+ *
+ * <p>A protocol built on this one (D-0030) extends it: {@link #appearance}
+ * names the parts it moves itself, which are cut out of the body, and
+ * {@link #drawExtras} draws them in the body's frame, posed and rocked with
+ * it, before the chests and the glass.
  */
-public final class VehicleRenderer extends EntityRenderer<Vehicle> {
+public class VehicleRenderer extends EntityRenderer<Vehicle> {
     private static final ResourceLocation MISSING = ResourceLocation.withDefaultNamespace("textures/misc/unknown_server.png");
     /** White at a third of the alpha: what the glass is multiplied by for whoever is aboard. */
     static final int GLASS_FROM_INSIDE = 0x55FFFFFF;
@@ -126,8 +131,21 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
     @Override
     public ResourceLocation getTextureLocation(Vehicle vehicle) {
         VehicleProfile p = vehicle.profile();
-        return p == null ? MISSING : Appearance.of(p).texture;
+        return p == null ? MISSING : appearance(vehicle, p).texture;
     }
+
+    /** effects: returns what {@code vehicle} of profile {@code p} is drawn from: the profile's appearance, with no extras here */
+    protected Appearance appearance(Vehicle vehicle, VehicleProfile p) {
+        return Appearance.of(p);
+    }
+
+    /**
+     * effects: draws what a protocol built on this one moves itself ({@link Appearance#extras}),
+     * with the pose stack in the body's frame -- turned, pitched, rolled and rocked as the body is
+     * -- into {@code solid}, the body's cutout buffer, at {@code light}; nothing here
+     */
+    protected void drawExtras(Vehicle vehicle, VehicleProfile p, Appearance a, float partialTick, PoseStack poseStack,
+                              MultiBufferSource buffers, VertexConsumer solid, int light, int overlay) {}
 
     @Override
     public void render(Vehicle vehicle, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
@@ -135,7 +153,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
         if (p == null) {
             return;
         }
-        Appearance a = Appearance.of(p);
+        Appearance a = appearance(vehicle, p);
         Suspension s = vehicle.suspension(partialTick);
         float yaw = Mth.rotLerp(partialTick, vehicle.yRotO, vehicle.getYRot());
         BodyPose pose = new BodyPose(Math.toRadians(yaw), s.pitch(), s.roll());
@@ -209,6 +227,8 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
             poseStack.popPose();
         }
 
+        drawExtras(vehicle, p, a, partialTick, poseStack, buffers, solid, packedLight, overlay);
+
         if (p.storage().isPresent()) {
             java.util.List<VehicleProfile.Chest> chests = p.storage().get().chests();
             for (int i = 0; i < chests.size(); i++) {
@@ -230,7 +250,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
      * effects: returns the body's colour as an ARGB int: the vehicle's dye, lifted; else the profile's factory
      * colour, exactly; else the profile's default dye, lifted; else white
      */
-    static int paintOf(Vehicle vehicle, VehicleProfile p) {
+    public static int paintOf(Vehicle vehicle, VehicleProfile p) {
         return colourOf(vehicle.paint(), p);
     }
 
@@ -239,7 +259,7 @@ public final class VehicleRenderer extends EntityRenderer<Vehicle> {
     }
 
     /** effects: applies {@code r} to the pose stack: a turn about its axis through its pivot */
-    static void rotateAround(PoseStack poseStack, Rotation r) {
+    public static void rotateAround(PoseStack poseStack, Rotation r) {
         Vec pivot = r.pivot();
         Vec axis = r.axis();
         Quaternionf q = new Quaternionf().rotationAxis((float) r.radians(), new Vector3f((float) axis.x(), (float) axis.y(), (float) axis.z()));

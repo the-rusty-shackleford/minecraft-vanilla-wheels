@@ -19,17 +19,19 @@ package com.chunkworks.vanillawheels.domain;
 
 /**
  * What a vehicle is built from on the lift: its chassis, one wheel per
- * wheel position, and an engine if it has one. Derived from the profile,
- * so no vehicle needs a recipe and none can have two.
+ * drawn wheel position, and an engine if it has one. Derived from the
+ * profile, so no vehicle needs a recipe and none can have two. A vehicle
+ * whose wheels are not drawn -- a helicopter's skids, a container's feet
+ * (D-0030) -- takes no wheels: a chassis and, if powered, an engine.
  *
- * <p>RI: wheels >= 1.
+ * <p>RI: wheels >= 0.
  * AF: the parts list "a chassis, {@code wheels} wheels, an engine iff
  *     {@code engine}".
  */
 public record Assembly(int wheels, boolean engine) {
     public Assembly {
-        if (wheels < 1) {
-            throw new IllegalArgumentException("a vehicle has at least one wheel: " + wheels);
+        if (wheels < 0) {
+            throw new IllegalArgumentException("a vehicle takes no fewer than no wheels: " + wheels);
         }
     }
 

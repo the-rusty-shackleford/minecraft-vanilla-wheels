@@ -56,7 +56,21 @@ public final class GameTestMod {
         }
     };
 
+    private static final net.neoforged.neoforge.registries.DeferredRegister<net.minecraft.world.entity.EntityType<?>> ENTITIES =
+            net.neoforged.neoforge.registries.DeferredRegister.create(net.minecraft.core.registries.Registries.ENTITY_TYPE, MOD_ID);
+
+    /** The box skids' profile: the box car with its wheels not drawn, claimed by {@link #SKID_VEHICLE}. */
+    public static final net.minecraft.resources.ResourceLocation BOX_SKIDS = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "box_skids");
+
+    /** A second vehicle kind (D-0030), as Rotorcraft's aircraft are: the entity that makes the box skids. */
+    public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.entity.EntityType<?>, net.minecraft.world.entity.EntityType<SkidVehicle>> SKID_VEHICLE =
+            ENTITIES.register("skid_vehicle", () -> net.minecraft.world.entity.EntityType.Builder.<SkidVehicle>of(SkidVehicle::new, net.minecraft.world.entity.MobCategory.MISC)
+                    .sized(1.5f, 1.0f).clientTrackingRange(10).updateInterval(2).build("skid_vehicle"));
+
     public GameTestMod(IEventBus modBus) {
+        ENTITIES.register(modBus);
+        com.chunkworks.vanillawheels.api.VehicleKinds.register(new com.chunkworks.vanillawheels.api.VehicleKinds.Kind(
+                (registries, id) -> id.equals(BOX_SKIDS), SKID_VEHICLE));
         com.chunkworks.vanillawheels.api.CargoRules.register(CARGO);
         // The chest-spill gametest's apples vanished, once in a while, between the wrench and five
         // ticks later, and the taker was found by these two hooks (a mock rider's first-tick pickup
@@ -75,4 +89,15 @@ public final class GameTestMod {
     }
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("Vanilla Wheels gametest");
+
+    /** The booth's client draws the test kind as every vehicle is drawn. */
+    @net.neoforged.fml.common.EventBusSubscriber(modid = MOD_ID, value = net.neoforged.api.distmarker.Dist.CLIENT)
+    public static final class Client {
+        private Client() {}
+
+        @net.neoforged.bus.api.SubscribeEvent
+        public static void onRenderers(net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
+            event.registerEntityRenderer(SKID_VEHICLE.get(), com.chunkworks.vanillawheels.client.VehicleRenderer::new);
+        }
+    }
 }

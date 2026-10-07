@@ -7,7 +7,11 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.12.0 — built, not released (Rotorcraft's helicopters; layering, D-0030)
+## 1.12.0 — released 2026-10-07 in pack 1.75.0 (Rotorcraft's helicopters; layering, D-0030; the horn)
+
+Released with Rotorcraft 1.0.0, the Huey and the Chinook on Rusty's "looks good, fix the latent key
+bug then release": sha1 `823f41da` on GitHub and on the server, protocol 6 unchanged (the server
+repo's `knowledge/releases/pack-1.75.0.md`). Not yet seen in play: the horn.
 
 Rusty asked for a Huey and a Chinook (2026-10-06), and for Rotorcraft to be a protocol of its own
 rather than flight inside this one. The plan is `~/.claude/plans/i-want-to-add-curious-locket.md`.

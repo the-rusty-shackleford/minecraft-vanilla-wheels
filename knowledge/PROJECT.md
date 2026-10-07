@@ -18,9 +18,12 @@ This version is what Rotorcraft builds on, and changes nothing for a car, a trai
 - Overridable hooks in `Vehicle`, each defaulting to what it always did.
 - `VehicleRenderer`'s `appearance` and `drawExtras` hooks; `Appearance.of(profile, extras)`.
 - `wheels.drawn: false` for skids and feet (the lift asks no wheels).
-- Sounds a data mod's own `sounds.json` defines.
+- Sounds a data mod's own `sounds.json` defines, and `sounds.pitch` / `sounds.volume` spans for the
+  engine loop (a rotor's note barely climbs; absent, a car's 0.75 to 1.6).
+- `drawExtras` gets the body's buffer asked for again after wheels of their own texture: the
+  Chinook's booth crashed every frame without it ("Not building!").
 
-Gate so far (2026-10-06): 126 JUnit and 94 GameTests green. The three new gametests use the
+Gate so far (2026-10-07): 126 JUnit and 95 GameTests green; the booth not run for this version (the Huey's and the Chinook's booths draw it). The three new gametests use the
 tests' own kind, `SkidVehicle`. Each was run against its mutation and caught it. The gametest
 server now loads Backpacks+ 0.7.1, the pack's; it had pinned 0.7.0, which the sibling build no
 longer has, and two bag tests failed for it. The README no longer claims crashes wear a vehicle:

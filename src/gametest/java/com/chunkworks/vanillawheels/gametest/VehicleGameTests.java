@@ -56,7 +56,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * two-block step and ends level on top; it runs a cow over at speed and
  * not at a walk; a gas can pours while held and coal no longer fuels, and an empty tank refuses the
  * throttle; the chest survives a crowbar and a placing; a disc goes in and
- * out; the headlights cycle and light up at night; the profile round-trips
+ * out; the horn stops when its driver gets out; the headlights cycle and light up at night; the profile round-trips
  * through its codec.
  *
  * <p>The runway template is 48 blocks long; a floor of dirt is laid on it.
@@ -452,6 +452,28 @@ public final class VehicleGameTests {
         var cells = p.getInventory().getItem(20).getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY);
         helper.assertTrue(cells.stream().anyMatch(s -> s.is(Items.MUSIC_DISC_CAT)), "into the pocketed bag: " + cells);
         helper.assertTrue(helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(p.blockPosition()).inflate(8)).isEmpty(), "nothing dropped");
+        helper.succeed();
+    }
+
+    /**
+     * The horn is its driver's: a passenger getting out leaves it sounding, the driver getting out
+     * with it held stops it. It sounded on after the driver left, until someone drove it again: the
+     * client stops reporting once its player is out, and the server hears the horn key only from
+     * the driver.
+     */
+    @GameTest(template = "runway", timeoutTicks = 40)
+    public void theHornStopsWhenItsDriverGetsOut(GameTestHelper helper) {
+        layFloor(helper);
+        Vehicle v = car(helper, 4.5, 7.5, true);
+        Player driver = riderAt(helper, v);
+        Player passenger = riderAt(helper, v);
+        helper.assertTrue(driver.startRiding(v, true) && passenger.startRiding(v, true), "both aboard");
+        helper.assertTrue(v.getControllingPassenger() == driver, "the first at the wheel");
+        v.setHorn(true);   // as the driver's held key reports it
+        passenger.stopRiding();
+        helper.assertTrue(v.horn(), "a passenger getting out leaves the driver's horn sounding");
+        driver.stopRiding();
+        helper.assertTrue(!v.horn(), "the driver getting out stops it");
         helper.succeed();
     }
 

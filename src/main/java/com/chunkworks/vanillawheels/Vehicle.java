@@ -506,8 +506,13 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     @Override
     protected void removePassenger(Entity passenger) {
+        boolean driver = passenger == getControllingPassenger();
         super.removePassenger(passenger);
         sizeRider(passenger, false);
+        // The horn is its driver's: once they are out, nobody reports its key, and the server hears it only from a driver.
+        if (driver && !level().isClientSide()) {
+            setHorn(false);
+        }
     }
 
     @Override

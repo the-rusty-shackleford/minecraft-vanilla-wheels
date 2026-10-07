@@ -50,8 +50,40 @@ public final class Keys {
     };
 
     public static final String CATEGORY = "key.categories.vanillawheels";
-    public static final KeyMapping HORN = new KeyMapping("key.vanillawheels.horn", DRIVING, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_CONTROL, CATEGORY);
-    public static final KeyMapping LIGHTS = new KeyMapping("key.vanillawheels.lights", DRIVING, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, CATEGORY);
+    public static final KeyMapping HORN = new DrivingKey("key.vanillawheels.horn", GLFW.GLFW_KEY_LEFT_CONTROL);
+    public static final KeyMapping LIGHTS = new DrivingKey("key.vanillawheels.lights", GLFW.GLFW_KEY_H);
+
+    /**
+     * effects: lets go of the driver's keys. A key's release is passed only to keys whose context
+     * is live, so a Control let go after getting out would hold the horn on into the next drive.
+     */
+    public static void releaseAll() {
+        HORN.setDown(false);
+        LIGHTS.setDown(false);
+    }
+
+    /**
+     * A driver's key. NeoForge judges a key bound with no modifier as up while Shift, Control or
+     * Alt is held, in every context but the game's own; the horn is Left Control, so holding it
+     * switched the horn off (it never sounded from 1.0.0 to 1.11.0), and H under a held Control did
+     * nothing. A driver's key judges its modifier as the game's own keys do: with none, it is down
+     * whatever else is held.
+     */
+    private static final class DrivingKey extends KeyMapping {
+        DrivingKey(String name, int key) {
+            super(name, DRIVING, InputConstants.Type.KEYSYM, key, CATEGORY);
+        }
+
+        @Override
+        public boolean isConflictContextAndModifierActive() {
+            return getKeyConflictContext().isActive() && getKeyModifier().isActive(KeyConflictContext.IN_GAME);
+        }
+
+        @Override
+        public boolean isActiveAndMatches(InputConstants.Key keyCode) {
+            return keyCode != InputConstants.UNKNOWN && keyCode.equals(getKey()) && isConflictContextAndModifierActive();
+        }
+    }
 
     /** effects: returns whether the drift key -- the game's jump key -- is down */
     public static boolean driftDown() {

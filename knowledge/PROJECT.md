@@ -26,7 +26,22 @@ This version is what Rotorcraft builds on, and changes nothing for a car, a trai
   and 1.5 a block of length, the number a car always had). The length rule put it 20 behind a
   Huey's pilot, the helicopter a speck; the Huey names 16, the Chinook 22.
 
-Gate (2026-10-07): 126 JUnit, 96 GameTests and the booth (47 checks) green; the Huey's and the
+- **The horn sounds** (found through Rotorcraft's playtest, 2026-10-07, where Left Shift never
+  descended). NeoForge judges a key bound with no modifier as up while Shift, Control or Alt is
+  held, in every context but the game's own; the driver's keys have their own, and the horn is
+  Left Control, so it never sounded from 1.0.0 to 1.11.0, and H under a held Control did nothing.
+  The driver's keys now judge their modifier as the game's keys do (`Keys.DrivingKey`) and are let
+  go whenever the player is not driving. That exposed a second fault: the horn sounded on after its
+  driver got out with it held (the client stops reporting, the server hears the key only from a
+  driver), so a driver getting out now stops it (`Vehicle.removePassenger`; GameTest
+  `theHornStopsWhenItsDriverGetsOut`). The booth presses real keys through XTEST
+  (`devtools/booth/xkey.py`): on 1.11.0's keys it failed the horn and H under Control; without the
+  let-go, the horn held into the next drive; without the server's stop, the GameTest failed. In
+  one booth run of four, "three clicks repair the car" read 6500 (no repair); not reproduced since,
+  its failure line now names the player's food, mode, crouch and vehicle.
+
+Gate (2026-10-07, after the keys): 126 JUnit, 97 GameTests and the booth (53 checks) green. Before
+them: 126 JUnit, 96 GameTests and the booth (47 checks) green; the Huey's and the
 Chinook's booths draw the layered vehicles. The three new gametests use the tests' own kind,
 `SkidVehicle`. Each was run against its mutation and caught it. The gametest server now loads
 Backpacks+ 0.7.1, the pack's; it had pinned 0.7.0, which the sibling build no longer has, and two

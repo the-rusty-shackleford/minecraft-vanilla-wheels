@@ -35,7 +35,12 @@ import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.phys.BlockHitResult;
+import com.chunkworks.vanillawheels.client.Keys;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +70,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -285,6 +291,7 @@ public final class PhotoBooth {
                 return previousGain > 0 && previousGain <= 0.801f ? null : "settled volume " + previousGain;
             });
         }));
+        t = keys(mc, s, t + 2);
         // Third person from the seat, looking a little up so the camera's rays sweep the meadow
         // behind the car, as a hillside's does on a descent: the camera keeps its full distance,
         // as the game's own would, since grass has no visual shape. Its outline once clipped it
@@ -719,7 +726,9 @@ public final class PhotoBooth {
             int condition = clientCondition(mc, carId);
             shoot(mc, "booth-repair");
             int row = hudSteel(mc, 0);
-            verdict("three clicks repair the car three steps, 65% to 72.5%", () -> condition == 7_250 ? null : "condition " + condition);
+            verdict("three clicks repair the car three steps, 65% to 72.5%", () -> condition == 7_250 ? null : "condition " + condition
+                    + (mc.player == null ? "" : ", food " + mc.player.getFoodData().getFoodLevel() + ", " + mc.gameMode.getPlayerMode()
+                    + ", crouching " + mc.player.isShiftKeyDown() + ", riding " + mc.player.getVehicle()));
             verdict("and the crosshair on it shows its wrench row", () -> row > 300 ? null : "steel pixels " + row);
             // Its key (D-0026): a blank paired at the car, held; a second blank beside it for the grey band.
             onServer(mc, sp -> {
@@ -1048,6 +1057,96 @@ public final class PhotoBooth {
                 }
             }
             return n == 0 ? 0.0 : (double) sum / n;
+        }
+    }
+
+    // --- the driver's keys, pressed for real --------------------------------
+
+    @org.jetbrains.annotations.Nullable private static Vehicle.Lights lightsBefore;
+    @org.jetbrains.annotations.Nullable private static Process controlDown;
+    @org.jetbrains.annotations.Nullable private static Process hDown;
+
+    /**
+     * The driver's keys on real presses (devtools/booth/xkey.py): Left Control held sounds the horn,
+     * H under it cycles the lights, and a Control let go after getting out does not hold the horn
+     * on into the next drive. Real presses, because NeoForge reads Control from GLFW's own key
+     * state, which nothing else moves; until 1.12.0 the horn never sounded.
+     * requires: the booth's player drives the box car at {@code t}
+     * effects: adds the steps from {@code t}, the lights as they were and the player at the wheel
+     * facing ahead at the last; returns the last step's tick
+     */
+    private static int keys(Minecraft mc, List<Step> s, int t) {
+        s.add(new Step(t, () -> {
+            lightsBefore = driven(mc) instanceof Vehicle v ? v.lights() : null;
+            controlDown = xkey("down", "Control_L");
+        }));
+        s.add(new Step(t += 40, () -> {
+            Vehicle v = driven(mc);
+            verdict("the key helper pressed Left Control", () -> controlDown != null && !controlDown.isAlive() && controlDown.exitValue() == 0
+                    ? null : "helper " + (controlDown == null ? "not started" : controlDown.isAlive() ? "still running" : "exit " + controlDown.exitValue()));
+            verdict("a real Left Control reaches the game window", () -> InputConstants.isKeyDown(mc.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)
+                    ? null : "GLFW reads Left Control up");
+            verdict("the horn sounds while Left Control is held", () -> Keys.HORN.isDown() && v != null && v.horn()
+                    ? null : "horn key " + Keys.HORN.isDown() + ", the car's horn " + (v == null ? null : v.horn()));
+            hDown = xkey("down", "h");
+        }));
+        s.add(new Step(t += 60, () -> {
+            Vehicle v = driven(mc);
+            verdict("the key helper pressed H", () -> hDown != null && !hDown.isAlive() && hDown.exitValue() == 0
+                    ? null : "helper " + (hDown == null ? "not started" : hDown.isAlive() ? "still running" : "exit " + hDown.exitValue()));
+            verdict("the lights key is down while H is held with Left Control", () -> Keys.LIGHTS.isDown() ? null : "lights key up");
+            verdict("H with Left Control held cycles the lights", () -> v != null && lightsBefore != null && v.lights() != lightsBefore
+                    ? null : "lights " + (v == null ? null : v.lights()) + ", before " + lightsBefore);
+            xkey("up", "h");
+            Vehicle.Lights before = lightsBefore;
+            withCar(mc, car -> {
+                for (int i = 0; i < Vehicle.Lights.values().length && car.lights() != before; i++) {
+                    car.cycleLights();
+                }
+            });
+            // Out with Control still held.
+            onServer(mc, ServerPlayer::stopRiding);
+        }));
+        s.add(new Step(t += 20, () -> xkey("up", "Control_L")));
+        s.add(new Step(t += 40, () -> withCar(mc, v -> {
+            ServerPlayer sp = v.getServer().getPlayerList().getPlayer(mc.player.getUUID());
+            if (sp != null) {
+                sp.startRiding(v, true);
+            }
+        })));
+        s.add(new Step(t += 20, () -> {
+            Vehicle v = driven(mc);
+            verdict("at the wheel again, a Left Control let go off the car does not hold the horn", () -> v != null && !Keys.HORN.isDown() && !v.horn()
+                    ? null : "driving " + v + ", horn key " + Keys.HORN.isDown() + ", the car's horn " + (v == null ? null : v.horn()));
+            if (mc.player != null && v != null) {
+                mc.player.setYRot(v.getYRot());
+                mc.player.yRotO = v.getYRot();
+            }
+        }));
+        return t;
+    }
+
+    /** effects: returns the vehicle the booth's player drives on the client, or null */
+    @org.jetbrains.annotations.Nullable
+    private static Vehicle driven(Minecraft mc) {
+        return mc.player != null && mc.player.getVehicle() instanceof Vehicle v && v.getControllingPassenger() == mc.player ? v : null;
+    }
+
+    /**
+     * effects: starts devtools/booth/xkey.py pressing ({@code down}) or letting go ({@code up}) of
+     * {@code keysym} on this client's display, and returns it; null, with a FAIL line, if it would
+     * not start. The helper refuses a display with a window manager, so it never types on a desktop.
+     */
+    @org.jetbrains.annotations.Nullable
+    private static Process xkey(String action, String keysym) {
+        Path script = Path.of(System.getProperty("user.dir"), "..", "..", "devtools", "booth", "xkey.py").normalize();
+        Path uv = Path.of(System.getProperty("user.home"), ".local", "bin", "uv");
+        try {
+            return new ProcessBuilder(Files.isExecutable(uv) ? uv.toString() : "uv", "run", "--no-project", "--with", "python-xlib",
+                    "python", script.toString(), action, keysym).inheritIO().start();
+        } catch (IOException e) {
+            LOG.error("booth: FAIL the key helper starts ({} {}) -- {}", action, keysym, e.toString());
+            return null;
         }
     }
 

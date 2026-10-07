@@ -147,6 +147,7 @@ public final class Controls {
                 hornDown = false;
             }
             lastSpeed = Float.NaN;
+            Keys.releaseAll();
             while (Keys.LIGHTS.consumeClick()) { }
             return;
         }

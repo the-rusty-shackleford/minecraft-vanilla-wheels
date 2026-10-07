@@ -107,7 +107,9 @@ sees the flames and hears the note. **Left Control** is the horn while held; **H
 off, on, auto (auto lights below a configurable darkness); the mode sits at the lower
 left of the screen beside the hotbar, a lamp icon and its word, whenever you ride. Both
 keys are live only while riding one of these vehicles, so Left Control stays sprint
-everywhere else. Crouch to dismount, as from a boat.
+everywhere else. A held Shift, Control or Alt never switches them off (NeoForge's own rule for a
+mod's keys would: before 1.12.0 the horn never sounded), and the horn stops when its driver gets
+out. Crouch to dismount, as from a boat.
 
 A vehicle climbs any ledge up to its profile's `climb` (one block for a pickup; a
 two-block ledge is a wall, use a ramp) without a jump: the collision box steps up the way

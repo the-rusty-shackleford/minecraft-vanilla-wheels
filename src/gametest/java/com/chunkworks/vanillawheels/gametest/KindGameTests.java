@@ -83,6 +83,17 @@ public final class KindGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public void aProfileNamesItsThirdPersonCameraDistanceAndOneThatDoesNotGetsALengthsWorth(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        VehicleProfile skids = VanillaWheels.profile(registries, GameTestMod.BOX_SKIDS).orElseThrow().value();
+        helper.assertValueEqual(skids.camera(), 9.0, "the box skids' camera, as written");
+        VehicleProfile car = VanillaWheels.profile(registries, BOX_CAR).orElseThrow().value();
+        helper.assertTrue(car.look().camera().isEmpty(), "the box car names none");
+        helper.assertValueEqual(car.camera(), 1.5 + 1.5 * car.body().length(), "so it stands a length's worth back, as before");
+        helper.succeed();
+    }
+
     @GameTest(template = "arena", timeoutTicks = 40)
     public void aClaimedProfileIsMadeByItsKindsEntityAndAnUnclaimedOneByTheProtocols(GameTestHelper helper) {
         layFloor(helper, 15);

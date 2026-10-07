@@ -199,5 +199,6 @@
     "engine": "vanillawheels:engine.petrol",
     "pitch": [0.6, 1.05],
     "volume": [0.3, 1.0]
-  }
+  },
+  "camera": 9.0
 }

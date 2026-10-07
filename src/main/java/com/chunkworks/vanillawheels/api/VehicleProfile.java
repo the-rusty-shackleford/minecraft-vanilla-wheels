@@ -60,15 +60,18 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
 
     /**
      * What the vehicle looks like: its meshes, texture, units, hand, paint, glass, cockpit, rider
-     * scale and sounds. One flat object in the JSON. {@code cockpit} names the parts -- a cage, a
-     * windshield's frame, mirrors -- that are not drawn for whoever looks out through their own eyes
-     * from aboard, so they never bar the view; everyone else sees them. {@code rider_scale} is the
-     * size everyone aboard is drawn and boxed at (the game's scale attribute), so a person fits a
-     * vehicle built to the world's scale rather than the vehicle being built to a person's.
+     * scale, sounds and third-person camera. One flat object in the JSON. {@code cockpit} names the
+     * parts -- a cage, a windshield's frame, mirrors -- that are not drawn for whoever looks out
+     * through their own eyes from aboard, so they never bar the view; everyone else sees them.
+     * {@code rider_scale} is the size everyone aboard is drawn and boxed at (the game's scale
+     * attribute), so a person fits a vehicle built to the world's scale rather than the vehicle being
+     * built to a person's. {@code camera} is how far behind a rider's eye the third-person camera
+     * stands, blocks; absent, {@link #cameraFor(double) a length's worth}, which suits a car and
+     * leaves a helicopter, whose pilot sits in its nose, a speck on the screen.
      */
     public record Look(ResourceLocation mesh, Optional<ResourceLocation> wheelMesh, Optional<ResourceLocation> texture, double scale,
                        Handedness handedness, Optional<Paint> paint, Optional<PartSelector> glass, Optional<PartSelector> cockpit,
-                       double riderScale, Sounds sounds) {
+                       double riderScale, Sounds sounds, Optional<Double> camera) {
         public static final MapCodec<Look> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 ResourceLocation.CODEC.fieldOf("mesh").forGetter(Look::mesh),
                 ResourceLocation.CODEC.optionalFieldOf("wheel_mesh").forGetter(Look::wheelMesh),
@@ -79,8 +82,14 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
                 PartSelector.CODEC.optionalFieldOf("glass").forGetter(Look::glass),
                 PartSelector.CODEC.optionalFieldOf("cockpit").forGetter(Look::cockpit),
                 Codec.doubleRange(0.2, 2.0).optionalFieldOf("rider_scale", 1.0).forGetter(Look::riderScale),
-                Sounds.CODEC.optionalFieldOf("sounds", Sounds.NONE).forGetter(Look::sounds)
+                Sounds.CODEC.optionalFieldOf("sounds", Sounds.NONE).forGetter(Look::sounds),
+                Codec.doubleRange(1.0, 64.0).optionalFieldOf("camera").forGetter(Look::camera)
         ).apply(i, Look::new));
+
+        /** effects: returns the third-person camera's distance for a vehicle {@code length} blocks long that names none: 1.5, and 1.5 a block */
+        public static double cameraFor(double length) {
+            return 1.5 + 1.5 * length;
+        }
     }
 
     /** What the vehicle carries: tank, chest, gauges, lamps, horn, radio, hitch, cargo, doors. One flat object in the JSON. */
@@ -117,6 +126,8 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     public Optional<PartSelector> cockpit() { return look.cockpit(); }
     public double riderScale() { return look.riderScale(); }
     public Sounds sounds() { return look.sounds(); }
+    /** The third-person camera's distance behind a rider's eye, blocks: the profile's, or a length's worth. */
+    public double camera() { return look.camera().orElseGet(() -> Look.cameraFor(body.length())); }
     public Optional<Fuel> fuel() { return kit.fuel(); }
     public Optional<Storage> storage() { return kit.storage(); }
     public List<Gauge> gauges() { return kit.gauges(); }

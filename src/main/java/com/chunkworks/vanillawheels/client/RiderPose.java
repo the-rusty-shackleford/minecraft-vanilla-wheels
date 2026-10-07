@@ -87,19 +87,15 @@ public final class RiderPose {
         }
     }
 
-    /** Blocks of camera distance for each block of a vehicle's length, in third person; the game's own is four blocks, for a person. */
-    private static final float CAMERA_PER_BLOCK = 1.5f;
-    private static final float CAMERA_BASE = 1.5f;
-
     /**
-     * effects: backs the third-person camera off in proportion to the
-     * vehicle the viewer rides, so a truck fills the frame the way a
-     * person does at the game's four blocks, instead of the camera sitting
-     * on its tailgate
+     * effects: backs the third-person camera off to the vehicle's own
+     * distance (the profile's {@code camera}, else a length's worth), so a
+     * truck fills the frame the way a person does at the game's four
+     * blocks, instead of the camera sitting on its tailgate
      */
     public static void onCameraDistance(CalculateDetachedCameraDistanceEvent event) {
         if (event.getCamera().getEntity().getVehicle() instanceof Vehicle v && v.profile() != null) {
-            float want = CAMERA_BASE + CAMERA_PER_BLOCK * (float) v.profile().body().length();
+            float want = (float) v.profile().camera();
             event.setDistance(Math.max(event.getDistance(), want));
         }
     }
@@ -125,7 +121,7 @@ public final class RiderPose {
         float partial = (float) event.getPartialTick();
         Vec3 eye = new Vec3(Mth.lerp(partial, rider.xo, rider.getX()), Mth.lerp(partial, rider.yo, rider.getY()) + rider.getEyeHeight(), Mth.lerp(partial, rider.zo, rider.getZ()));
         Vec3 back = new Vec3(camera.getLookVector()).scale(-1.0);
-        float want = (CAMERA_BASE + CAMERA_PER_BLOCK * (float) v.profile().body().length()) * rider.getScale();
+        float want = (float) v.profile().camera() * rider.getScale();
         double zoom = want;
         Level level = rider.level();
         for (int i = 0; i < 8; i++) {

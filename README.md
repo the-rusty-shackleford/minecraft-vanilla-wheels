@@ -436,6 +436,9 @@ A protocol can build vehicles of its own on this one (D-0030), as Rotorcraft bui
   mod's own `sounds.json` defines; it is played all the same. `sounds.pitch` and `sounds.volume`
   (each `[idle, full]`, absent a car's `[0.75, 1.6]` and `[0.28, 0.72]`) set where the loop runs
   from idle to flat out: a rotor's barely climbs.
+- **The third-person camera.** A profile's `camera` (blocks, 1 to 64) is how far behind a rider's
+  eye the camera stands; absent, 1.5 and 1.5 a block of the body's length, which suits a car and
+  leaves a helicopter, whose pilot sits in its nose, a speck on the screen.
 
 The gametests' own `SkidVehicle` is a kind at its smallest.
 

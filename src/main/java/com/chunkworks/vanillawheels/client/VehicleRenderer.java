@@ -227,6 +227,12 @@ public class VehicleRenderer extends EntityRenderer<Vehicle> {
             poseStack.popPose();
         }
 
+        // Wheels with a texture of their own asked the buffer source for another type, which in the
+        // level's immediate source ends the body's batch: the extras get the body's buffer asked for
+        // again, live. (A Chinook, its own wheel mesh and its rotors, crashed every client without this.)
+        if (wheelOut != solid) {
+            solid = buffers.getBuffer(RenderType.entityCutoutNoCull(a.texture));
+        }
         drawExtras(vehicle, p, a, partialTick, poseStack, buffers, solid, packedLight, overlay);
 
         if (p.storage().isPresent()) {

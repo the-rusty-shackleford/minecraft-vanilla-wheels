@@ -23,7 +23,7 @@ This version is what Rotorcraft builds on, and changes nothing for a car, a trai
 - `drawExtras` gets the body's buffer asked for again after wheels of their own texture: the
   Chinook's booth crashed every frame without it ("Not building!").
 
-Gate so far (2026-10-07): 126 JUnit and 95 GameTests green; the booth not run for this version (the Huey's and the Chinook's booths draw it). The three new gametests use the
+Gate (2026-10-07): 126 JUnit, 95 GameTests and the booth (47 checks) green; the Huey's and the Chinook's booths draw the layered vehicles. The three new gametests use the
 tests' own kind, `SkidVehicle`. Each was run against its mutation and caught it. The gametest
 server now loads Backpacks+ 0.7.1, the pack's; it had pinned 0.7.0, which the sibling build no
 longer has, and two bag tests failed for it. The README no longer claims crashes wear a vehicle:

@@ -78,6 +78,9 @@ public final class VanillaWheelsClient {
     public static void onKeys(RegisterKeyMappingsEvent event) {
         event.register(Keys.HORN);
         event.register(Keys.LIGHTS);
+        event.register(Keys.UP);
+        event.register(Keys.DOWN);
+        event.register(Keys.GET_OUT);
     }
 
     @SubscribeEvent

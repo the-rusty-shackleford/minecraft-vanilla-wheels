@@ -1,12 +1,15 @@
 # Vanilla Wheels
 
-**[Version 1.11.0](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.11.0)**
-is published and deployed in shared pack **1.73.0**. Its network protocol is 6, so the client
+**[Version 1.12.0](https://github.com/the-rusty-shackleford/minecraft-vanilla-wheels/releases/tag/v1.12.0)**
+is published and deployed in shared pack **1.75.0**. Its network protocol is 6, so the client
 and server must both run a 1.10 or later; shared-pack players can use **Update Pack** in Prism.
+1.12.0 lets other protocols be layered on this one (D-0030, see
+[Layering](#layering-a-protocol-on-this-one-1120)); Rotorcraft's helicopters are the first.
 
-**1.12.0** is built but not released (D-0030): other protocols can be layered on this one (see
-[Layering](#layering-a-protocol-on-this-one-1120)); Rotorcraft's helicopters are the first. Nothing
-changes for a car, a trailer or the network.
+**1.13.0** is built but not released (D-0031): what every body that moves in three dimensions
+shares -- its hull, its crashes, the up, down and get-out keys -- moved here from Rotorcraft, for a
+second protocol, the submarines; an engine may burn at a rate; a protocol may set a vehicle down
+anywhere. Its network protocol is 7. Nothing changes for a car or a trailer.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
@@ -109,7 +112,10 @@ left of the screen beside the hotbar, a lamp icon and its word, whenever you rid
 keys are live only while riding one of these vehicles, so Left Control stays sprint
 everywhere else. A held Shift, Control or Alt never switches them off (NeoForge's own rule for a
 mod's keys would: before 1.12.0 the horn never sounded), and the horn stops when its driver gets
-out. Crouch to dismount, as from a boat.
+out. Crouch to dismount, as from a boat. Aboard a body that moves in three dimensions (an
+aircraft, a submarine; 1.13.0, D-0031) **Space** is up, **Left Shift** down and **R** gets you out,
+from any seat: Shift never lets you off there, and the three are *Up*, *Down* and *Get out* under
+Vanilla Wheels in Controls.
 
 A vehicle climbs any ledge up to its profile's `climb` (one block for a pickup; a
 two-block ledge is a wall, use a ramp) without a jump: the collision box steps up the way
@@ -180,7 +186,9 @@ sized back as they leave. A seat may name an `eye`: the rider's entity is placed
 eye is there -- on the centreline in the glass, ahead of the pillars, where the driver's
 camera then is -- while the body is drawn sitting at the seat. And `cockpit` names the
 parts (a cage, a frame, mirrors) never drawn from a rider's own eyes in first person,
-so nothing bars the view; everyone else sees them. The only
+so nothing bars the view; everyone else sees them. Glass it names as well (a bubble
+canopy, a port: 1.13.0) is glass to everyone else and not drawn for the rider looking out
+through it, so a curved pane of many boxes never stacks its faces across the view. The only
 walls a vehicle's move meets are blocks and other vehicles (never its own trailer or
 tower): a boat stops dead at anything pushable, and a car that did would stall at every
 cow and bystander. The living are run over instead (below).
@@ -380,7 +388,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
              "from": [-15, 6, -41], "to": [0, 34, -39]}],   // the door's box shut (optional): a crouching click anywhere on it, shut or swung, toggles; without it, within a block and a half of the hinge
   "paint": {"part": {"group": "body"}, "default": "light_blue", "factory": "#58acff"},   // factory: the exact colour an undyed vehicle wears (optional); a door's painted part takes the dye too
   "glass": {"group": "windshield"},
-  "cockpit": {"group": ["cage", "windshield_frame", "mirrors"]},   // not drawn from a rider's own eyes (optional)
+  "cockpit": {"group": ["cage", "windshield_frame", "mirrors"]},   // not drawn from a rider's own eyes (optional); glass it names too stays glass to everyone else
   "rider_scale": 0.7,                                              // everyone aboard is this size (optional, 1)
   "sounds": {"engine": "vanillawheels:engine.petrol"}
 }
@@ -442,7 +450,27 @@ A protocol can build vehicles of its own on this one (D-0030), as Rotorcraft bui
   eye the camera stands; absent, 1.5 and 1.5 a block of the body's length, which suits a car and
   leaves a helicopter, whose pilot sits in its nose, a speck on the screen.
 
-The gametests' own `SkidVehicle` is a kind at its smallest.
+**A body that moves in three dimensions (1.13.0, D-0031).** What an aircraft and a submarine
+share, each off for a car:
+
+- `verticalControls()`: Up (Space), Down (Left Shift), Get out (R) in any seat, `Keys.lift()`;
+  Shift never dismounts (a mixin on `Player.wantsToStopRiding`, and the rider is not drawn
+  crouching); the get-out key asks `getOut(rider)`, which a protocol may refuse.
+- `hullPoints()`, `hullClamp(delta)` and `hullClampAxes(delta)`: the body meets the world at
+  points probed over boxes (`domain/Hull`) in every direction; call a clamp from
+  `footprintClamp`. `hullClamp` cuts the move as a whole (an aircraft in the air);
+  `hullClampAxes` cuts the rise or fall first and then the move across, as the game's own
+  collision does, so a hull on a floor slides along it (a submarine on the seabed).
+- `crashes()`, `ownChange()` and `crashed(wear)`: the server judges each move the pilot's client
+  reports against the one before; what it lost beyond the body's own model costs condition by a
+  `domain/Crash` of the protocol's own speeds, once an impact.
+- `fuelRate()`: ticks of fuel a burning tick costs, the fraction carried (`domain/FuelDebt`).
+- `Keys.RidingKey`: a protocol's own key that judges its modifier as the game's keys do.
+- `VehicleItem.place(level, player, stack, at, yaw)`: set a vehicle down anywhere, through the
+  same checks as a click on a block face.
+
+The gametests' own `SkidVehicle` is a kind at its smallest; a test switches on each of these on it
+in turn (`ThreeDimensionGameTests`).
 
 ## Towing and animals
 
@@ -541,7 +569,7 @@ in `devtools/art/sounds/SOURCES.md`. These changes leave driving physics unchang
 
 ## Layout
 
-`src/domain` (JDK-only, plain JUnit): `Drive` (the step: throttle, drag, rolling,
+`src/domain` (JDK-only, plain JUnit): `Hull`, `Crash` and `FuelDebt` (D-0031), `Drive` (the step: throttle, drag, rolling,
 steering by the bicycle rule, grip, drift), `Suspension`, `Terrain` (the drawn pose),
 `CrossSection` (what of a block the vehicle footprint meets), `Impact`, `Tank`, `Tow` (the
 trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
@@ -549,7 +577,7 @@ trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
 `BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
 `WheelSpin`, `BodyPose`, `BakedMesh`).
 `src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`, `CargoRules`, `VehicleKinds`), the `Vehicle` entity
-and its parts, `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `lift` (the two blocks, the
+and its parts, `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `mixin/PlayerMixin` (D-0031), `lift` (the two blocks, the
 block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary`,
 `Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
 the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,

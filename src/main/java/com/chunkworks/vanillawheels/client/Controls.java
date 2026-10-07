@@ -134,13 +134,22 @@ public final class Controls {
         }
     }
 
-    /** The horn and headlight keys, each tick the player is at a wheel. */
+    /** The horn and headlight keys, each tick the player is at a wheel; the get-out key, each tick they ride a body that moves in three dimensions (D-0031). */
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             hornDown = false;
+            Keys.releaseAboard();
             return;
         }
+        Vehicle aboard = mc.player.getVehicle() instanceof Vehicle v && v.verticalControls() ? v : null;
+        if (aboard == null) {
+            Keys.releaseAboard();
+        }
+        if (Keys.GET_OUT_PRESS.consume() && aboard != null) {
+            PacketDistributor.sendToServer(new Payloads.GetOut(aboard.getId()));
+        }
+        boolean lights = Keys.LIGHTS_PRESS.consume();
         Vehicle driven = mc.player.getVehicle() instanceof Vehicle v && v.getControllingPassenger() == mc.player ? v : null;
         if (driven == null) {
             if (hornDown) {
@@ -148,7 +157,6 @@ public final class Controls {
             }
             lastSpeed = Float.NaN;
             Keys.releaseAll();
-            while (Keys.LIGHTS.consumeClick()) { }
             return;
         }
         boolean horn = Keys.HORN.isDown() && mc.screen == null;
@@ -156,7 +164,7 @@ public final class Controls {
             hornDown = horn;
             PacketDistributor.sendToServer(new Payloads.Horn(driven.getId(), horn));
         }
-        while (Keys.LIGHTS.consumeClick()) {
+        if (lights) {
             PacketDistributor.sendToServer(new Payloads.Lights(driven.getId()));
         }
     }

@@ -52,42 +52,61 @@ public final class VehicleItem extends Item {
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
         ItemStack stack = context.getItemInHand();
-        ResourceLocation id = VanillaWheels.vehicleOf(stack).orElse(null);
-        if (id == null || context.getPlayer() == null) {
+        if (VanillaWheels.vehicleOf(stack).isEmpty() || context.getPlayer() == null) {
             return InteractionResult.FAIL;
         }
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
-        if (VanillaWheels.profile(level.registryAccess(), id).isEmpty()) {
-            context.getPlayer().displayClientMessage(Component.translatable("vanillawheels.no_such_vehicle", id.toString()), true);
-            return InteractionResult.FAIL;
-        }
         BlockPos above = context.getClickedPos().relative(context.getClickedFace());
         Vec3 at = new Vec3(above.getX() + 0.5, above.getY(), above.getZ() + 0.5);
-        Vehicle vehicle = Vehicle.create((ServerLevel) level, id, at, context.getPlayer().getYRot());
-        if (vehicle == null) {
-            return InteractionResult.FAIL;
+        return place((ServerLevel) level, context.getPlayer(), stack, at, context.getPlayer().getYRot()) != null
+                ? InteractionResult.CONSUME : InteractionResult.FAIL;
+    }
+
+    /**
+     * requires: server thread; {@code stack} is a vehicle item in {@code player}'s hand
+     * effects: sets the vehicle {@code stack} holds down at {@code at} facing {@code yaw} degrees,
+     *     with its cargo, condition, paint, fuel and disc, made by the kind that claims its profile;
+     *     a packed one is used up even in creative, a fresh one in survival only; returns it, or null
+     *     with the reason above the hotbar (no such vehicle, a stale packed vehicle, no room). What a
+     *     click on a block face does, and where a protocol sets one down elsewhere (D-0031: a
+     *     submarine on the water's surface).
+     * throws: none
+     */
+    @org.jetbrains.annotations.Nullable
+    public static Vehicle place(ServerLevel level, net.minecraft.world.entity.player.Player player, ItemStack stack, Vec3 at, float yaw) {
+        ResourceLocation id = VanillaWheels.vehicleOf(stack).orElse(null);
+        if (id == null) {
+            return null;
         }
-        RecoveryData recovery = RecoveryData.get(((ServerLevel) level).getServer());
+        if (VanillaWheels.profile(level.registryAccess(), id).isEmpty()) {
+            player.displayClientMessage(Component.translatable("vanillawheels.no_such_vehicle", id.toString()), true);
+            return null;
+        }
+        Vehicle vehicle = Vehicle.create(level, id, at, yaw);
+        if (vehicle == null) {
+            return null;
+        }
+        RecoveryData recovery = RecoveryData.get(level.getServer());
         if (!recovery.canPlace(stack) || !vehicle.loadFromItem(stack)) {
-            context.getPlayer().displayClientMessage(Component.translatable("vanillawheels.key.stale_vehicle"), true);
-            return InteractionResult.FAIL;
+            player.displayClientMessage(Component.translatable("vanillawheels.key.stale_vehicle"), true);
+            return null;
         }
         AABB box = vehicle.getBoundingBox();
         if (!level.noCollision(vehicle, box.deflate(0.05))) {
-            context.getPlayer().displayClientMessage(Component.translatable("vanillawheels.no_room"), true);
-            return InteractionResult.FAIL;
+            player.displayClientMessage(Component.translatable("vanillawheels.no_room"), true);
+            return null;
         }
         vehicle.placingFromItem(true);
-        if (!level.addFreshEntity(vehicle)) return InteractionResult.FAIL;
+        if (!level.addFreshEntity(vehicle)) return null;
         vehicle.placingFromItem(false);
         recovery.deployed(vehicle, stack);
         level.playSound(null, at.x, at.y, at.z, ModContent.CLANK.get(), net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 0.9f);
-        if (!context.getPlayer().hasInfiniteMaterials() || stack.has(ModContent.PACKED_TOKEN.get())) {
+        if (!player.hasInfiniteMaterials() || stack.has(ModContent.PACKED_TOKEN.get())) {
             stack.shrink(1);
         }
-        return InteractionResult.CONSUME;
+        return vehicle;
     }
 
     @Override public boolean isBarVisible(ItemStack stack) { return stack.getOrDefault(ModContent.CONDITION.get(), 10000) < 10000; }

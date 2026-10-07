@@ -715,20 +715,26 @@ public final class PhotoBooth {
                 sp.containerMenu.broadcastChanges();
             });
         }));
+        // Judged on the server as the clicks land, the client's copy a few ticks later: one run's client read the car
+        // unrepaired four ticks after the clicks, and which side was behind is what the two verdicts tell apart.
         s.add(new Step(t += SETTLE / 2, () -> onServer(mc, sp -> {
             if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
                 for (int i = 0; i < 3; i++) {
                     sp.interactOn(car, InteractionHand.MAIN_HAND);
                 }
+                int condition = car.condition();
+                verdict("three clicks repair the car three steps, 65% to 72.5%", () -> condition == 7_250 ? null : "condition " + condition
+                        + ", food " + sp.getFoodData().getFoodLevel() + ", " + sp.gameMode.getGameModeForPlayer()
+                        + ", crouching " + sp.isShiftKeyDown() + ", riding " + sp.getVehicle());
+            } else {
+                LOG.error("booth: FAIL the car is there to be repaired");
             }
         })));
+        int[] seen = new int[1];
         s.add(new Step(t += 4, () -> {
-            int condition = clientCondition(mc, carId);
+            seen[0] = clientCondition(mc, carId);
             shoot(mc, "booth-repair");
             int row = hudSteel(mc, 0);
-            verdict("three clicks repair the car three steps, 65% to 72.5%", () -> condition == 7_250 ? null : "condition " + condition
-                    + (mc.player == null ? "" : ", food " + mc.player.getFoodData().getFoodLevel() + ", " + mc.gameMode.getPlayerMode()
-                    + ", crouching " + mc.player.isShiftKeyDown() + ", riding " + mc.player.getVehicle()));
             verdict("and the crosshair on it shows its wrench row", () -> row > 300 ? null : "steel pixels " + row);
             // Its key (D-0026): a blank paired at the car, held; a second blank beside it for the grey band.
             onServer(mc, sp -> {
@@ -741,6 +747,8 @@ public final class PhotoBooth {
             });
         }));
         s.add(new Step(t += 8, () -> {
+            int condition = clientCondition(mc, carId);
+            verdict("the client shows the repair within twelve ticks", () -> condition == 7_250 ? null : "condition " + condition + " (" + seen[0] + " at four ticks)");
             ItemStack held = mc.player == null ? ItemStack.EMPTY : mc.player.getMainHandItem();
             shoot(mc, "booth-key-held");
             verdict("the paired key is named for its car", () -> held.getHoverName().getString().startsWith("Key to") ? null : "named " + held.getHoverName().getString());
@@ -1095,7 +1103,9 @@ public final class PhotoBooth {
             verdict("the key helper pressed H", () -> hDown != null && !hDown.isAlive() && hDown.exitValue() == 0
                     ? null : "helper " + (hDown == null ? "not started" : hDown.isAlive() ? "still running" : "exit " + hDown.exitValue()));
             verdict("the lights key is down while H is held with Left Control", () -> Keys.LIGHTS.isDown() ? null : "lights key up");
-            verdict("H with Left Control held cycles the lights", () -> v != null && lightsBefore != null && v.lights() != lightsBefore
+            // Held three seconds, past the keyboard's repeat delay: once, not once a repeat (D-0032).
+            Vehicle.Lights once = lightsBefore == null ? null : Vehicle.Lights.values()[(lightsBefore.ordinal() + 1) % Vehicle.Lights.values().length];
+            verdict("H with Left Control held cycles the lights once", () -> v != null && once != null && v.lights() == once
                     ? null : "lights " + (v == null ? null : v.lights()) + ", before " + lightsBefore);
             xkey("up", "h");
             Vehicle.Lights before = lightsBefore;

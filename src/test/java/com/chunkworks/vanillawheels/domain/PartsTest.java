@@ -37,7 +37,8 @@ import org.junit.jupiter.api.Test;
  * both lenses and paint is a lens; an absent selector cuts nothing; an
  * extra (another protocol's moving piece, D-0030) is cut before
  * everything, so a painted blade in it is neither the body's paint nor a
- * door's, and two extras never share a face.
+ * door's, and two extras never share a face. Glass the cockpit names as
+ * well is the cockpit's glass, apart from both (D-0031).
  */
 final class PartsTest {
 
@@ -84,7 +85,7 @@ final class PartsTest {
             all.add(d.painted());
             all.add(d.rest());
         }
-        all.addAll(List.of(p.lamps(), p.glass(), p.cockpit(), p.body(), p.rest()));
+        all.addAll(List.of(p.lamps(), p.glass(), p.cockpitGlass(), p.cockpit(), p.body(), p.rest()));
         return all;
     }
 
@@ -157,9 +158,33 @@ final class PartsTest {
         assertEquals(List.of(hinge.group()), groups(door.rest()));
         assertEquals(List.of(), groups(p.lamps()));
         assertEquals(List.of(), groups(p.glass()));
+        assertEquals(List.of(), groups(p.cockpitGlass()));
         assertEquals(List.of(), groups(p.cockpit()));
         assertEquals(List.of(side.group()), groups(p.body()));
         assertEquals(List.of(), groups(p.rest()));
+    }
+
+    @Test
+    void glassTheCockpitNamesTooIsTheCockpitsGlassApartFromTheGlassAndTheCockpit() {
+        List<Vec> positions = List.of(new Vec(0, 0, 0), new Vec(1, 0, 0), new Vec(0, 1, 0));
+        List<Corner> corners = List.of(new Corner(0, 0), new Corner(1, 0), new Corner(2, 0));
+        Face dome = new Face("m", "cockpit/glass/dome", corners, Vec.Y);
+        Face lamp = new Face("m", "glass/lamp_cover", corners, Vec.Y);
+        Face frame = new Face("m", "cockpit/frame", corners, Vec.Y);
+        Face side = new Face("m", "paint/side", corners, Vec.Y);
+        Mesh mesh = Mesh.of(positions, List.of(new Uv(0, 0)), List.of(dome, lamp, frame, side));
+        Parts p = Parts.cut(mesh, List.of(), List.of(),
+                Optional.empty(), Optional.of(Selector.group("glass")), Optional.of(Selector.group("cockpit")), Optional.of(Selector.group("paint")));
+        assertEquals(List.of(dome.group()), groups(p.cockpitGlass()));
+        assertEquals(List.of(lamp.group()), groups(p.glass()));
+        assertEquals(List.of(frame.group()), groups(p.cockpit()));
+        assertEquals(List.of(side.group()), groups(p.body()));
+        assertEquals(List.of(), groups(p.rest()));
+        // Without a cockpit selector, the dome is glass like any other.
+        Parts open = Parts.cut(mesh, List.of(), List.of(),
+                Optional.empty(), Optional.of(Selector.group("glass")), Optional.empty(), Optional.of(Selector.group("paint")));
+        assertEquals(List.of(dome.group(), lamp.group()), groups(open.glass()));
+        assertEquals(List.of(), groups(open.cockpitGlass()));
     }
 
     @Test

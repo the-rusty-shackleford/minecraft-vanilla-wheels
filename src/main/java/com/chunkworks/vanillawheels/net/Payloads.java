@@ -33,13 +33,15 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * What the driver's client tells the server beyond where the vehicle is
  * (vanilla carries that): the drive state, so the server can burn fuel,
  * hurt what is run over and show other players the wheels; the horn; the
- * headlight mode. Each is sent on change, never per tick.
+ * headlight mode; and, from any seat aboard a body that moves in three
+ * dimensions, the get-out key (D-0031). Each is sent on change or on the
+ * press, never per tick.
  */
 public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "6";
+    private static final String VERSION = "7";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {
@@ -112,6 +114,18 @@ public final class Payloads {
         }
     }
 
+    /** The get-out key, from any seat aboard a body that moves in three dimensions (D-0031). */
+    public record GetOut(int vehicle) implements CustomPacketPayload {
+        public static final Type<GetOut> TYPE = new Type<>(VanillaWheels.id("get_out"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, GetOut> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, GetOut::vehicle, GetOut::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
         registrar.playToClient(ContactVelocity.TYPE, ContactVelocity.STREAM_CODEC, (payload, context) -> {
@@ -128,6 +142,12 @@ public final class Payloads {
                 driven(context, payload.vehicle()).ifPresent(Vehicle::cycleLights));
         registrar.playToServer(Pose.TYPE, Pose.STREAM_CODEC, (payload, context) ->
                 towedOrDriven(context, payload.vehicle()).ifPresent(v -> v.onPose(payload.lift(), payload.pitch(), payload.roll())));
+        registrar.playToServer(GetOut.TYPE, GetOut.STREAM_CODEC, (payload, context) -> {
+            if (context.player() instanceof net.minecraft.server.level.ServerPlayer player && player.level().getEntity(payload.vehicle()) instanceof Vehicle v
+                    && player.getVehicle() == v && v.verticalControls()) {
+                v.getOut(player);
+            }
+        });
     }
 
     /** effects: returns the vehicle {@code id} names if the sending player drives it or the head of its tow chain */

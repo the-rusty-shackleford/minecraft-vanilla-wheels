@@ -66,6 +66,8 @@ public final class Appearance {
     public final BakedMesh body;
     public final BakedMesh lamps;
     public final BakedMesh glass;
+    /** The glass the cockpit names too: glass for everyone but whoever looks out through it from aboard. */
+    public final BakedMesh cockpitGlass;
     /** The cage, frame and mirrors: not drawn for whoever looks out from aboard in first person. */
     public final BakedMesh cockpit;
     public final List<Needle> needles;
@@ -111,6 +113,7 @@ public final class Appearance {
         this.body = BakedMesh.of(cut.body(), scale);
         this.lamps = BakedMesh.of(cut.lamps(), scale);
         this.glass = BakedMesh.of(cut.glass(), scale);
+        this.cockpitGlass = BakedMesh.of(cut.cockpitGlass(), scale);
         this.cockpit = BakedMesh.of(cut.cockpit(), scale);
         this.needles = List.copyOf(ns);
         this.doors = List.copyOf(ds);

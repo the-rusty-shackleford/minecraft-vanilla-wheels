@@ -58,3 +58,7 @@ tags: [index]
 - [D-0029](D-0029.md): Cargo is a registry of rules (`api/CargoRules`), animals the first; another mod's rule says what rides, what loads, what leads it and what becomes of its tether. An empty-handed click loads whatever the player leads that a rule admits (a captive's chain is on the captive). Serfdom's captives are the first other rule.
 
 - [D-0030](D-0030.md): A protocol may be layered on this one: `api/VehicleKinds` lets it claim profiles for its own entity types, whose classes extend `Vehicle` and override its hooks (the wheel's tick, towing, policies, the engine loop); the renderer draws its extras; `wheels.drawn: false` is skids or feet. Rotorcraft is the first.
+
+- [D-0031](D-0031.md): A body that moves in three dimensions (an aircraft in the air, a submarine) shares its hull (`domain/Hull`, `Vehicle.hullClamp`), its crashes (`domain/Crash` with a protocol's own speeds, judged from reported moves), and its keys (Up, Down, Get out; Shift never dismounts, a mixin) from here, moved out of Rotorcraft on Rusty's call; an engine may burn at a rate (`fuelRate`, `FuelDebt`); a protocol may set a vehicle down anywhere (`VehicleItem.place`). Network 7.
+
+- [D-0032](D-0032.md): A key that acts once (the lights, getting out; Rotorcraft's hook and sprayer) acts on its press, not on the keyboard's repeats (`client/Keys.Press`): held past the repeat delay, H cycled the lights through every mode.

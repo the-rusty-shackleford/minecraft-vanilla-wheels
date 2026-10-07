@@ -7,6 +7,37 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.13.0 — built 2026-10-07, unreleased (the submarines; D-0031)
+
+nfx's brief for two submarines; Rusty: "it's probably an extension of vanilla wheels. It's a new
+vehicle." The plan is `~/.claude/plans/peppy-scribbling-lollipop.md`: a submarine protocol layered
+here (D-0030), as Rotorcraft is. Rusty chose (2026-10-07) that what both need move here from
+Rotorcraft rather than be copied. That is D-0031:
+- the hull (`domain/Hull`, `hullPoints`, `hullClamp`, and `hullClampAxes` for a hull that rests on a floor);
+- crash judging (`domain/Crash`, `crashes`, `ownChange`, `crashed`);
+- the vertical controls: Up, Down and Get out, with the Shift mixin (`verticalControls`, `getOut`,
+  `Keys.RidingKey`);
+- plus a fuel rate (`fuelRate`, `domain/FuelDebt`) and `VehicleItem.place`;
+- and, for the submarines' ports and bubble, the cockpit's glass: glass the `cockpit` names too is
+  not drawn from a rider's own eyes (`Parts.cockpitGlass`).
+
+D-0032 rides in it: a key that acts once (the lights, getting out; Rotorcraft's hook and sprayer)
+acts on its press, not on the keyboard's repeats (`Keys.Press`). Held past the repeat delay, H
+had cycled the lights through every mode since 1.0.0; that was the booth's "H with Left Control
+held cycles the lights" flake (two runs in four), now a check that it cycles once, which the old
+code fails.
+
+Network 7.
+
+- Gate (2026-10-07): 147 JUnit, 103 gametests (`ThreeDimensionGameTests` new, six, each beside a
+  control and run against its mutation), the booth's 55 lines (54 checks and its last) green twice
+  running. The repair check, which once read the car unrepaired four ticks after the clicks, is
+  now judged on the server as the clicks land and on the client within twelve ticks, so a repeat
+  says which side was behind.
+- Rotorcraft 1.1.0 moved onto it with no change in behaviour (its gate green, the real-key booth
+  included); the Huey's and the Chinook's gametests pass on it.
+- Ships with the submarines, on Rusty's go. Not released.
+
 ## 1.12.0 — released 2026-10-07 in pack 1.75.0 (Rotorcraft's helicopters; layering, D-0030; the horn)
 
 Released with Rotorcraft 1.0.0, the Huey and the Chinook on Rusty's "looks good, fix the latent key

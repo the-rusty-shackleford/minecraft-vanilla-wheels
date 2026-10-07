@@ -16,6 +16,9 @@ Lift that builds vehicles from a chassis, wheels and an engine.
 Vehicle mods nest this jar inside their own; the loader keeps one copy.
 '''
 
+[[mixins]]
+config="vanillawheels.mixins.json"
+
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"

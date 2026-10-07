@@ -22,8 +22,10 @@ import com.chunkworks.vanillawheels.api.CargoRules;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.client.Controls;
+import com.chunkworks.vanillawheels.domain.Crash;
 import com.chunkworks.vanillawheels.domain.CrossSection;
 import com.chunkworks.vanillawheels.domain.Drive;
+import com.chunkworks.vanillawheels.domain.FuelDebt;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.RayBox;
@@ -164,6 +166,16 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private double wheelTravelO;
     /** The driver's throttle as the server last heard it: what burns fuel. */
     private int throttle;
+    /** The share of a tick of fuel burnt and not yet taken from the tank, for an engine burning at a rate other than one (D-0031). */
+    private FuelDebt fuelDebt = FuelDebt.NONE;
+    /** The last move the controlling player's client reported, for judging the next as a crash (D-0031); the server's, never saved. */
+    @Nullable private Vec3 lastReported;
+    /** Whether the last reported move already met what stopped it: an impact is charged once. */
+    private boolean impacting;
+    private final BlockPos.MutableBlockPos hullProbe = new BlockPos.MutableBlockPos();
+    private static final org.slf4j.Logger LOG = com.mojang.logging.LogUtils.getLogger();
+    /** A reported move longer than this, blocks, is a teleport or a recall, never judged as a crash. */
+    static final double NOT_A_MOVE = 6.0;
     /**
      * An input the server drives with when nobody is at the wheel: what a
      * gametest, and one day an autopilot, steers by. Null for none.
@@ -1497,8 +1509,15 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The server's per-tick duties: fuel, lights, the horn, running things over. */
     private void serverTick(VehicleProfile p) {
         if (burnsFuel() && fuelRequired()) {
-            Tank tank = tank().burn(1);
-            entityData.set(DATA_FUEL, tank.ticks());
+            FuelDebt.Burn burn = fuelDebt.burn(Mth.clamp(fuelRate(), 0.0, FuelDebt.MAX_RATE));
+            fuelDebt = burn.next();
+            if (burn.ticks() > 0) {
+                Tank tank = tank().burn(burn.ticks());
+                entityData.set(DATA_FUEL, tank.ticks());
+            }
+        }
+        if (!(getControllingPassenger() instanceof Player)) {
+            lastReported = null;
         }
         if (++lightCheckTicks >= 20) {
             lightCheckTicks = 0;
@@ -1566,6 +1585,224 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     protected void pose(Suspension s) {
         suspension = s;
         pose = new Terrain.Pose(s.pitch(), s.roll(), getY() + s.lift(), 0.0, 0.0);
+    }
+
+    /**
+     * effects: returns the share of a tick of fuel the engine burns for each tick that it burns
+     * ({@link #burnsFuel}), clamped to 0..{@link FuelDebt#MAX_RATE}: 1 for every car; a protocol's
+     * upgrade may make it more or less (D-0031). What is not a whole tick is owed to the next.
+     */
+    protected double fuelRate() {
+        return 1.0;
+    }
+
+    // --- a body that moves in three dimensions (D-0031) ---------------------
+
+    /**
+     * effects: returns whether its riders work it with the up, down and get-out keys (Space, Left
+     * Shift, R) rather than a car's: then Shift never lets a rider off (the game dismounts a rider
+     * whose sneak key is down, and a pilot holding it to go down would drop out), a rider holding
+     * it is not drawn crouching (the crouch would drop the eye and the seat with it), and the
+     * get-out key asks {@link #getOut}. False for every car.
+     */
+    public boolean verticalControls() {
+        return false;
+    }
+
+    /**
+     * requires: server thread
+     * effects: lets {@code rider} out, if they ride it, when they press the get-out key aboard a
+     * body with {@link #verticalControls}; a protocol may refuse where getting out is unsafe (an
+     * aircraft, high in the air)
+     */
+    public void getOut(Player rider) {
+        if (rider.getVehicle() == this) {
+            rider.stopRiding();
+        }
+    }
+
+    /**
+     * effects: returns the points it meets the world at when it moves in three dimensions, as x, y,
+     * z triples in blocks in the body's frame ({@link com.chunkworks.vanillawheels.domain.Hull#points}),
+     * or null to meet it, in {@link #hullClamp}, at the nose's and tail's corners and middles up the
+     * body's height. A protocol keeps the points it computed from its own profile; never changed by
+     * the caller.
+     */
+    @Nullable
+    protected double[] hullPoints() {
+        return null;
+    }
+
+    /**
+     * effects: returns {@code delta} cut short so that none of the hull's points ({@link #hullPoints})
+     * ends inside a block's collision bounds, in any direction: the furthest share of it, found to a
+     * hundred-and-twenty-eighth and backed off a fiftieth, that is clear. A move that starts with a
+     * point inside a block is let through, so a body can always back out. A protocol whose body
+     * moves in three dimensions calls this from {@link #footprintClamp}; both sides run it, so the
+     * server's re-run of a reported move agrees with the client's.
+     */
+    protected Vec3 hullClamp(Vec3 delta) {
+        if (hullBlocked(0.0, 0.0, 0.0) || !hullBlocked(delta.x, delta.y, delta.z)) {
+            return delta;
+        }
+        double lo = 0.0, hi = 1.0;
+        for (int i = 0; i < 7; i++) {
+            double mid = (lo + hi) / 2.0;
+            if (hullBlocked(delta.x * mid, delta.y * mid, delta.z * mid)) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        return delta.scale(Math.max(0.0, lo - 0.02));
+    }
+
+    /**
+     * effects: returns {@code delta} cut short axis by axis, as the game's own collision is: its
+     * rise or fall first, the furthest share of it that leaves every hull point clear, then its move
+     * across from that height, the same way. A body resting on a floor, or pressed up under a
+     * ceiling, still slides along it, where {@link #hullClamp}, cutting the move as a whole, stops it
+     * at the touch: a submarine on the seabed with its planes down. A move that starts with a point
+     * inside a block is let through, so a body can always back out.
+     */
+    protected Vec3 hullClampAxes(Vec3 delta) {
+        if (hullBlocked(0.0, 0.0, 0.0)) {
+            return delta;
+        }
+        double dy = delta.y * clearShare(0.0, 0.0, 0.0, 0.0, delta.y, 0.0);
+        double across = clearShare(0.0, dy, 0.0, delta.x, 0.0, delta.z);
+        return new Vec3(delta.x * across, dy, delta.z * across);
+    }
+
+    /**
+     * effects: returns the share of the move (mx, my, mz), made from the body moved by (ox, oy, oz),
+     * that leaves every hull point clear: 1 for all of it, else the furthest clear share found to a
+     * hundred-and-twenty-eighth and backed off a fiftieth, never under 0
+     */
+    private double clearShare(double ox, double oy, double oz, double mx, double my, double mz) {
+        if (!hullBlocked(ox + mx, oy + my, oz + mz)) {
+            return 1.0;
+        }
+        double lo = 0.0, hi = 1.0;
+        for (int i = 0; i < 7; i++) {
+            double mid = (lo + hi) / 2.0;
+            if (hullBlocked(ox + mx * mid, oy + my * mid, oz + mz * mid)) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        return Math.max(0.0, lo - 0.02);
+    }
+
+    /**
+     * effects: returns whether any of the hull's points, the body moved by (dx, dy, dz), stands
+     * inside a block's collision bounds: {@link #hullPoints} when there are any, else the nose's and
+     * tail's corners and middles anywhere up the body's height; false without a profile
+     */
+    protected boolean hullBlocked(double dx, double dy, double dz) {
+        VehicleProfile p = profile();
+        if (p == null) {
+            return false;
+        }
+        double yaw = Math.toRadians(getYRot()), c = Math.cos(yaw), s = Math.sin(yaw);
+        double x = getX() + dx, y = getY() + dy, z = getZ() + dz;
+        double[] hull = hullPoints();
+        if (hull != null) {
+            for (int i = 0; i < hull.length; i += 3) {
+                double px = hull[i], pz = hull[i + 2];
+                if (inBlock(x + px * c - pz * s, y + hull[i + 1], z + pz * c + px * s)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        double hw = p.body().width() / 2.0, hl = p.body().length() / 2.0;
+        for (int point = 0; point < 6; point++) {
+            double px = point % 3 == 0 ? -hw : point % 3 == 1 ? hw : 0.0;
+            double pz = point < 3 ? hl : -hl;
+            double wx = x + px * c - pz * s, wz = z + pz * c + px * s;
+            for (double h = 0.1; h < p.body().height(); h += 0.9) {
+                if (inBlock(wx, y + h, wz)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** effects: returns whether the world point (wx, wy, wz) stands inside its block's collision bounds */
+    protected boolean inBlock(double wx, double wy, double wz) {
+        hullProbe.set(Mth.floor(wx), Mth.floor(wy), Mth.floor(wz));
+        net.minecraft.world.phys.shapes.VoxelShape shape = level().getBlockState(hullProbe).getCollisionShape(level(), hullProbe);
+        if (shape.isEmpty()) {
+            return false;
+        }
+        double lx = wx - hullProbe.getX(), ly = wy - hullProbe.getY(), lz = wz - hullProbe.getZ();
+        return lx >= shape.min(net.minecraft.core.Direction.Axis.X) && lx <= shape.max(net.minecraft.core.Direction.Axis.X)
+                && ly >= shape.min(net.minecraft.core.Direction.Axis.Y) && ly <= shape.max(net.minecraft.core.Direction.Axis.Y)
+                && lz >= shape.min(net.minecraft.core.Direction.Axis.Z) && lz <= shape.max(net.minecraft.core.Direction.Axis.Z);
+    }
+
+    /**
+     * effects: returns what a crash costs this body, or null if a crash costs it nothing but speed
+     * (every car). With one, the server judges each move the controlling player's client reports
+     * against the one before it ({@link #move}): what it lost beyond {@link #ownChange} was taken
+     * by the world, and wears it ({@link #crashed}).
+     */
+    @Nullable
+    protected Crash crashes() {
+        return null;
+    }
+
+    /**
+     * effects: returns how much this body's own model can change its velocity in a tick, blocks a
+     * tick: its acceleration or brake, its turn, its climb, and a hair. A reported move that
+     * changed by more was stopped by the world. Asked only when {@link #crashes} is not null.
+     */
+    protected double ownChange() {
+        return 0.02;
+    }
+
+    /**
+     * requires: server thread
+     * effects: wears it by {@code wear} condition points, what a {@link Crash} charged a collision:
+     * exactly (a hurt's amount is rounded up and would add a point), shown as the wrench row's
+     * blink, written to the log; at no condition left it is destroyed ({@link #destroy}, which a
+     * protocol may defer: an aircraft comes down first). Nothing for a bump or a landing (no wear).
+     */
+    protected void crashed(int wear) {
+        if (wear > 0 && !isRemoved()) {
+            LOG.info("Vanilla Wheels: {} at {} crashed: {} condition lost", getName().getString(), blockPosition().toShortString(), wear);
+            setCondition(condition() - wear);
+            markHurt();
+            gameEvent(GameEvent.ENTITY_DAMAGE);
+            if (condition() == 0) {
+                destroy(damageSources().flyIntoWall());
+            }
+        }
+    }
+
+    /**
+     * effects: on the server, judges the move the controlling player's client reported, {@code now},
+     * against the one before it: when it lost more of its speed than the body's own model can shed
+     * in a tick ({@link #ownChange}), the world stopped it, and it is charged for the speed it
+     * carried into what stopped it ({@link Crash#impact}) -- once an impact: an impact met early in
+     * a tick is finished the next, and that is not charged again. A move longer than
+     * {@link #NOT_A_MOVE} is a teleport, never a crash.
+     */
+    private void judge(Crash crash, Vec3 now) {
+        Vec3 before = lastReported;
+        lastReported = now;
+        if (before == null || before.length() > NOT_A_MOVE || now.length() > NOT_A_MOVE) {
+            impacting = false;
+            return;
+        }
+        boolean hit = Crash.lost(before.x, before.y, before.z, now.x, now.y, now.z, ownChange()) > 0.0;
+        if (hit && !impacting) {
+            crashed(crash.impact(before.x, before.y, before.z, now.x, now.y, now.z));
+        }
+        impacting = hit;
     }
 
     /** effects: hurts and shoves every living thing in the body's path this tick, once each per half second */
@@ -1685,6 +1922,12 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             Vec3 incoming = delta.scale(Math.min(approach, tuning.maxSpeed() * Drive.BOOST_CAP) / asked);
             resolveContacts(incoming);
             if (!level().isClientSide() && breaksFragile()) breakFragile(incoming);
+        }
+        if (type == MoverType.PLAYER && !level().isClientSide()) {
+            Crash crash = crashes();
+            if (crash != null) {
+                judge(crash, delta);
+            }
         }
     }
 

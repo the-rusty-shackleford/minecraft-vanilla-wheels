@@ -26,11 +26,13 @@ import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * The driver's keys beyond the movement keys the game already has: the
- * horn on Left Control and the headlights on H. Both live in a conflict
- * context that is active only while the player drives one of our
- * vehicles, so Control does not fight sprint and H fights nothing anywhere
- * else.
+ * The riders' keys beyond the movement keys the game already has. The driver's: the horn on Left
+ * Control and the headlights on H, live only while the player drives one of our vehicles, so
+ * Control does not fight sprint and H fights nothing anywhere else. Aboard a body that moves in
+ * three dimensions ({@link Vehicle#verticalControls}, D-0031): up on Space, down on Left Shift and
+ * get out on R, Immersive Aircraft's keys, which the friends fly with; live in any seat aboard one,
+ * so Space and Shift keep their jobs everywhere else. A protocol makes its own keys with
+ * {@link RidingKey}.
  */
 public final class Keys {
     private Keys() {}
@@ -49,9 +51,26 @@ public final class Keys {
         }
     };
 
+    /** Active while the local player rides, in any seat, a vehicle of ours that moves in three dimensions, with no screen open. */
+    public static final IKeyConflictContext ABOARD = new IKeyConflictContext() {
+        @Override
+        public boolean isActive() {
+            Minecraft mc = Minecraft.getInstance();
+            return mc.player != null && mc.screen == null && mc.player.getVehicle() instanceof Vehicle v && v.verticalControls();
+        }
+
+        @Override
+        public boolean conflicts(IKeyConflictContext other) {
+            return this == other;
+        }
+    };
+
     public static final String CATEGORY = "key.categories.vanillawheels";
-    public static final KeyMapping HORN = new DrivingKey("key.vanillawheels.horn", GLFW.GLFW_KEY_LEFT_CONTROL);
-    public static final KeyMapping LIGHTS = new DrivingKey("key.vanillawheels.lights", GLFW.GLFW_KEY_H);
+    public static final KeyMapping HORN = new RidingKey("key.vanillawheels.horn", DRIVING, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_CONTROL, CATEGORY);
+    public static final KeyMapping LIGHTS = new RidingKey("key.vanillawheels.lights", DRIVING, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, CATEGORY);
+    public static final KeyMapping UP = new RidingKey("key.vanillawheels.up", ABOARD, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_SPACE, CATEGORY);
+    public static final KeyMapping DOWN = new RidingKey("key.vanillawheels.down", ABOARD, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_SHIFT, CATEGORY);
+    public static final KeyMapping GET_OUT = new RidingKey("key.vanillawheels.get_out", ABOARD, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CATEGORY);
 
     /**
      * effects: lets go of the driver's keys. A key's release is passed only to keys whose context
@@ -63,15 +82,62 @@ public final class Keys {
     }
 
     /**
-     * A driver's key. NeoForge judges a key bound with no modifier as up while Shift, Control or
-     * Alt is held, in every context but the game's own; the horn is Left Control, so holding it
-     * switched the horn off (it never sounded from 1.0.0 to 1.11.0), and H under a held Control did
-     * nothing. A driver's key judges its modifier as the game's own keys do: with none, it is down
-     * whatever else is held.
+     * effects: lets go of the keys aboard a body that moves in three dimensions, for the same
+     * reason: a Shift held to the ground and let go after getting out would stay down and take the
+     * next one boarded down with it.
      */
-    private static final class DrivingKey extends KeyMapping {
-        DrivingKey(String name, int key) {
-            super(name, DRIVING, InputConstants.Type.KEYSYM, key, CATEGORY);
+    public static void releaseAboard() {
+        UP.setDown(false);
+        DOWN.setDown(false);
+        GET_OUT.setDown(false);
+    }
+
+    /**
+     * A key that acts once a press (D-0032). The game clicks a key on each of the keyboard's repeats
+     * as well as on its press, so a key held past the repeat delay (two thirds of a second on X)
+     * acted again and again: the lights cycled through every mode while H was held, and a held hook
+     * key caught and let go of its load. A press is a click while the key was not already down at
+     * the last look: the repeats come while it is.
+     */
+    public static final class Press {
+        private final KeyMapping key;
+        private boolean held;
+
+        public Press(KeyMapping key) {
+            this.key = key;
+        }
+
+        /** effects: drains the key's clicks and returns whether one was a press; call it every client tick, aboard or not */
+        public boolean consume() {
+            boolean clicked = false;
+            while (key.consumeClick()) {
+                clicked = true;
+            }
+            boolean press = clicked && !held;
+            held = key.isDown();
+            return press;
+        }
+    }
+
+    public static final Press LIGHTS_PRESS = new Press(LIGHTS);
+    public static final Press GET_OUT_PRESS = new Press(GET_OUT);
+
+    /** effects: returns which way the rider asks to go: 1 up, -1 down, 0 neither; up wins when both are held */
+    public static int lift() {
+        return UP.isDown() ? 1 : DOWN.isDown() ? -1 : 0;
+    }
+
+    /**
+     * A rider's key, live only in its own context. NeoForge judges a key bound with no modifier as
+     * up while Shift, Control or Alt is held, in every context but the game's own; the horn is Left
+     * Control, so holding it switched the horn off (it never sounded from 1.0.0 to 1.11.0), H under
+     * a held Control did nothing, and Rotorcraft's descend on Left Shift switched itself off. A
+     * rider's key judges its modifier as the game's own keys do: with none, it is down whatever else
+     * is held.
+     */
+    public static class RidingKey extends KeyMapping {
+        public RidingKey(String name, IKeyConflictContext context, InputConstants.Type type, int key, String category) {
+            super(name, context, type, key, category);
         }
 
         @Override

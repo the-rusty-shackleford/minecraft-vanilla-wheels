@@ -242,11 +242,16 @@ public class VehicleRenderer extends EntityRenderer<Vehicle> {
             }
         }
 
-        if (a.glass.quadCount() > 0) {
+        // The cockpit's glass (D-0031): a bubble or a port the rider looks out through is not drawn for their own eyes.
+        boolean cockpitGlass = a.cockpitGlass.quadCount() > 0 && !throughOwnEyes(vehicle);
+        if (a.glass.quadCount() > 0 || cockpitGlass) {
             VertexConsumer glass = buffers.getBuffer(RenderType.entityTranslucent(a.texture));
             Entity camera = Minecraft.getInstance().getCameraEntity();
             int tint = camera != null && camera.getVehicle() == vehicle ? GLASS_FROM_INSIDE : MeshDrawer.WHITE;
             MeshDrawer.draw(a.glass, poseStack.last(), glass, tint, packedLight, overlay, MeshDrawer.Shading.LIT);
+            if (cockpitGlass) {
+                MeshDrawer.draw(a.cockpitGlass, poseStack.last(), glass, tint, packedLight, overlay, MeshDrawer.Shading.LIT);
+            }
         }
         poseStack.popPose();
         super.render(vehicle, entityYaw, partialTick, poseStack, buffers, packedLight);

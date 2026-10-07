@@ -508,13 +508,36 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
         ).apply(i, Paint::new));
     }
 
-    /** The sounds the vehicle makes by itself. */
-    public record Sounds(Optional<ResourceLocation> engine) {
+    /**
+     * The sounds the vehicle makes by itself: its engine's loop, and the note and the loudness the
+     * loop runs between from idle to flat out ({@code pitch} and {@code volume}, each written
+     * [idle, full]). A car's engine climbs a long way; a rotor turns at one speed and hardly climbs
+     * at all (D-0030). Absent, a car's.
+     */
+    public record Sounds(Optional<ResourceLocation> engine, Span pitch, Span volume) {
+        public static final Span CAR_PITCH = new Span(0.75, 1.6);
+        public static final Span CAR_VOLUME = new Span(0.28, 0.72);
+
         public static final Codec<Sounds> CODEC = RecordCodecBuilder.create(i -> i.group(
-                ResourceLocation.CODEC.optionalFieldOf("engine").forGetter(Sounds::engine)
+                ResourceLocation.CODEC.optionalFieldOf("engine").forGetter(Sounds::engine),
+                Span.codec(0.5, 2.0).optionalFieldOf("pitch", CAR_PITCH).forGetter(Sounds::pitch),
+                Span.codec(0.0, 4.0).optionalFieldOf("volume", CAR_VOLUME).forGetter(Sounds::volume)
         ).apply(i, Sounds::new));
 
-        public static final Sounds NONE = new Sounds(Optional.empty());
+        public static final Sounds NONE = new Sounds(Optional.empty(), CAR_PITCH, CAR_VOLUME);
+    }
+
+    /** From {@code idle} to {@code full}: what a sound is at a fraction of the way, written [idle, full]. */
+    public record Span(double idle, double full) {
+        /** effects: returns the codec of spans whose two ends are each within [min, max] */
+        public static Codec<Span> codec(double min, double max) {
+            return Codec.doubleRange(min, max).listOf(2, 2).xmap(l -> new Span(l.get(0), l.get(1)), s -> List.of(s.idle(), s.full()));
+        }
+
+        /** effects: returns the span's value {@code fraction} of the way from idle to full */
+        public double at(double fraction) {
+            return idle + (full - idle) * fraction;
+        }
     }
 
     public static final Codec<VehicleProfile> CODEC = RecordCodecBuilder.create(i -> i.group(

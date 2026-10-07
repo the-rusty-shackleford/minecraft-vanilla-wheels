@@ -20,6 +20,8 @@ package com.chunkworks.vanillawheels.gametest;
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.VanillaWheelsMod;
+import com.chunkworks.vanillawheels.api.VanillaWheels;
+import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.domain.Input;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -66,6 +68,19 @@ public final class KindGameTests {
                 }
             }
         }
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public void aProfileSetsItsEngineLoopsNoteAndLoudnessAndOneThatDoesNotKeepsACars(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        VehicleProfile.Sounds skids = VanillaWheels.profile(registries, GameTestMod.BOX_SKIDS).orElseThrow().value().sounds();
+        helper.assertValueEqual(skids.pitch(), new VehicleProfile.Span(0.6, 1.05), "the box skids' note, as written");
+        helper.assertValueEqual(skids.volume(), new VehicleProfile.Span(0.3, 1.0), "and their loudness");
+        helper.assertTrue(Math.abs(skids.pitch().at(0.5) - 0.825) < 1e-9, "halfway is halfway: " + skids.pitch().at(0.5));
+        VehicleProfile.Sounds car = VanillaWheels.profile(registries, BOX_CAR).orElseThrow().value().sounds();
+        helper.assertValueEqual(car.pitch(), VehicleProfile.Sounds.CAR_PITCH, "a profile naming no note has a car's, 0.75 to 1.6");
+        helper.assertValueEqual(car.volume(), VehicleProfile.Sounds.CAR_VOLUME, "and a car's loudness, 0.28 to 0.72");
+        helper.succeed();
     }
 
     @GameTest(template = "arena", timeoutTicks = 40)

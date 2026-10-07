@@ -433,7 +433,9 @@ A protocol can build vehicles of its own on this one (D-0030), as Rotorcraft bui
   or feet touch the ground, drawn with the body. No wheel mesh is drawn there, and the lift builds
   the vehicle from its chassis (and engine) without wheels.
 - **Sounds a data mod ships.** A profile's `sounds.engine` may name a sound that only the vehicle
-  mod's own `sounds.json` defines; it is played all the same.
+  mod's own `sounds.json` defines; it is played all the same. `sounds.pitch` and `sounds.volume`
+  (each `[idle, full]`, absent a car's `[0.75, 1.6]` and `[0.28, 0.72]`) set where the loop runs
+  from idle to flat out: a rotor's barely climbs.
 
 The gametests' own `SkidVehicle` is a kind at its smallest.
 

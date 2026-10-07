@@ -43,7 +43,8 @@ public final class EngineSound extends AbstractTickableSoundInstance {
         this.looping = true;
         this.delay = 0;
         this.volume = 0.0f;
-        this.pitch = 0.75f;
+        VehicleProfile p = vehicle.profile();
+        this.pitch = (float) (p == null ? VehicleProfile.Sounds.CAR_PITCH : p.sounds().pitch()).idle();
         this.x = vehicle.getX();
         this.y = vehicle.getY();
         this.z = vehicle.getZ();
@@ -89,9 +90,12 @@ public final class EngineSound extends AbstractTickableSoundInstance {
         float fraction = vehicle.engineLoad();
         // A boost is heard: the engine climbs past its top note by the burn, and a little louder.
         float burn = vehicle.burn();
+        // The note and the loudness run between the profile's idle and full (a car's when it names none).
+        VehicleProfile p = vehicle.profile();
+        VehicleProfile.Sounds sounds = p == null ? VehicleProfile.Sounds.NONE : p.sounds();
         // A continuous bed beneath action cues, eased on entry and boost changes.
         // At 20 ticks/s these caps prevent single-tick gain/pitch jumps.
-        pitch = Mth.approach(pitch, Mth.lerp(fraction, 0.75f, 1.6f) + 0.35f * burn, 0.06f);
-        volume = Mth.approach(volume, Mth.lerp(fraction, 0.28f, 0.72f) + 0.08f * burn, 0.05f);
+        pitch = Mth.approach(pitch, (float) sounds.pitch().at(fraction) + 0.35f * burn, 0.06f);
+        volume = Mth.approach(volume, (float) sounds.volume().at(fraction) + 0.08f * burn, 0.05f);
     }
 }

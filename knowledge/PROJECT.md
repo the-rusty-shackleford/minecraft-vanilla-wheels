@@ -7,7 +7,7 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.13.0 — built 2026-10-07, unreleased (the submarines; D-0031)
+## 1.13.0 — released 2026-10-08 in pack 1.78.0 (the submarines; D-0031)
 
 nfx's brief for two submarines; Rusty: "it's probably an extension of vanilla wheels. It's a new
 vehicle." The plan is `~/.claude/plans/peppy-scribbling-lollipop.md`: a submarine protocol layered
@@ -40,7 +40,11 @@ Network 7.
   says which side was behind.
 - Rotorcraft 1.1.0 moved onto it with no change in behaviour (its gate green, the real-key booth
   included); the Huey's and the Chinook's gametests pass on it.
-- Ships with the submarines, on Rusty's go. Not released.
+- Released with the submarines on Rusty's go ("Release the submarine batch"), tag `v1.13.0` at
+  `37475ac`: the release gate (2026-10-08, `clean build --no-build-cache`) green with 147 JUnit, 103
+  gametests and the booth's 55 checks; sha1 `584d4687` on GitHub and on the server, network 7 (the
+  server repo's `knowledge/releases/pack-1.78.0.md`). Not yet seen in play: anyone diving, or
+  flying since 1.75.0.
 
 ## 1.12.0 — released 2026-10-07 in pack 1.75.0 (Rotorcraft's helicopters; layering, D-0030; the horn)
 

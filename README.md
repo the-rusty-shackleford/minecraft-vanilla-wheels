@@ -6,7 +6,7 @@ and server must both run a 1.10 or later; shared-pack players can use **Update P
 1.12.0 lets other protocols be layered on this one (D-0030, see
 [Layering](#layering-a-protocol-on-this-one-1120)); Rotorcraft's helicopters are the first.
 
-**1.13.0** is built but not released (D-0031): what every body that moves in three dimensions
+**1.13.0** is released (pack 1.78.0, D-0031): what every body that moves in three dimensions
 shares -- its hull, its crashes, the up, down and get-out keys -- moved here from Rotorcraft, for a
 second protocol, the submarines; an engine may burn at a rate; a protocol may set a vehicle down
 anywhere. Its network protocol is 7. Nothing changes for a car or a trailer.

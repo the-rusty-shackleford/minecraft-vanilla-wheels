@@ -115,7 +115,8 @@ mod's keys would: before 1.12.0 the horn never sounded), and the horn stops when
 out. Crouch to dismount, as from a boat. Aboard a body that moves in three dimensions (an
 aircraft, a submarine; 1.13.0, D-0031) **Space** is up, **Left Shift** down and **R** gets you out,
 from any seat: Shift never lets you off there, and the three are *Up*, *Down* and *Get out* under
-Vanilla Wheels in Controls.
+Vanilla Wheels in Controls. Boarding one, the game's line names the get-out key ("Press R to
+Dismount"), not Shift.
 
 A vehicle climbs any ledge up to its profile's `climb` (one block for a pickup; a
 two-block ledge is a wall, use a ramp) without a jump: the collision box steps up the way
@@ -455,7 +456,8 @@ share, each off for a car:
 
 - `verticalControls()`: Up (Space), Down (Left Shift), Get out (R) in any seat, `Keys.lift()`;
   Shift never dismounts (a mixin on `Player.wantsToStopRiding`, and the rider is not drawn
-  crouching); the get-out key asks `getOut(rider)`, which a protocol may refuse.
+  crouching); the get-out key asks `getOut(rider)`, which a protocol may refuse; the boarding line
+  names the get-out key (a client mixin on `ClientPacketListener.handleSetEntityPassengersPacket`).
 - `hullPoints()`, `hullClamp(delta)` and `hullClampAxes(delta)`: the body meets the world at
   points probed over boxes (`domain/Hull`) in every direction; call a clamp from
   `footprintClamp`. `hullClamp` cuts the move as a whole (an aircraft in the air);

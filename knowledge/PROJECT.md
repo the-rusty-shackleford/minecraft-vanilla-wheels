@@ -27,6 +27,10 @@ had cycled the lights through every mode since 1.0.0; that was the booth's "H wi
 held cycles the lights" flake (two runs in four), now a check that it cycles once, which the old
 code fails.
 
+D-0033 rides in it too, from Rusty's submarine playtest: aboard anything with vertical controls,
+the boarding line names the get-out key ("Press R to Dismount"), not Shift; the helicopters had
+said Shift since Rotorcraft 1.0.0.
+
 Network 7.
 
 - Gate (2026-10-07): 147 JUnit, 103 gametests (`ThreeDimensionGameTests` new, six, each beside a

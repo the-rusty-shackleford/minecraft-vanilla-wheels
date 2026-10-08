@@ -62,3 +62,5 @@ tags: [index]
 - [D-0031](D-0031.md): A body that moves in three dimensions (an aircraft in the air, a submarine) shares its hull (`domain/Hull`, `Vehicle.hullClamp`), its crashes (`domain/Crash` with a protocol's own speeds, judged from reported moves), and its keys (Up, Down, Get out; Shift never dismounts, a mixin) from here, moved out of Rotorcraft on Rusty's call; an engine may burn at a rate (`fuelRate`, `FuelDebt`); a protocol may set a vehicle down anywhere (`VehicleItem.place`). Network 7.
 
 - [D-0032](D-0032.md): A key that acts once (the lights, getting out; Rotorcraft's hook and sprayer) acts on its press, not on the keyboard's repeats (`client/Keys.Press`): held past the repeat delay, H cycled the lights through every mode.
+
+- [D-0033](D-0033.md): Aboard a body with vertical controls (D-0031) the boarding line names the get-out key ("Press R to Dismount"), not Shift, which goes down there (Rusty, in the submarine playtest: the subs and the helicopters said Left Shift); a client mixin on the passengers packet; a car's line is untouched.

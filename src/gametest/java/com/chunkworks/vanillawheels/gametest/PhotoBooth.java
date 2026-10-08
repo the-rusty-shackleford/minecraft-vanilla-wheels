@@ -274,6 +274,11 @@ public final class PhotoBooth {
             int needles = count(mc, PhotoBooth::needleRed);
             shoot(mc, "booth-dash");
             verdict("the driver is aboard", () -> mc.player != null && mc.player.getVehicle() instanceof Vehicle ? null : "vehicle " + (mc.player == null ? null : mc.player.getVehicle()));
+            verdict("a car's boarding line names Shift, a car's way out", () -> {
+                String want = net.minecraft.network.chat.Component.translatable("mount.onboard", mc.options.keyShift.getTranslatedKeyMessage()).getString();
+                String line = boardingLine(mc);
+                return want.equals(line) ? null : "line \"" + line + "\", want \"" + want + "\"";
+            });
             verdict("from the driver's seat the dash needles are in view", () -> needles > 40 ? null : "needle pixels " + needles);
             verdict("engine startup eases in on the real mounted vehicle", () -> {
                 if (!(mc.player != null && mc.player.getVehicle() instanceof Vehicle v)) return "not mounted";
@@ -1161,6 +1166,18 @@ public final class PhotoBooth {
     }
 
     // --- plumbing --------------------------------------------------------
+
+    /** effects: returns the line the game last showed over the hotbar (the boarding line, on boarding), or null */
+    @org.jetbrains.annotations.Nullable
+    private static String boardingLine(Minecraft mc) {
+        try {
+            java.lang.reflect.Field f = net.minecraft.client.gui.Gui.class.getDeclaredField("overlayMessageString");
+            f.setAccessible(true);
+            return f.get(mc.gui) instanceof net.minecraft.network.chat.Component c ? c.getString() : null;
+        } catch (ReflectiveOperationException e) {
+            return "unreadable: " + e;
+        }
+    }
 
     private static void onServer(Minecraft mc, Consumer<ServerPlayer> action) {
         MinecraftServer server = mc.getSingleplayerServer();

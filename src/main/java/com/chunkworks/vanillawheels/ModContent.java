@@ -19,6 +19,7 @@ package com.chunkworks.vanillawheels;
 
 import net.minecraft.network.chat.Component;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
+import com.chunkworks.vanillawheels.api.VehicleKinds;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
 import com.chunkworks.vanillawheels.lift.LiftControllerBlock;
@@ -221,13 +222,17 @@ public final class ModContent {
         }
     }
 
-    /** Every usable Vanilla Wheels item in its own Creative inventory tab. */
+    /**
+     * Every usable Vanilla Wheels item in its own Creative inventory tab, with the ground vehicles: a
+     * profile a protocol built on this one claims ({@link VehicleKinds}) is in that protocol's tab.
+     */
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> CREATIVE_TAB = TABS.register("main", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.vanillawheels"))
             .icon(() -> WHEEL.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 var profiles = parameters.holders().lookupOrThrow(VanillaWheels.VEHICLES).listElements()
                         .map(holder -> holder.key().location())
+                        .filter(id -> !VehicleKinds.claimed(parameters.holders(), id))
                         .sorted(java.util.Comparator.comparing(ResourceLocation::toString)).toList();
                 profiles.forEach(id -> output.accept(vehicleStack(id)));
                 profiles.forEach(id -> output.accept(chassisStack(id)));

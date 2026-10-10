@@ -22,6 +22,7 @@ import com.chunkworks.vanillawheels.api.CargoRules;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.client.Controls;
+import com.chunkworks.vanillawheels.domain.Blows;
 import com.chunkworks.vanillawheels.domain.Crash;
 import com.chunkworks.vanillawheels.domain.CrossSection;
 import com.chunkworks.vanillawheels.domain.Drive;
@@ -56,6 +57,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionHand;
@@ -197,6 +199,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     @Nullable private UUID releasedFrom;
     /** Players' punches in a row toward packing it up (D-0025); the server's, never saved. */
     private com.chunkworks.vanillawheels.domain.Knocks knocks = com.chunkworks.vanillawheels.domain.Knocks.NONE;
+    /** This tick's blasts, each taken once however many hit boxes it reached (D-0034); server only, not saved. */
+    private Blows.Area areaBlows = Blows.Area.NONE;
+    /** The last bolt that struck it, taken once however many ticks and hit boxes it struck (D-0034); server only, not saved. */
+    @Nullable private UUID struckBy;
     /** The doors' swing on the client, 0 shut to 1 open, eased toward the synced state. */
     private float doorSwing;
     private float doorSwingO;
@@ -458,6 +464,12 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         @Override
         public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
             return getParent().hurt(source, amount);
+        }
+
+        /** effects: the body takes the bolt, once ({@link Vehicle#thunderHit}) */
+        @Override
+        public void thunderHit(ServerLevel level, net.minecraft.world.entity.LightningBolt lightning) {
+            getParent().thunderHit(level, lightning);
         }
 
         @Override
@@ -1550,6 +1562,15 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** effects: returns whether the engine burns fuel this tick: under throttle, with someone or a script at the wheel */
     protected boolean burnsFuel() {
         return throttle != 0 && (getControllingPassenger() != null || scripted != null);
+    }
+
+    /**
+     * effects: returns what every blow but a player's own is divided by (D-0034): the profile's
+     * durability, 1 without a profile; a protocol may scale it (a submarine's fit-out)
+     */
+    protected double durability() {
+        VehicleProfile p = profile();
+        return p == null ? 1.0 : p.durability();
     }
 
     /** effects: returns whether this body runs over the living in its path */
@@ -2879,13 +2900,29 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         packAway();
     }
 
+    /**
+     * effects: takes a bolt of lightning once (D-0034): a bolt strikes everything near it on every tick it
+     * lives, through each of its flashes, and the body and every hit box ({@link Part}) are each struck; a
+     * living thing's hurt cooldown takes it once, and a vehicle has none. Before 1.14.0, one bolt wore a
+     * vehicle a blow for every piece on every tick.
+     */
+    @Override
+    public void thunderHit(ServerLevel level, net.minecraft.world.entity.LightningBolt lightning) {
+        if (lightning.getUUID().equals(struckBy)) return;
+        struckBy = lightning.getUUID();
+        super.thunderHit(level, lightning);
+    }
+
     /** effects: command/void kills use the same cargo-preserving destruction path as combat damage */
     @Override public void kill() { destroy(level().damageSources().genericKill()); }
 
     /**
-     * Persistent wear replaces vanilla's transient boat hit counter; five points of damage break a pristine vehicle.
-     * A player's own blow is a knock, not wear: six in a row pack the vehicle up (D-0025) -- while mobs, arrows,
-     * bullets, explosions, fire and crashes still wear it.
+     * Persistent wear replaces vanilla's transient boat hit counter: a blow costs its amount divided by the
+     * vehicle's {@link #durability} ({@link Blows#wear}, D-0034). A player's own blow is a knock, not wear: six
+     * in a row pack the vehicle up (D-0025) -- while mobs, arrows, bullets, explosions and fire still wear it.
+     * An explosion reaches the body and every hit box ({@link Part}), each a blow of its own: the vehicle takes
+     * it once, at its largest piece ({@link Blows.Area}); before 1.14.0 it took all of them, up to five times
+     * the blast. Lightning is taken once a bolt ({@link #thunderHit}).
      */
     @Override public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (level().isClientSide() || isRemoved()) return true;
@@ -2894,9 +2931,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return true;
         }
         if (isInvulnerableTo(source) || !Float.isFinite(amount) || amount <= 0) return false;
+        int wear = Blows.wear(amount, durability());
+        if (source.is(DamageTypeTags.IS_EXPLOSION)) {
+            long tick = level().getGameTime();
+            int due = areaBlows.due(tick, wear);
+            areaBlows = areaBlows.after(tick, wear);
+            if (due == 0) return false;
+            wear = due;
+        }
         rock(10.0f);
         markHurt();
-        setCondition(condition() - (int) Math.min(10000, Math.ceil(amount * 2000.0)));
+        setCondition(condition() - wear);
         gameEvent(GameEvent.ENTITY_DAMAGE, source.getEntity());
         if (condition() == 0) destroy(source);
         return true;

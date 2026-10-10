@@ -25,9 +25,11 @@ Sister mods: [Luminance](https://github.com/the-rusty-shackleford/minecraft-lumi
 
 ## Creative inventory
 
-The **Vanilla Wheels** tab contains every installed vehicle and its chassis, followed
+The **Vanilla Wheels** tab contains every installed ground vehicle and its chassis, followed
 by the Mechanic Lift, Rolling Garage Door panels, key fob, wheels, engine and full/empty gas cans. Trailblazer,
 Trailer and Farmer's Pickup share this page. New vehicle profiles join it automatically.
+A protocol built on this one lists its own vehicles in its own tab (1.14.0, D-0034): the
+helicopters are in Rotorcraft's, the submarines in Submersibles'.
 The ordinary vanilla categories and Creative search remain available too.
 Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed separately. See the
 [full-pack tab check](devtools/verification/creative-tab.md).
@@ -271,7 +273,12 @@ knock, not wear -- punching a car up must not hand you a wreck.
 ## Damage, repairs and recovery keys (1.8.0)
 
 Vehicles have persistent condition. Mobs, arrows and bullets, explosions and fire wear it; a
-player's own blow is a knock toward packing it, not wear (D-0025). Driving into a wall or landing
+player's own blow is a knock toward packing it, not wear (D-0025). A point of damage costs 2000 of
+its 10000 divided by its profile's `durability` (1.14.0, D-0034; absent 1, a boat's five points to a
+wreck): at 8, a car or truck takes seven pistol rounds, four rifle rounds, two shotgun shells or two
+rockets. An explosion counts once, at the most any of the vehicle's hit boxes took, and a bolt of
+lightning once; both reached every hit box, and before 1.14.0 a rocket or a creeper wrecked
+anything. Driving into a wall or landing
 hard does not: a car's crash costs it speed, not condition (this said "crashes" until 1.12.0, which
 no version did). Worn to nothing, a
 vehicle drops as a packed wreck with its cargo intact. Set it down and right-click it back up, or
@@ -377,6 +384,7 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "engine": {"max_speed": 0.9, "acceleration": 0.02, "reverse_speed": 0.3, "brake": 0.05, "drag": 0.01},
   "handling": {"grip": 0.85, "steer_degrees": 32, "drift_grip": 0.12, "drift_boost": 0.3, "drift_charge_ticks": 40},
   "climb": 2.0, "mass": 1.45,
+  "durability": 8.0,                                  // divides every blow but a player's punch (optional, 0.1..100, absent 1; 1.14.0)
   "fuel": {"capacity": 24000},                        // burn ticks, as the furnace counts them
   "storage": {"chests": [{"at": [0, 16, -35], "yaw": 180, "scale": 0.6, "rows": 6}]},   // the chests: each the game's double chest, drawn where and how big the profile says, its own rows (optional)
   "gauges": [{"kind": "speed", "part": {"material": "needle", "x_max": -5}, "pivot": [-8, 17, 21.9], "axis": [0, 0, 1], "zero": 0.3, "sweep": 4.7}],
@@ -467,6 +475,10 @@ share, each off for a car:
   reports against the one before; what it lost beyond the body's own model costs condition by a
   `domain/Crash` of the protocol's own speeds, once an impact.
 - `fuelRate()`: ticks of fuel a burning tick costs, the fraction carried (`domain/FuelDebt`).
+- `durability()`: what a blow is divided by, the profile's `durability`; a protocol may scale it
+  (a submarine's fit-out, 1.14.0).
+- `VehicleKinds.claimed(registries, id)`: whether a protocol claims a profile; Vanilla Wheels' own
+  creative tab leaves those out, for the protocol's tab to list (1.14.0).
 - `Keys.RidingKey`: a protocol's own key that judges its modifier as the game's keys do.
 - `VehicleItem.place(level, player, stack, at, yaw)`: set a vehicle down anywhere, through the
   same checks as a click on a block face.

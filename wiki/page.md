@@ -73,7 +73,10 @@ Vehicles run on **gas cans**.
 
 ## Damage, packing up and repairs
 
-A vehicle has a **condition**. Mobs, arrows, bullets, explosions, fire and crashes wear it.
+A vehicle has a **condition**. Mobs, arrows, bullets, explosions and fire wear it; your own punches
+don't. Each vehicle has a **durability** that divides the damage: a car or truck takes about seven
+pistol rounds, four rifle rounds, two shotgun shells or two rockets before it's a wreck, and a
+helicopter more. An explosion or a lightning strike counts once.
 It shows as a row of ten **wrenches** above your hunger bar, for the vehicle you're riding (and
 the trailer it tows) or the one you're looking at. Like hearts, the row blinks when it's hurt
 and jiggles when it's low.

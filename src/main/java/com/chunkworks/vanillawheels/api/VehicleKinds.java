@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiPredicate;
 import java.util.function.Supplier;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
@@ -47,9 +48,11 @@ public final class VehicleKinds {
     /**
      * A protocol's vehicles: which profiles it claims, by id in a level's registries -- both sides
      * ask, so the claim must be decided by what both sides see, such as the protocol's own synced
-     * datapack registry -- and the entity type that makes them.
+     * datapack registry -- and the entity type that makes them. The registries are a lookup, not
+     * the level's whole access, so a creative tab may ask too (until 1.14.0 they were a
+     * {@code RegistryAccess}; the erased signature is the same).
      */
-    public record Kind(BiPredicate<RegistryAccess, ResourceLocation> claims, Supplier<? extends EntityType<? extends Vehicle>> type) {}
+    public record Kind(BiPredicate<HolderLookup.Provider, ResourceLocation> claims, Supplier<? extends EntityType<? extends Vehicle>> type) {}
 
     private static final List<Kind> KINDS = new CopyOnWriteArrayList<>();
 
@@ -66,6 +69,19 @@ public final class VehicleKinds {
             }
         }
         return ModContent.VEHICLE_ENTITY.get();
+    }
+
+    /**
+     * effects: returns whether a protocol built on this one claims profile {@code id}: not one of
+     * this protocol's own ground vehicles, so it is listed in that protocol's creative tab, not here
+     */
+    public static boolean claimed(HolderLookup.Provider registries, ResourceLocation id) {
+        for (Kind kind : KINDS) {
+            if (kind.claims().test(registries, id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** effects: returns every entity type a vehicle can be: this protocol's own first, then each kind's, in order */

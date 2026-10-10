@@ -64,3 +64,5 @@ tags: [index]
 - [D-0032](D-0032.md): A key that acts once (the lights, getting out; Rotorcraft's hook and sprayer) acts on its press, not on the keyboard's repeats (`client/Keys.Press`): held past the repeat delay, H cycled the lights through every mode.
 
 - [D-0033](D-0033.md): Aboard a body with vertical controls (D-0031) the boarding line names the get-out key ("Press R to Dismount"), not Shift, which goes down there (Rusty, in the submarine playtest: the subs and the helicopters said Left Shift); a client mixin on the passengers packet; a car's line is untouched.
+
+- [D-0034](D-0034.md): A profile's `durability` (absent 1) divides every blow but a player's own punch (`domain/Blows`); crashes are not divided. An explosion is taken once, at its largest piece, and a bolt once: both reached the body and every hit box (part entities), and a rocket or a creeper wrecked anything. The creative tab lists the ground vehicles only; a protocol's vehicles are in its own tab (`VehicleKinds.claimed`).

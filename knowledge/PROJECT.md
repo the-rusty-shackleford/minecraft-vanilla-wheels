@@ -7,6 +7,28 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.14.0 — built and gated 2026-10-10, unreleased (durability; a blast and a bolt once; the ground vehicles' tab; D-0034)
+
+Friends found vehicles flimsy (one arrow, six wrenches); Rusty asked what the guns do before settling
+numbers and, shown that every RWM gun wrecked any car or helicopter in one hit, took the proposed
+durabilities. D-0034:
+- a profile's `durability` (0.1 to 100, absent 1) divides every blow but a player's own punch
+  (`domain/Blows`); `Vehicle.durability()` is a hook a protocol may scale; crashes are not divided;
+- an explosion is taken once, at its largest piece (`Blows.Area`): a vehicle's hit boxes are part
+  entities and NeoForge's explosion hurt each of them, so a rocket or a creeper wrecked anything;
+- a bolt of lightning is taken once (`thunderHit`): it struck every piece on every tick it lived;
+- the creative tab lists the ground vehicles only (`VehicleKinds.claimed`); Rotorcraft and
+  Submersibles list theirs in their own tabs.
+
+The numbers ship in the vehicle mods: Trailblazer, Trailer and the Pickup 8, the Sling Container 8,
+the Huey 10, the Chinook 12, the Explorer 4 and the Scout 1.5 (moved from Submersibles). Network 7
+unchanged: nothing on the wire changed (durability is read on the server).
+
+- Gate: the release gate (2026-10-10, `clean build --no-build-cache`) green with 156 JUnit, 107 gametests and the booth's 55 checks. Each new rule was run against its mutation and caught it: no
+  division (three tests), no blast rule, no bolt rule, no tab filter.
+- Played in a 4070 playtest (Prism instance `helicopter-playtest`, 2026-10-10) with the rest of the
+  batch; Rusty: "Looks good". Not yet seen: a vehicle shot on the box.
+
 ## 1.13.0 — released 2026-10-08 in pack 1.78.0 (the submarines; D-0031)
 
 nfx's brief for two submarines; Rusty: "it's probably an extension of vanilla wheels. It's a new

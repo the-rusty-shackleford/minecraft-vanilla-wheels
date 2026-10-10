@@ -51,12 +51,22 @@ import net.minecraft.world.item.DyeColor;
  * converts. Vectors are the mesh's frame, +Z forward, +Y up, before the
  * {@link Handedness} mirror; {@link #toLocal()} mirrors everything at once.
  *
+ * <p>{@code durability} divides every blow the vehicle takes but a player's
+ * own punch, which is a knock (D-0025): a mob's, an arrow's, a bullet's, a
+ * blast's, a fire's ({@code domain/Blows}, D-0034). Absent, 1: five points of
+ * damage wreck it, as a boat. Crashes are charged by their protocol's
+ * {@code Crash}, not divided.
+ *
  * <p>RI: scale > 0; body positive; at least one seat when there is an
  *     engine, and exactly one driver then; no driver without an engine;
- *     wheels non-empty with a positive radius; climb >= 0; mass > 0.
+ *     wheels non-empty with a positive radius; climb >= 0; mass > 0;
+ *     0.1 <= durability <= 100.
  */
 public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels wheels, Optional<Engine> engine,
-                             Handling handling, double climb, double mass, Kit kit) {
+                             Handling handling, double climb, double mass, double durability, Kit kit) {
+
+    /** The least and the most a profile's durability may be. */
+    public static final double MIN_DURABILITY = 0.1, MAX_DURABILITY = 100.0;
 
     /**
      * What the vehicle looks like: its meshes, texture, units, hand, paint, glass, cockpit, rider
@@ -560,10 +570,14 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
             Handling.CODEC.optionalFieldOf("handling", Handling.DEFAULT).forGetter(VehicleProfile::handling),
             Codec.doubleRange(0.0, 4.0).optionalFieldOf("climb", 1.0).forGetter(VehicleProfile::climb),
             Codec.doubleRange(0.05, 50.0).optionalFieldOf("mass", 1.0).forGetter(VehicleProfile::mass),
+            Codec.doubleRange(MIN_DURABILITY, MAX_DURABILITY).optionalFieldOf("durability", 1.0).forGetter(VehicleProfile::durability),
             Kit.MAP_CODEC.forGetter(VehicleProfile::kit)
     ).apply(i, VehicleProfile::new));
 
     public VehicleProfile {
+        if (!(durability >= MIN_DURABILITY && durability <= MAX_DURABILITY)) {
+            throw new IllegalArgumentException("durability is " + MIN_DURABILITY + ".." + MAX_DURABILITY + ": " + durability);
+        }
         seats = List.copyOf(seats);
         long drivers = seats.stream().filter(Seat::driver).count();
         if (engine.isPresent()) {

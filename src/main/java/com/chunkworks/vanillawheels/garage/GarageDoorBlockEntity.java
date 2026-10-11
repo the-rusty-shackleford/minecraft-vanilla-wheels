@@ -2,6 +2,9 @@
 package com.chunkworks.vanillawheels.garage;
 
 import com.chunkworks.vanillawheels.ModContent;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.NbtUtils;
+import org.jetbrains.annotations.Nullable;
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.domain.Shutter;
 import net.minecraft.core.*;
@@ -18,10 +21,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.*;
 import java.util.List;
 
-/** Loaded shutter metadata. AF: origin/size describe the shared door, lift its
- * clearance in eighth-blocks. RI: bounded dimensions and travel; only origin owns
- * the cached panel list and ticks. Followers persist clearance but never tick.
- * Neither discovery nor controller lookup loads chunks. */
+/** Loaded door metadata, for the rolling garage door and the hidden door (D-0036). AF: origin/size
+ * describe the shared door, lift its travel in eighth-blocks (a rolling curtain's clearance, a
+ * sinking one's drop), look the block a hidden door's panel is drawn as (null: the default).
+ * RI: bounded dimensions and travel within the block's kind; only origin owns the cached panel
+ * list and ticks. Followers persist travel but never tick. Neither discovery nor controller
+ * lookup loads chunks. */
 public final class GarageDoorBlockEntity extends BlockEntity {
     private BlockPos origin;
     private int width = 1, height = 1, lift, previousLift;
@@ -31,12 +36,22 @@ public final class GarageDoorBlockEntity extends BlockEntity {
     private Shutter.Rectangle motion;
     private int shapeLift = -1;
     private VoxelShape cachedShape = Shapes.empty();
+    private @Nullable BlockState look;
 
-    /** requires: registered panel state; effects: creates closed metadata; throws: none. */
+    /** requires: registered panel state; effects: creates closed metadata of the type its block's
+     * panels carry; throws: none. */
     public GarageDoorBlockEntity(BlockPos pos, BlockState state) {
-        super(ModContent.GARAGE_DOOR_BE.get(), pos, state);
+        super(state.getBlock() instanceof GarageDoorBlock door ? door.panelType() : ModContent.GARAGE_DOOR_BE.get(), pos, state);
         origin = pos; updateBounds();
     }
+    /** requires: none; effects: returns how this door's curtain opens; throws: none. */
+    public Shutter.Kind kind() {
+        return getBlockState().getBlock() instanceof GarageDoorBlock door ? door.kind() : Shutter.Kind.ROLLING;
+    }
+    /** requires: none; effects: returns the block this panel is drawn as, or null for its default; throws: none. */
+    public @Nullable BlockState look() { return look; }
+    /** requires: server side; effects: draws this panel as {@code state} from now on, for every viewer; throws: none. */
+    public void setLook(BlockState state) { look = state; changed(); }
     /** requires: none; effects: returns assembly origin; throws: none. */
     public BlockPos origin() { return origin; }
     /** requires: none; effects: returns door width; throws: none. */
@@ -88,9 +103,9 @@ public final class GarageDoorBlockEntity extends BlockEntity {
         bounds = axis() == Direction.Axis.X
                 ? new AABB(origin.getX(),origin.getY(),origin.getZ(),origin.getX()+width,origin.getY()+height,origin.getZ()+1)
                 : new AABB(origin.getX(),origin.getY(),origin.getZ(),origin.getX()+1,origin.getY()+height,origin.getZ()+width);
-        aperture = axis() == Direction.Axis.X
-                ? new AABB(bounds.minX+.1,bounds.minY,bounds.minZ+.1,bounds.maxX-.1,bounds.maxY-Shutter.HEADER,bounds.maxZ-.1)
-                : new AABB(bounds.minX+.1,bounds.minY,bounds.minZ+.1,bounds.maxX-.1,bounds.maxY-Shutter.HEADER,bounds.maxZ-.1);
+        // A sinking curtain has no header: its doorway is its whole height.
+        double header = kind() == Shutter.Kind.SINKING ? 0 : Shutter.HEADER;
+        aperture = new AABB(bounds.minX+.1,bounds.minY,bounds.minZ+.1,bounds.maxX-.1,bounds.maxY-header,bounds.maxZ-.1);
     }
 
     private boolean loaded() {
@@ -115,7 +130,8 @@ public final class GarageDoorBlockEntity extends BlockEntity {
         door.previousLift = door.lift;
         if (level.isClientSide) return;
         if (!door.formed || !pos.equals(door.origin)) return;
-        int limit = door.height*Shutter.UNITS-4;
+        var kind = door.kind();
+        int limit = Shutter.travel(door.motion, kind);
         if ((door.powered && door.lift == limit) || (!door.powered && door.lift == 0)) {
             door.moving = false; return;
         }
@@ -124,10 +140,14 @@ public final class GarageDoorBlockEntity extends BlockEntity {
                 e -> !e.isSpectator() && (e instanceof LivingEntity || e instanceof Vehicle
                         || e instanceof AbstractMinecart || e instanceof Boat
                         || e instanceof net.neoforged.neoforge.entity.PartEntity<?>)).isEmpty();
-        int next = Shutter.advance(door.motion,door.lift,door.powered,obstructed);
+        int next = Shutter.advance(door.motion,kind,door.lift,door.powered,obstructed);
         if (next == door.lift) { door.moving = false; return; }
-        if (!door.moving) level.playSound(null,pos,door.powered ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.IRON_DOOR_CLOSE,
-                SoundSource.BLOCKS,.55f,.65f);
+        if (!door.moving) {
+            if (kind == Shutter.Kind.SINKING) level.playSound(null,pos,door.powered ? SoundEvents.PISTON_CONTRACT : SoundEvents.PISTON_EXTEND,
+                    SoundSource.BLOCKS,.7f,.55f);
+            else level.playSound(null,pos,door.powered ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.IRON_DOOR_CLOSE,
+                    SoundSource.BLOCKS,.55f,.65f);
+        }
         door.moving = true;
         for (var panel : door.panels) {
             panel.previousLift = panel.lift;
@@ -145,6 +165,14 @@ public final class GarageDoorBlockEntity extends BlockEntity {
         if (shapeLift == travel) return cachedShape;
         shapeLift = travel;
         double y = worldPosition.getY()-origin.getY();
+        if (kind() == Shutter.Kind.SINKING) {
+            // The sheet is a block thick and fills each row up to its sinking top edge (D-0036).
+            int row = (int) y;
+            double top = row >= 0 && row < height && travel <= height*Shutter.UNITS
+                    ? Shutter.sunkTop(motion, row, travel) : 1;
+            cachedShape = top > 0 ? Shapes.box(0,0,0,1,top,1) : Shapes.empty();
+            return cachedShape;
+        }
         int across = axis() == Direction.Axis.X ? worldPosition.getX()-origin.getX() : worldPosition.getZ()-origin.getZ();
         double bottom = Math.max(0,travel/(double)Shutter.UNITS-y);
         double top = Math.min(1,height-Shutter.HEADER-y);
@@ -162,14 +190,17 @@ public final class GarageDoorBlockEntity extends BlockEntity {
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition,getBlockState(),getBlockState(),Block.UPDATE_CLIENTS);
     }
+    /** effects: a panel loaded from disk re-forms its door on the next tick, through its own block: a
+     * tick scheduled for another block is dropped, and the door would never answer redstone again */
     @Override public void onLoad() {
         super.onLoad();
-        if (level != null && !level.isClientSide) level.scheduleTick(worldPosition,ModContent.GARAGE_DOOR.get(),1);
+        if (level != null && !level.isClientSide) level.scheduleTick(worldPosition,getBlockState().getBlock(),1);
     }
     @Override protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag,registries);
         tag.putLong("Origin",origin.asLong()); tag.putInt("Width",width); tag.putInt("Height",height);
         tag.putInt("Lift",lift); tag.putBoolean("Formed",formed); tag.putBoolean("Powered",powered);
+        if (look != null) tag.put("Look",NbtUtils.writeBlockState(look));
     }
     @Override protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag,registries);
@@ -177,12 +208,14 @@ public final class GarageDoorBlockEntity extends BlockEntity {
         width = Math.clamp(tag.getInt("Width"),1,Shutter.MAX_SIZE);
         height = Math.clamp(tag.getInt("Height"),1,Shutter.MAX_SIZE);
         previousLift = lift;
-        lift = Math.clamp(tag.getInt("Lift"),0,height*Shutter.UNITS-4);
+        lift = Math.clamp(tag.getInt("Lift"),0,Shutter.travel(new Shutter.Rectangle(0,0,width,height),kind()));
         formed = tag.getBoolean("Formed"); powered = tag.getBoolean("Powered");
+        look = tag.contains("Look") ? NbtUtils.readBlockState(registries.lookupOrThrow(Registries.BLOCK),tag.getCompound("Look")) : null;
         shapeLift = -1; updateBounds();
     }
     @Override public CompoundTag getUpdateTag(HolderLookup.Provider registries) { return saveWithoutMetadata(registries); }
     @Override public ClientboundBlockEntityDataPacket getUpdatePacket() { return ClientboundBlockEntityDataPacket.create(this); }
-    /** requires: none; effects: returns cached world render bounds; throws: none. */
-    public AABB renderBounds() { return bounds; }
+    /** requires: none; effects: returns cached world render bounds: a sinking door's reach down as
+     * deep as it sinks, so it is drawn while it goes into its sill; throws: none. */
+    public AABB renderBounds() { return kind() == Shutter.Kind.SINKING ? bounds.expandTowards(0,-height,0) : bounds; }
 }

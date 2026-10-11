@@ -2,6 +2,7 @@
 package com.chunkworks.vanillawheels.garage;
 
 import com.chunkworks.vanillawheels.ModContent;
+import com.chunkworks.vanillawheels.domain.Shutter;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.*;
 import net.minecraft.server.level.ServerLevel;
@@ -19,7 +20,7 @@ import net.minecraft.world.phys.shapes.*;
  * axis/reversed encode exactly four facings; only the elected root ticks.
  * The original axis and reversed=false preserve both legacy orientations.
  * Shape, collision and rendering use the same server-owned travel. */
-public final class GarageDoorBlock extends BaseEntityBlock {
+public class GarageDoorBlock extends BaseEntityBlock {
     public static final MapCodec<GarageDoorBlock> CODEC = simpleCodec(GarageDoorBlock::new);
     public static final EnumProperty<Direction.Axis> AXIS = BlockStateProperties.HORIZONTAL_AXIS;
     public static final BooleanProperty REVERSED = BooleanProperty.create("reversed");
@@ -31,12 +32,16 @@ public final class GarageDoorBlock extends BaseEntityBlock {
         registerDefaultState(stateDefinition.any().setValue(AXIS, Direction.Axis.X).setValue(REVERSED, false).setValue(ROOT, false));
     }
     @Override protected MapCodec<? extends BaseEntityBlock> codec() { return CODEC; }
+    /** requires: none; effects: returns how this door's curtain opens; throws: none. */
+    public Shutter.Kind kind() { return Shutter.Kind.ROLLING; }
+    /** requires: registry loaded; effects: returns the block entity type its panels carry; throws: none. */
+    public BlockEntityType<GarageDoorBlockEntity> panelType() { return ModContent.GARAGE_DOOR_BE.get(); }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> b) { b.add(AXIS, REVERSED, ROOT); }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.INVISIBLE; }
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) { return new GarageDoorBlockEntity(pos, state); }
     @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
         return state.getValue(ROOT)
-                ? createTickerHelper(type, ModContent.GARAGE_DOOR_BE.get(), GarageDoorBlockEntity::tick) : null;
+                ? createTickerHelper(type, panelType(), GarageDoorBlockEntity::tick) : null;
     }
     @Override public BlockState getStateForPlacement(BlockPlaceContext context) {
         var level = context.getLevel();
@@ -59,7 +64,7 @@ public final class GarageDoorBlock extends BaseEntityBlock {
             state = withFacing(state, facing(neighbor));
             inherited = true;
         }
-        if (!GarageDoorAssembly.canAdd(level, pos, axis, state.getValue(REVERSED))) return null;
+        if (!GarageDoorAssembly.canAdd(level, pos, this, axis, state.getValue(REVERSED))) return null;
         return state;
     }
 
@@ -78,12 +83,12 @@ public final class GarageDoorBlock extends BaseEntityBlock {
     @Override protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState old, boolean moved) {
         super.onPlace(state, level, pos, old, moved);
         if (!level.isClientSide && (!old.is(this) || facing(old) != facing(state))) {
-            GarageDoorAssembly.schedule(level, pos, state.getValue(AXIS));
-            if (old.is(this)) GarageDoorAssembly.schedule(level, pos, old.getValue(AXIS));
+            GarageDoorAssembly.schedule(level, pos, this, state.getValue(AXIS));
+            if (old.is(this)) GarageDoorAssembly.schedule(level, pos, this, old.getValue(AXIS));
         }
     }
     @Override protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState replacement, boolean moved) {
-        if (!replacement.is(this) && !level.isClientSide) GarageDoorAssembly.schedule(level, pos, state.getValue(AXIS));
+        if (!replacement.is(this) && !level.isClientSide) GarageDoorAssembly.schedule(level, pos, this, state.getValue(AXIS));
         super.onRemove(state, level, pos, replacement, moved);
     }
     @Override protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
@@ -97,6 +102,7 @@ public final class GarageDoorBlock extends BaseEntityBlock {
     }
     @Override protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         if (level.getBlockEntity(pos) instanceof GarageDoorBlockEntity panel) return panel.shape();
+        if (kind() == Shutter.Kind.SINKING) return Shapes.block();
         return state.getValue(AXIS) == Direction.Axis.X ? Block.box(0,0,6,16,16,10) : Block.box(6,0,0,10,16,16);
     }
     @Override protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {

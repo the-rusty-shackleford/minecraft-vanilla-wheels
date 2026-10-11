@@ -304,6 +304,70 @@ def lift_stripe():
     return px
 
 
+# ------------------------------------------------- the hidden door and the vehicle sensor (D-0035, D-0036)
+
+STONE, STONE_LIGHT, STONE_DARK = (124, 124, 122), (150, 150, 146), (82, 82, 84)
+LENS, LENS_LIT, LENS_GLOW = (30, 34, 40), (255, 176, 48), (255, 232, 160)
+
+
+def hidden_door():
+    """The Hidden Door's item and particles: rough rock in a thin dark steel frame."""
+    noise = Noise(0x41DE)
+    px = [[(0, 0, 0, 255) for _ in range(16)] for _ in range(16)]
+    # Joints between rough stones, offset row to row like a dry wall.
+    joints_y = {4, 9, 13}
+    for y in range(16):
+        for x in range(16):
+            c = shade(STONE, int((noise.next() - 0.5) * 26))
+            row = 0 if y < 4 else 1 if y < 9 else 2 if y < 13 else 3
+            if y in joints_y or (x + 5 * row) % 7 == 0:
+                c = STONE_DARK
+            elif (x + 5 * row) % 7 == 1 or y - 1 in joints_y:
+                c = shade(STONE_LIGHT, int((noise.next() - 0.5) * 10))
+            if x == 0 or y == 0 or x == 15 or y == 15:
+                c = STEEL_DARK
+            px[y][x] = (*c, 255)
+    return px
+
+
+def sensor_side():
+    """The Vehicle Sensor's sides: riveted steel with a hazard band across the middle."""
+    px = lift_plate()
+    for x in range(1, 15):
+        for y in (7, 8):
+            px[y][x] = (*((230, 190, 40) if (x + y) % 4 < 2 else (34, 34, 38)), 255)
+    return px
+
+
+def sensor_top(lit):
+    """The Vehicle Sensor's top: steel round a lens, dark at rest, amber while a vehicle is over it."""
+    px = lift_plate()
+    for y in range(16):
+        for x in range(16):
+            d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5
+            if d <= 4.6:
+                c = (LENS_LIT if lit else LENS) if d > 1.6 else (LENS_GLOW if lit else shade(LENS, 22))
+                if not lit and (x, y) == (6, 6):
+                    c = shade(LENS, 60)
+                px[y][x] = (*c, 255)
+            elif d <= 5.6:
+                px[y][x] = (*STEEL_DARK, 255)
+    return px
+
+
+def floor_hatch_top():
+    """The Floor Hatch's top (D-0037): the lift deck's diamond plate in a dark frame, a lighter bevel
+    inside it, as a steel trap would be."""
+    px = lift_deck()
+    for y in range(16):
+        for x in range(16):
+            if x in (0, 15) or y in (0, 15):
+                px[y][x] = (*STEEL_DARK, 255)
+            elif x in (1, 14) or y in (1, 14):
+                px[y][x] = (*STEEL_LIGHT, 255)
+    return px
+
+
 def lift_gui():
     """The menu's background: a 176 x 184 panel on a 256 x 256 sheet, slots at the menu's positions."""
     W, H = 176, 184
@@ -601,6 +665,11 @@ def main(argv) -> None:
         write_png(ASSETS / "textures/block/mechanic_lift.png", 16, 16, lift_plate())
         write_png(ASSETS / "textures/block/mechanic_lift_deck.png", 16, 16, lift_deck())
         write_png(ASSETS / "textures/block/mechanic_lift_stripe.png", 16, 16, lift_stripe())
+        write_png(ASSETS / "textures/block/hidden_door.png", 16, 16, hidden_door())
+        write_png(ASSETS / "textures/block/vehicle_sensor_side.png", 16, 16, sensor_side())
+        write_png(ASSETS / "textures/block/vehicle_sensor_top.png", 16, 16, sensor_top(False))
+        write_png(ASSETS / "textures/block/vehicle_sensor_top_on.png", 16, 16, sensor_top(True))
+        write_png(ASSETS / "textures/block/floor_hatch_top.png", 16, 16, floor_hatch_top())
         write_png(ASSETS / "textures/gui/mechanic_lift.png", 256, 256, lift_gui())
         for name, pixels in slot_hint_icons().items():
             write_png(ASSETS / f"textures/gui/slot_{name}.png", 16, 16, pixels)

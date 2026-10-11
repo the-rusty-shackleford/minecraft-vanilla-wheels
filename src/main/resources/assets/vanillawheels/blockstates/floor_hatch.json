@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "looked=false": {
+      "model": "vanillawheels:block/floor_hatch"
+    },
+    "looked=true": {
+      "model": "vanillawheels:block/floor_hatch_looked"
+    }
+  }
+}

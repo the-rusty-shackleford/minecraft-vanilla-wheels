@@ -156,6 +156,43 @@ public final class ModContent {
             BLOCK_ENTITIES.register("garage_door", () -> BlockEntityType.Builder.of(
                     com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity::new, GARAGE_DOOR.get()).build(null));
 
+    /** The Hidden Door (D-0036): the garage door's panel, its curtain a block thick sinking whole into
+     * the sill, each panel drawn as the solid block it was given. Dynamic in shape as the garage door is. */
+    public static final DeferredBlock<com.chunkworks.vanillawheels.garage.HiddenDoorBlock> HIDDEN_DOOR =
+            BLOCKS.registerBlock("hidden_door", com.chunkworks.vanillawheels.garage.HiddenDoorBlock::new,
+                    BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(3,6).sound(SoundType.STONE)
+                            .noOcclusion().dynamicShape().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> HIDDEN_DOOR_ITEM = ITEMS.registerSimpleBlockItem(HIDDEN_DOOR);
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity>> HIDDEN_DOOR_BE =
+            BLOCK_ENTITIES.register("hidden_door", () -> BlockEntityType.Builder.of(
+                    com.chunkworks.vanillawheels.garage.GarageDoorBlockEntity::new, HIDDEN_DOOR.get()).build(null));
+
+    /** The Vehicle Sensor (D-0035): full redstone power while a vehicle is within its range, 8 blocks to start. */
+    public static final DeferredBlock<com.chunkworks.vanillawheels.garage.VehicleSensorBlock> VEHICLE_SENSOR =
+            BLOCKS.registerBlock("vehicle_sensor", com.chunkworks.vanillawheels.garage.VehicleSensorBlock::new,
+                    BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3,6).sound(SoundType.METAL)
+                            .pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> VEHICLE_SENSOR_ITEM = ITEMS.registerSimpleBlockItem(VEHICLE_SENSOR);
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.chunkworks.vanillawheels.garage.VehicleSensorBlockEntity>> VEHICLE_SENSOR_BE =
+            BLOCK_ENTITIES.register("vehicle_sensor", () -> BlockEntityType.Builder.of(
+                    com.chunkworks.vanillawheels.garage.VehicleSensorBlockEntity::new, VEHICLE_SENSOR.get()).build(null));
+
+    /** The Floor Hatch (D-0037): a housing in a floor that slides a plate over the opening in front of it,
+     * and draws it back for anything rising from below; a rail stands on its edge while the hole is open. */
+    public static final DeferredBlock<com.chunkworks.vanillawheels.garage.FloorHatchBlock> FLOOR_HATCH =
+            BLOCKS.registerBlock("floor_hatch", com.chunkworks.vanillawheels.garage.FloorHatchBlock::new,
+                    BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3,6).sound(SoundType.METAL)
+                            .dynamicShape().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> FLOOR_HATCH_ITEM = ITEMS.registerSimpleBlockItem(FLOOR_HATCH);
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.chunkworks.vanillawheels.garage.FloorHatchBlockEntity>> FLOOR_HATCH_BE =
+            BLOCK_ENTITIES.register("floor_hatch", () -> BlockEntityType.Builder.of(
+                    com.chunkworks.vanillawheels.garage.FloorHatchBlockEntity::new, FLOOR_HATCH.get()).build(null));
+    /** A shut Floor Hatch's plate: laid and taken up by its housing only; no item, cannot be mined. */
+    public static final DeferredBlock<com.chunkworks.vanillawheels.garage.HatchPlateBlock> HATCH_PLATE =
+            BLOCKS.registerBlock("hatch_plate", com.chunkworks.vanillawheels.garage.HatchPlateBlock::new,
+                    BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(-1.0f, 3600000.0f).sound(SoundType.METAL)
+                            .noLootTable().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK));
+
     private static BlockBehaviour.Properties liftProperties() {
         return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0f, 6.0f).sound(SoundType.METAL).noOcclusion().noLootTable().pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK);
     }
@@ -238,6 +275,9 @@ public final class ModContent {
                 profiles.forEach(id -> output.accept(chassisStack(id)));
                 output.accept(LIFT_ITEM.get());
                 output.accept(GARAGE_DOOR_ITEM.get());
+                output.accept(HIDDEN_DOOR_ITEM.get());
+                output.accept(VEHICLE_SENSOR_ITEM.get());
+                output.accept(FLOOR_HATCH_ITEM.get());
                 output.accept(KEY_FOB.get());
                 output.accept(WHEEL.get());
                 output.accept(ENGINE.get());

@@ -7,6 +7,26 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.15.0 — the garage blocks: Hidden Door, Vehicle Sensor, Floor Hatch (D-0035 to D-0037); gated in the lab, unreleased
+
+For Rusty's underground garage under his house (built first in a lab copy of his world,
+`minecraft mods/tools/lab-server`, generators in its `garage/`), on his "Apply it to the real world now":
+- **Vehicle Sensor** (D-0035): full power, strongly, while any vehicle is within its range (a cube,
+  1..32, default 8, clicked through 2/4/8/12/16/20/24/32); looks every 2 ticks, lets go half a second
+  after. Rusty: "range based and not 'tripwire' based"; the tripwire built first is gone.
+- **Hidden Door** (D-0036): the garage door's assembly with a curtain that sinks whole into its sill,
+  half a block a tick, each panel drawn as a solid block given to it. Found on the way: a panel's load
+  tick named the garage door block, so a hidden door went dead after a restart (fixed for both, with a
+  reload test).
+- **Floor Hatch** (D-0037): housings lay real plate blocks over an opening and take them away for
+  anything rising from below, with an iron-bar guard while the hole is open; never under a foot unless
+  the car is within 1.5 blocks. For the elevator's nook: a Create car takes a block it meets with it.
+- Network 7 unchanged (no new payloads; new blocks and block entities only).
+- Tests: 124 gametests and the JUnit suite green; every new rule run against its mutation and caught.
+  In the lab, on Rusty's real elevator and tunnel: door open in 0.41 s for a parked Trailblazer 18
+  blocks out; the hatch shut 1.6 s after sending the car down, open 5 s before it arrives.
+- Not yet: the release gate (`clean build --no-build-cache` with the booth), Rusty's look at the hatch.
+
 ## 1.14.0 — released 2026-10-11 in pack 1.82.0 (durability; a blast and a bolt once; the ground vehicles' tab; D-0034)
 
 Released on Rusty's go ("Release the 2026-10-10 batch and Survivalist Armor 0.2.0. This is my go."), tag `v1.14.0` at `36ef78d`, the release gate (2026-10-11, `clean build --no-build-cache`) green again on that commit; sha1 `fcccae85` on GitHub and on the server (the server repo's `knowledge/releases/pack-1.82.0.md`). Not yet seen in play on the box.

@@ -11,6 +11,10 @@ shares -- its hull, its crashes, the up, down and get-out keys -- moved here fro
 second protocol, the submarines; an engine may burn at a rate; a protocol may set a vehicle down
 anywhere. Its network protocol is 7. Nothing changes for a car or a trailer.
 
+**1.15.0** (pack 1.83.0) adds three garage blocks for a hidden vehicle tunnel and a lift shaft: the
+[Hidden Door, the Vehicle Sensor and the Floor Hatch](#hidden-doors-vehicle-sensors-and-floor-hatches-115)
+(D-0035 to D-0037). Network 7, unchanged.
+
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
 burns fuel, shows its gauges on a physical dash, lights the road, honks, plays records,
@@ -94,6 +98,47 @@ Assemblies crossing unloaded chunks suspend without loading those chunks.
 
 Available in **1.9.0**. See the
 [server and shader-client evidence](devtools/verification/garage-door.md).
+
+## Hidden doors, vehicle sensors and floor hatches (1.15)
+
+Built for Rusty's underground garage: a tunnel whose rock face opens for a car and nobody else, and a
+floor that closes over an elevator's hole. All three are drawn by Vanilla Wheels' own renderers and
+never swap blocks while they move, so nothing flickers under shaders.
+
+**Hidden Door** (D-0036). Craft eight from eight Rolling Garage Door panels around a sticky piston.
+Build it as a garage door (side by side and upward, up to 16 by 16; power any section: on opens, off
+closes), but its curtain is a block thick and sinks whole into the ground under it, half a block a
+tick (a four-high door is open in 0.4 s), leaving the full opening. Right-click a panel with a solid
+whole block (stone, andesite, planks...) and it is drawn as that block, using none of it; sneak to place
+the block instead. Closing waits while anything is in the doorway.
+
+**Vehicle Sensor** (D-0035). Craft two from seven steel ingots, an observer and redstone. Full redstone
+power out of every side, strongly, while a vehicle is within its range: any of ours or any part of
+one, or anything not alive carrying a player (a boat, a minecart, another mod's aircraft); never a
+player on foot, a mob, a ridden horse or an item. The range is a cube, 8 blocks to start; click it with
+an empty hand to step 2, 4, 8, 12, 16, 20, 24, 32 (sneak to step down), and it says the range over
+the hotbar. It looks every 2 ticks and lets go half a second after the last vehicle leaves. Buried
+under a door's sill, it powers the sill and the door on it; with range 20 a car at full speed (18
+blocks a second) finds a Hidden Door open with ten blocks to spare.
+
+**Floor Hatch** (D-0037). Craft two from two Hidden Door panels and iron bars. Lay housings in a floor
+beside an opening, facing it (they face the way you look); a row of them is one hatch. Each lays a
+plate over the opening in front of it, 3 deep to start (click with an empty hand: 1 to 16, sneak to
+step down), real whole blocks you walk on, and takes them away when it opens, so the opening is a real
+hole. Right-click a housing with a solid block and the housing and its plate are drawn as it.
+- **Opens** while powered, while something not alive rises toward it from below (an elevator's car,
+  up to 16 blocks down: no wiring), and while something fills the opening (the car at home).
+- **Never under a foot**: while someone stands on the plate it waits, unless what rises is within 1.5
+  blocks under it, so they step down onto the car.
+- **Shuts** only over an empty opening with nothing in the plate's layer: once the car has gone below.
+- **The guard**: iron bars rise out of the housings along the open edge before the plate draws back,
+  stand while the hole is open and empty, and fold away when it is shut or filled. Solid, a block high.
+- Breaking a housing takes its plate with it; the plate cannot be mined and has no item.
+
+Diagnosing: `/data get block <housing>` shows `Depth`, `Travel` (eighths drawn back, 0 shut),
+`Guard` (0..4), `Plated` and `Look`; a sensor's `range` and `powered` are its block state; a hidden
+door's root panel shows `Lift`, `Formed`, `Powered`. A Create car meeting a shut plate would take it
+with it, which is why the hatch opens for anything rising before it arrives.
 
 ## Driving
 

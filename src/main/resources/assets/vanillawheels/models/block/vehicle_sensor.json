@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "vanillawheels:block/vehicle_sensor_top",
+    "side": "vanillawheels:block/vehicle_sensor_side",
+    "bottom": "vanillawheels:block/vehicle_sensor_side"
+  }
+}

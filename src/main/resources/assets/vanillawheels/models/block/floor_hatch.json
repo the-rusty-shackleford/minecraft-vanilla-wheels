@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "vanillawheels:block/floor_hatch_top",
+    "bottom": "vanillawheels:block/mechanic_lift",
+    "side": "vanillawheels:block/mechanic_lift"
+  }
+}

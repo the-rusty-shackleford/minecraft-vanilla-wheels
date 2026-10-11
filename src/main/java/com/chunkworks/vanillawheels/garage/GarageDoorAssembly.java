@@ -1,7 +1,6 @@
 /* Copyright (C) 2026 Rusty Shackleford and nfx. SPDX-License-Identifier: AGPL-3.0-or-later */
 package com.chunkworks.vanillawheels.garage;
 
-import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.domain.Shutter;
 import net.minecraft.core.*;
 import net.minecraft.server.level.ServerLevel;
@@ -16,8 +15,7 @@ public final class GarageDoorAssembly {
     private record Scan(List<BlockPos> panels, boolean loaded, boolean overflow) {}
 
     /** requires: horizontal axis; effects: schedules local topology checks; throws: none. */
-    public static void schedule(Level level, BlockPos pos, Direction.Axis axis) {
-        var block = ModContent.GARAGE_DOOR.get();
+    public static void schedule(Level level, BlockPos pos, GarageDoorBlock block, Direction.Axis axis) {
         level.scheduleTick(pos, block, 1);
         level.scheduleTick(pos.above(), block, 1);
         level.scheduleTick(pos.below(), block, 1);
@@ -26,7 +24,7 @@ public final class GarageDoorAssembly {
         level.scheduleTick(pos.relative(across.getOpposite()), block, 1);
     }
 
-    private static Scan scan(Level level, BlockPos start, Direction.Axis axis, boolean reversed, boolean adding) {
+    private static Scan scan(Level level, BlockPos start, GarageDoorBlock block, Direction.Axis axis, boolean reversed, boolean adding) {
         var queue = new ArrayDeque<BlockPos>();
         var seen = new HashSet<BlockPos>();
         var panels = new ArrayList<BlockPos>();
@@ -39,7 +37,7 @@ public final class GarageDoorAssembly {
             if (!level.hasChunkAt(pos)) { loaded = false; continue; }
             var state = level.getBlockState(pos);
             if (!(adding && pos.equals(start))
-                    && (!state.is(ModContent.GARAGE_DOOR.get()) || state.getValue(GarageDoorBlock.AXIS) != axis
+                    && (!state.is(block) || state.getValue(GarageDoorBlock.AXIS) != axis
                         || state.getValue(GarageDoorBlock.REVERSED) != reversed)) continue;
             panels.add(pos.immutable());
             if (panels.size() > Shutter.MAX_PANELS) return new Scan(List.copyOf(panels), loaded, true);
@@ -50,8 +48,8 @@ public final class GarageDoorAssembly {
 
     /** requires: horizontal axis; effects: validates new panel against bounded loaded
      * neighbors; incomplete rectangles are allowed while building; throws: none. */
-    public static boolean canAdd(Level level, BlockPos pos, Direction.Axis axis, boolean reversed) {
-        var scan = scan(level, pos, axis, reversed, true);
+    public static boolean canAdd(Level level, BlockPos pos, GarageDoorBlock block, Direction.Axis axis, boolean reversed) {
+        var scan = scan(level, pos, block, axis, reversed, true);
         if (!scan.loaded || scan.overflow) return false;
         var min = pos; var max = pos;
         for (var p : scan.panels) {
@@ -66,9 +64,9 @@ public final class GarageDoorAssembly {
      * controller of a filled rectangle, retaining existing clearance; throws: none. */
     public static void rebuild(ServerLevel level, BlockPos start) {
         var state = level.getBlockState(start);
-        if (!state.is(ModContent.GARAGE_DOOR.get())) return;
+        if (!(state.getBlock() instanceof GarageDoorBlock block)) return;
         var axis = state.getValue(GarageDoorBlock.AXIS);
-        var scan = scan(level, start, axis, state.getValue(GarageDoorBlock.REVERSED), false);
+        var scan = scan(level, start, block, axis, state.getValue(GarageDoorBlock.REVERSED), false);
         if (!scan.loaded) return;
         var rectangle = scan.overflow ? Optional.<Shutter.Rectangle>empty() : Shutter.rectangle(scan.panels.stream()
                 .map(p -> new Shutter.Cell(axis == Direction.Axis.X ? p.getX() : p.getZ(), p.getY())).toList());
@@ -89,7 +87,12 @@ public final class GarageDoorAssembly {
         var r = rectangle.get();
         var origin = axis == Direction.Axis.X ? new BlockPos(r.left(),r.bottom(),start.getZ())
                 : new BlockPos(start.getX(),r.bottom(),r.left());
-        int lift = Math.min(r.fullyRaised(), Math.max(0, raisedEdge-r.bottom()*Shutter.UNITS));
+        // A rolling curtain's lift is an edge above the sill, so a repaired door keeps its highest
+        // raised panel; a sinking curtain has no such edge, and keeps the deepest drop it had.
+        int lift = block.kind() == Shutter.Kind.SINKING
+                ? parts.stream().mapToInt(GarageDoorBlockEntity::lift).max().orElse(0)
+                : Math.max(0, raisedEdge-r.bottom()*Shutter.UNITS);
+        lift = Math.min(Shutter.travel(r, block.kind()), lift);
         var immutable = List.copyOf(parts);
         for (var part : parts) part.configure(origin, r.width(), r.height(), true, lift,
                 part.getBlockPos().equals(origin) ? immutable : List.of());

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "HBH"
+  ],
+  "key": {
+    "H": {
+      "item": "vanillawheels:hidden_door"
+    },
+    "B": {
+      "item": "minecraft:iron_bars"
+    }
+  },
+  "result": {
+    "id": "vanillawheels:floor_hatch",
+    "count": 2
+  }
+}

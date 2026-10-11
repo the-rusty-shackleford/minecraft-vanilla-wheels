@@ -88,5 +88,11 @@
   "vanillawheels.key.all_here": "Every one of your keys is with you.",
   "vanillawheels.key.home": "Your %s stays with you",
   "vanillawheels.key.keeps": "Never lost: it stays with you, and comes back if dropped or left anywhere.",
-  "block.vanillawheels.garage_door": "Rolling Garage Door"
+  "block.vanillawheels.garage_door": "Rolling Garage Door",
+  "block.vanillawheels.hidden_door": "Hidden Door",
+  "block.vanillawheels.vehicle_sensor": "Vehicle Sensor",
+  "block.vanillawheels.vehicle_sensor.range": "Vehicle Sensor range: %s blocks",
+  "block.vanillawheels.floor_hatch": "Floor Hatch",
+  "block.vanillawheels.floor_hatch.depth": "Floor Hatch opening: %s blocks deep",
+  "block.vanillawheels.hatch_plate": "Floor Hatch Plate"
 }

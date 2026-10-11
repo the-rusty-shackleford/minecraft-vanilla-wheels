@@ -1,8 +1,8 @@
 Vanilla Wheels is what makes the pack's vehicles go: the [Trailblazer](/wiki/trailblazer),
 the [Trailer](/wiki/trailer) and the [Farmer's Pickup](/wiki/farmers-pickup). It drives them,
 fuels them, keeps their chests, repairs them and recovers them, and it adds the **Mechanic
-Lift** to build them on, **keys** that are never lost, and **rolling garage doors** to park
-them behind.
+Lift** to build them on, **keys** that are never lost, **rolling garage doors** to park them
+behind, and, for a hidden garage, **hidden doors**, **vehicle sensors** and **floor hatches**.
 
 ![A Trailblazer drifting out of a turn with its afterburner lit](img/boost.webp)
 
@@ -197,3 +197,40 @@ Craft **eight Rolling Garage Door panels** from eight steel ingots around one re
 - Breaking a section gives back one panel.
 
 ![The door open](img/garage-open.webp)
+
+## Hidden doors, vehicle sensors and floor hatches
+
+Three blocks for a hidden garage: a rock face that opens for your car, and a floor that closes over a
+lift's hole.
+
+**Hidden Door.** Craft eight from eight Rolling Garage Door panels around a sticky piston.
+
+- Build it like a garage door, up to 16 by 16, and power it the same way. It sinks into the ground in
+  a moment (a four-high door in under half a second) and leaves the whole opening clear.
+- Right-click a panel with a solid block (stone, andesite, planks) and it looks like that block. It
+  doesn't use the block up. Sneak to place the block instead.
+- It won't close on anything in the doorway.
+
+**Vehicle Sensor.** Craft two from seven steel ingots, an observer and redstone.
+
+- It gives full redstone power while a vehicle is near it: a car, truck, helicopter or submarine, or
+  a boat or minecart with someone in it. Players on foot, animals and dropped items don't count.
+- **Range:** 8 blocks to start, in every direction. Right-click it with an empty hand to step through
+  2, 4, 8, 12, 16, 20, 24 and 32 blocks; sneak to step back. It shows the range over your hotbar.
+- Bury one under a hidden door's bottom edge with a range of 20, and the door opens for a car coming
+  at full speed from either side, then closes half a second after it has gone.
+
+**Floor Hatch.** Craft two from two Hidden Door panels and iron bars.
+
+- Lay hatches in your floor beside a hole, facing it (they face the way you look). Side by side they
+  work as one. Each slides a solid floor over the hole in front of it, three blocks deep to start;
+  right-click with an empty hand to change the depth (1 to 16), sneak to go back.
+- Right-click a hatch with a solid block and it and its floor look like that block.
+- **It opens by itself** when anything (like an elevator) comes up from below, when it gets
+  redstone power, or while something fills the hole. It closes once whatever came up has gone back
+  down.
+- **It won't drop you:** if you're standing on it when the elevator is called, it waits until the
+  car is right under you, so you just step down onto it.
+- **Guard rail:** whenever the hole is open, iron bars rise along the hatch's edge so nobody walks in.
+  They fold away when the floor closes or the elevator arrives.
+- Break a hatch to take it up; its floor goes with it.

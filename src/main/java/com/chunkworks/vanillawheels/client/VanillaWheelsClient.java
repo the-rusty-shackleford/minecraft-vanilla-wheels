@@ -54,6 +54,8 @@ public final class VanillaWheelsClient {
         event.registerEntityRenderer(ModContent.VEHICLE_ENTITY.get(), VehicleRenderer::new);
         event.registerBlockEntityRenderer(ModContent.LIFT_BE.get(), com.chunkworks.vanillawheels.client.lift.LiftRenderer::new);
         event.registerBlockEntityRenderer(ModContent.GARAGE_DOOR_BE.get(), com.chunkworks.vanillawheels.client.garage.GarageDoorRenderer::new);
+        event.registerBlockEntityRenderer(ModContent.HIDDEN_DOOR_BE.get(), com.chunkworks.vanillawheels.client.garage.HiddenDoorRenderer::new);
+        event.registerBlockEntityRenderer(ModContent.FLOOR_HATCH_BE.get(), com.chunkworks.vanillawheels.client.garage.FloorHatchRenderer::new);
     }
 
     @SubscribeEvent

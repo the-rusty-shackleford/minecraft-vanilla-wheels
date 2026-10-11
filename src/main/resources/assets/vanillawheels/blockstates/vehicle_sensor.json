@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "vanillawheels:block/vehicle_sensor"
+    },
+    "powered=true": {
+      "model": "vanillawheels:block/vehicle_sensor_on"
+    }
+  }
+}

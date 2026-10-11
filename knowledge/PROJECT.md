@@ -7,7 +7,10 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.14.0 — built and gated 2026-10-10, unreleased (durability; a blast and a bolt once; the ground vehicles' tab; D-0034)
+## 1.14.0 — released 2026-10-11 in pack 1.82.0 (durability; a blast and a bolt once; the ground vehicles' tab; D-0034)
+
+Released on Rusty's go ("Release the 2026-10-10 batch and Survivalist Armor 0.2.0. This is my go."), tag `v1.14.0` at `36ef78d`, the release gate (2026-10-11, `clean build --no-build-cache`) green again on that commit; sha1 `fcccae85` on GitHub and on the server (the server repo's `knowledge/releases/pack-1.82.0.md`). Not yet seen in play on the box.
+
 
 Friends found vehicles flimsy (one arrow, six wrenches); Rusty asked what the guns do before settling
 numbers and, shown that every RWM gun wrecked any car or helicopter in one hit, took the proposed

@@ -135,6 +135,9 @@ hole. Right-click a housing with a solid block and the housing and its plate are
   stand while the hole is open and empty, and fold away when it is shut or filled. Solid, a block high.
 - Breaking a housing takes its plate with it; the plate cannot be mined and has no item.
 
+A housing reads redstone like any block: a lever standing on the block beside one powers it, and the
+hatch stays open while that lever is on. Keep a lift's levers off the housings' neighbours.
+
 Diagnosing: `/data get block <housing>` shows `Depth`, `Travel` (eighths drawn back, 0 shut),
 `Guard` (0..4), `Plated` and `Look`; a sensor's `range` and `powered` are its block state; a hidden
 door's root panel shows `Lift`, `Formed`, `Powered`. A Create car meeting a shut plate would take it

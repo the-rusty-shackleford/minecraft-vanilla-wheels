@@ -7,7 +7,14 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.15.0 — the garage blocks: Hidden Door, Vehicle Sensor, Floor Hatch (D-0035 to D-0037); gated in the lab, unreleased
+## 1.15.0 — released 2026-10-11 in pack 1.83.0 (the garage blocks: Hidden Door, Vehicle Sensor, Floor Hatch; D-0035 to D-0037)
+
+Released on Rusty's go ("Ready to apply to the real world now"), tag `v1.15.0` at `e1f306a`; the release gate
+(`clean build --no-build-cache`, booth in software on `:7`) green: 169 JUnit, 124 GameTests, 55 booth checks;
+sha1 `015a768a` on GitHub and on the server (the server repo's `knowledge/releases/pack-1.83.0.md`). The
+garage they were made for is built into Rusty's world (the server repo's `knowledge/operations/garage.md`),
+where all three were seen working. Nobody else has used them yet.
+
 
 For Rusty's underground garage under his house (built first in a lab copy of his world,
 `minecraft mods/tools/lab-server`, generators in its `garage/`), on his "Apply it to the real world now":
@@ -25,7 +32,8 @@ For Rusty's underground garage under his house (built first in a lab copy of his
 - Tests: 124 gametests and the JUnit suite green; every new rule run against its mutation and caught.
   In the lab, on Rusty's real elevator and tunnel: door open in 0.41 s for a parked Trailblazer 18
   blocks out; the hatch shut 1.6 s after sending the car down, open 5 s before it arrives.
-- Not yet: the release gate (`clean build --no-build-cache` with the booth), Rusty's look at the hatch.
+- Rusty looked at the hatch in the lab: "Love it". On the box a fault of the installation (a lever's block
+  beside a housing powers the hatch open) moved his lever, not the code; README's diagnosing note covers it.
 
 ## 1.14.0 — released 2026-10-11 in pack 1.82.0 (durability; a blast and a bolt once; the ground vehicles' tab; D-0034)
 

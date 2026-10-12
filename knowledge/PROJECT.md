@@ -7,7 +7,7 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.16.0 — built and gated 2026-10-11, unreleased (seats kept, take the controls, a crew across a logout; a reported move re-run at its own heading; D-0038, D-0039)
+## 1.16.0 — released 2026-10-12 in pack 1.85.0 (seats kept, take the controls, a crew across a logout; a reported move re-run at its own heading; D-0038, D-0039)
 
 From OtatopMalloy's death on the box (2026-10-11, 23:24 UTC; the server repo's
 `knowledge/operations/death-recovery.md`): he and Bobandy_ timed out of a hovering Huey a quarter of a
@@ -30,7 +30,7 @@ later") and chose the take-the-controls key.
   tests then written failed, the lone rider's passed) and pass on the new. Three mutations caught.
   Rotorcraft 1.2.1, the Huey 1.2.1 and the Chinook 1.1.1 pass on it, and so do Submersibles' 23
   GameTests.
-- Not done: the release (Rusty's word); seeing it on the box.
+- Released on Rusty's go ("Proceed"), tag `v1.16.0` at `cab585b`; the release gate (`clean build --no-build-cache`) green on that commit; sha1 `b21a3a4d` on GitHub and on the server (the server repo's `knowledge/releases/pack-1.85.0.md`). Not yet seen on the box: the new seats, U, a crew's logout, a turning Huey near trees.
 - **A reported move is re-run at its own heading** (D-0039, closes issue #2). The Huey's "moved wrongly"
   resets on the box: the game re-ran a driver's move at the previous tick's heading and took the
   reported one only after, so a hull or footprint that turns with the body was tested a tick behind.

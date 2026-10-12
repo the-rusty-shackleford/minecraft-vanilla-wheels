@@ -78,6 +78,16 @@ public final class SkidVehicle extends Vehicle {
         return hull;
     }
 
+    /** effects: returns whether the hull, the body moved by (dx, dy, dz) at its present yaw, stands in a block */
+    public boolean blockedAt(double dx, double dy, double dz) {
+        return hullBlocked(dx, dy, dz);
+    }
+
+    /** effects: returns what the hull, at its present yaw, lets through of {@code delta} */
+    public Vec3 clampOf(Vec3 delta) {
+        return hullClamp(delta);
+    }
+
     @Override
     protected Vec3 footprintClamp(Vec3 delta) {
         return hull == null ? super.footprintClamp(delta) : axes ? hullClampAxes(delta) : hullClamp(delta);

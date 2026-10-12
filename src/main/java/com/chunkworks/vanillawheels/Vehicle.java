@@ -679,6 +679,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         return riders().size() < p.seats().size();
     }
 
+    /**
+     * requires: server thread
+     * effects: turns it to {@code yRot}, the heading its driver's client reports, before the game
+     * re-runs the reported move (D-0039): the client turned and then moved, and the footprint or the
+     * hull the re-run tests turns with the body. The game takes the same heading right after, in
+     * every outcome, so nothing else changes.
+     */
+    public void faceReported(float yRot) {
+        setYRot(Mth.wrapDegrees(yRot));
+    }
+
     /** effects: returns whether {@code player} would find a seat free aboard */
     public boolean hasSeatFor(Player player) {
         return canAddPassenger(player);

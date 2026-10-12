@@ -32,8 +32,12 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
+import net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.level.GameType;
@@ -90,6 +94,63 @@ public final class ThreeDimensionGameTests {
         Vec3 at = helper.absoluteVec(new Vec3(x, FLOOR, z));
         player.teleportTo(at.x, at.y, at.z);
         return player;
+    }
+
+    /** effects: answers {@code player}'s pending teleport as their client would, so the server takes their moves again */
+    private static void acceptTeleport(ServerPlayer player) {
+        try {
+            java.lang.reflect.Field id = ServerGamePacketListenerImpl.class.getDeclaredField("awaitingTeleport");
+            id.setAccessible(true);
+            player.connection.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(id.getInt(player.connection)));
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("the teleport id is unreadable", e);
+        }
+    }
+
+    /**
+     * The pilot's client turns, then moves (every vehicle's tick does), and reports where it went and
+     * its new heading. The game re-runs the move on the server before it takes the heading from the
+     * report, so a hull that turns with the body was tested a tick's turn behind: a long nose that
+     * clears a block at the new heading met it at the old one, the server cut the move to nothing and
+     * put the body back, "moved wrongly" (the Huey on the box, 2026-10-11). Through the game's own
+     * handler, with the pilot's real connection.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public void aTurningPilotsReportedMoveIsReRunAtTheHeadingItWasFlownAt(GameTestHelper helper) {
+        layFloor(helper, 15);
+        // In the air, as an aircraft uses its hull: the game's re-run asks a millionth lower than the
+        // report, and a hull resting its bottom on a floor would read that as into the floor.
+        SkidVehicle hulled = skids(helper, 7.5, 4.5, 0.0f);
+        hulled.setPos(hulled.getX(), hulled.getY() + 2.0, hulled.getZ());
+        hulled.hull = NOSE;
+        hulled.hover = true;
+        helper.setBlock(new BlockPos(6, FLOOR + 2, 8), Blocks.STONE);
+        ServerPlayer pilot = player(helper, "turning-pilot", 7.5, 4.5);
+        helper.assertTrue(pilot.startRiding(hulled, true) && hulled.getControllingPassenger() == pilot, "the pilot at the controls");
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    // A tick of the pilot's client: a 45-degree turn, then 0.6 forward along the new heading.
+                    float turned = 45.0f;
+                    Vec3 delta = new Vec3(-Math.sin(Math.toRadians(turned)), 0.0, Math.cos(Math.toRadians(turned))).scale(0.6);
+                    Vec3 start = hulled.position();
+                    Vehicle made = Vehicle.create(helper.getLevel(), GameTestMod.BOX_SKIDS, start, turned);
+                    helper.assertTrue(made instanceof SkidVehicle, "the client's copy");
+                    SkidVehicle client = (SkidVehicle) made;
+                    client.hull = NOSE;
+                    helper.assertTrue(!hulled.blockedAt(0.0, 0.0, 0.0), "the nose clears the stone where it starts");
+                    helper.assertTrue(client.clampOf(delta).distanceTo(delta) < 1e-9, "turned, the client's nose clears it the whole move");
+                    helper.assertTrue(hulled.blockedAt(delta.x, delta.y, delta.z), "unturned, the nose would end in it");
+                    client.absMoveTo(start.x + delta.x, start.y, start.z + delta.z, turned, 0.0f);
+                    acceptTeleport(pilot);
+                    pilot.connection.tick();   // the listener takes the vehicle it validates and where it stands
+                    pilot.connection.handleMoveVehicle(new ServerboundMoveVehiclePacket(client));
+                    helper.assertTrue(hulled.position().distanceTo(client.position()) < 1e-6,
+                            "the server took the pilot's move: " + hulled.position().subtract(start) + " of " + delta);
+                    helper.assertTrue(Math.abs(Mth.wrapDegrees(hulled.getYRot() - turned)) < 1e-3, "and its heading: " + hulled.getYRot());
+                    pilot.connection.disconnect(net.minecraft.network.chat.Component.literal("test complete"));
+                })
+                .thenSucceed();
     }
 
     @GameTest(template = "arena", timeoutTicks = 60)

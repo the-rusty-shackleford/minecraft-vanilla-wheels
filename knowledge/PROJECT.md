@@ -7,7 +7,7 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.16.0 — built and gated 2026-10-11, unreleased (seats kept, take the controls, a crew across a logout; D-0038)
+## 1.16.0 — built and gated 2026-10-11, unreleased (seats kept, take the controls, a crew across a logout; a reported move re-run at its own heading; D-0038, D-0039)
 
 From OtatopMalloy's death on the box (2026-10-11, 23:24 UTC; the server repo's
 `knowledge/operations/death-recovery.md`): he and Bobandy_ timed out of a hovering Huey a quarter of a
@@ -25,15 +25,18 @@ later") and chose the take-the-controls key.
   never on a harm, within 8 blocks (`domain/Landing`). A lone rider still takes the vehicle along, as
   the game does.
 - Network "8" (the take-the-controls payload).
-- Gate (`clean build --no-build-cache`, booth in software on a rootful Xwayland `:7`): 180 JUnit, 130
-  GameTests, the booth's 60 checks. `CrewGameTests` reproduced the death on the old code (5 of its
+- Gate (`clean build --no-build-cache`, booth in software on a rootful Xwayland `:7`), with D-0039 in:
+  180 JUnit, 131 GameTests, the booth's 60 checks. `CrewGameTests` reproduced the death on the old code (5 of its
   tests then written failed, the lone rider's passed) and pass on the new. Three mutations caught.
   Rotorcraft 1.2.1, the Huey 1.2.1 and the Chinook 1.1.1 pass on it, and so do Submersibles' 23
   GameTests.
 - Not done: the release (Rusty's word); seeing it on the box.
-- Filed, not fixed: issue #2, the server's "moved wrongly" resets of reported aircraft moves (on
-  Immersive Aircraft's planes as well). Unpinned, with one candidate: the re-run turns the hull at the
-  previous tick's yaw.
+- **A reported move is re-run at its own heading** (D-0039, closes issue #2). The Huey's "moved wrongly"
+  resets on the box: the game re-ran a driver's move at the previous tick's heading and took the
+  reported one only after, so a hull or footprint that turns with the body was tested a tick behind.
+  A mixin on `handleMoveVehicle` turns our vehicle to the reported heading first. A GameTest sends a
+  real move packet through the pilot's connection, turning 45 degrees by a stone: without the mixin
+  "moved wrongly! 0.6", moved nowhere; with it, taken. Immersive Aircraft's own resets remain.
 
 ## 1.15.0 — released 2026-10-11 in pack 1.83.0 (the garage blocks: Hidden Door, Vehicle Sensor, Floor Hatch; D-0035 to D-0037)
 

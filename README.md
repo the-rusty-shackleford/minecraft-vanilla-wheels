@@ -17,7 +17,9 @@ anywhere. Its network protocol is 7. Nothing changes for a car or a trailer.
 
 **1.16.0** (built, unreleased; D-0038): a rider keeps their seat, a passenger takes a free driver's
 seat with **U**, and a crew logging out of a vehicle is seated in it again on logging back in, or stood
-somewhere safe, never in the air where their seat was (see [Driving](#driving)). Network 8.
+somewhere safe, never in the air where their seat was (see [Driving](#driving)). And the server
+re-runs a driver's reported move at the heading the client made it at (D-0039): a turning Huey's hull
+was tested a tick behind and the move refused, "moved wrongly". Network 8.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,

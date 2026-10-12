@@ -4,7 +4,8 @@
   "package": "com.chunkworks.vanillawheels.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "PlayerMixin"
+    "PlayerMixin",
+    "ServerGamePacketListenerImplMixin"
   ],
   "client": [
     "ClientPacketListenerMixin"

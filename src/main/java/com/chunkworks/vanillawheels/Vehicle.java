@@ -30,6 +30,7 @@ import com.chunkworks.vanillawheels.domain.FuelDebt;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.RayBox;
+import com.chunkworks.vanillawheels.domain.Seats;
 import com.chunkworks.vanillawheels.domain.Rotation;
 import com.chunkworks.vanillawheels.domain.Suspension;
 import com.chunkworks.vanillawheels.domain.Terrain;
@@ -134,6 +135,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private static final EntityDataAccessor<Boolean> DATA_DOORS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
     /** Which chests are open, a bit each: a chest's lid is up while its bit is set. The server counts the openers per chest. */
     private static final EntityDataAccessor<Integer> DATA_OPEN = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
+    /** Who sits where (D-0038): {@link Seats#encode}'s form, the server's to change. */
+    private static final EntityDataAccessor<String> DATA_SEATS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.STRING);
+    /** The seats as last decoded, and the text and profile they were decoded from. */
+    @Nullable private Seats seats;
+    @Nullable private String seatsText;
+    @Nullable private VehicleProfile seatsProfile;
+    /** Whether the driver's seat came free with riders aboard, to tell them next tick how to take the controls. */
+    private boolean offerControls;
     private final int[] openers = new int[8];
     /** How close a tongue must come to a hitch to catch, blocks; how far it may stretch before it lets go. */
     public static final double CATCH = 0.5;
@@ -340,6 +349,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_TRAILER, -1);
         builder.define(DATA_DOORS, false);
         builder.define(DATA_OPEN, 0);
+        builder.define(DATA_SEATS, "");
     }
 
     @Override
@@ -526,6 +536,14 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     protected void addPassenger(Entity passenger) {
         super.addPassenger(passenger);
         sizeRider(passenger, true);
+        if (!level().isClientSide() && !CargoRules.rides(passenger)) {
+            Seats s = seats();
+            if (!s.hasRoom() && s.seatOf(passenger.getUUID()) < 0) {
+                // Seats still held for riders a load did not bring back: theirs go first.
+                s = s.keepOnly(riderIds());
+            }
+            setSeats(s.board(passenger.getUUID()));
+        }
     }
 
     @Override
@@ -533,9 +551,119 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         boolean driver = passenger == getControllingPassenger();
         super.removePassenger(passenger);
         sizeRider(passenger, false);
-        // The horn is its driver's: once they are out, nobody reports its key, and the server hears it only from a driver.
-        if (driver && !level().isClientSide()) {
-            setHorn(false);
+        if (!level().isClientSide()) {
+            // Only their own seat comes free: nobody moves up into the driver's (D-0038).
+            setSeats(seats().leave(passenger.getUUID()));
+            if (passenger instanceof net.minecraft.server.level.ServerPlayer player) {
+                Crew.forget(player);
+            }
+            if (driver) {
+                // The horn is its driver's: once they are out, nobody reports its key, and the server hears it only from a driver.
+                setHorn(false);
+                offerControls = true;
+            }
+        }
+    }
+
+    /**
+     * effects: returns who sits where aboard (D-0038), fitted to the profile's seats: the server's
+     * record, synced to every client. No seats while the profile is unknown.
+     */
+    public Seats seats() {
+        VehicleProfile p = profile();
+        String text = entityData.get(DATA_SEATS);
+        if (seats == null || p != seatsProfile || !text.equals(seatsText)) {
+            seats = p == null ? Seats.empty(0, -1) : Seats.decode(text, p.seats().size(), driverSeat(p));
+            seatsText = text;
+            seatsProfile = p;
+        }
+        return seats;
+    }
+
+    /** requires: server thread; effects: makes {@code s} the seats, syncs them, and has every player aboard remember theirs for a logout (D-0038) */
+    private void setSeats(Seats s) {
+        entityData.set(DATA_SEATS, s.encode());
+        for (Entity e : getPassengers()) {
+            if (e instanceof net.minecraft.server.level.ServerPlayer player) {
+                Crew.remember(player, this, s.seatOf(player.getUUID()));
+            }
+        }
+    }
+
+    /** effects: returns the ids of everyone in a seat, cargo left out */
+    private List<UUID> riderIds() {
+        return riders().stream().map(Entity::getUUID).toList();
+    }
+
+    /**
+     * requires: server thread
+     * effects: moves {@code rider} into the driver's seat if they ride in another seat of a vehicle
+     * that drives itself and nobody is at the controls (D-0038); with someone there, tells them who
+     */
+    public void takeControls(Player rider) {
+        VehicleProfile p = profile();
+        if (p == null || !p.isPowered() || rider.getVehicle() != this || CargoRules.rides(rider)) {
+            return;
+        }
+        Seats s = seats();
+        if (s.seatOf(rider.getUUID()) == s.driver()) {
+            return;
+        }
+        if (!s.controlsFree()) {
+            LivingEntity driver = getControllingPassenger();
+            rider.displayClientMessage(Component.translatable("vanillawheels.controls.taken", driver == null ? Component.literal("?") : driver.getDisplayName()), true);
+            return;
+        }
+        setSeats(s.takeControls(rider.getUUID()));
+    }
+
+    /**
+     * requires: server thread
+     * effects: puts {@code player} back aboard (D-0038), into {@code seat} while it is free, else
+     * into the seat boarding gives; returns whether they are aboard. False when no seat is free.
+     */
+    public boolean reseat(Player player, int seat) {
+        if (player.getVehicle() == this) {
+            return true;
+        }
+        if (!canAddPassenger(player)) {
+            return false;
+        }
+        Seats before = seats();
+        entityData.set(DATA_SEATS, before.board(player.getUUID(), seat).encode());
+        if (player.startRiding(this, true)) {
+            return true;
+        }
+        entityData.set(DATA_SEATS, before.encode());
+        return false;
+    }
+
+    /** requires: server thread; effects: tells every player aboard, once, that nobody is at the controls and which key takes them */
+    private void offerControls() {
+        offerControls = false;
+        VehicleProfile p = profile();
+        if (p == null || !p.isPowered() || !seats().controlsFree()) {
+            return;
+        }
+        Component line = Component.translatable("vanillawheels.controls.free", Component.keybind("key.vanillawheels.take_controls"));
+        for (Entity e : riders()) {
+            if (e instanceof Player player) {
+                player.displayClientMessage(line, true);
+            }
+        }
+    }
+
+    /** requires: server thread; effects: frees the seats held for riders who are not aboard: a load that did not bring them back */
+    private void dropAbsentRiders() {
+        Seats s = seats();
+        int aboard = 0;
+        for (Entity e : getPassengers()) {
+            if (!CargoRules.rides(e)) {
+                aboard++;
+            }
+        }
+        if (s.taken() > aboard) {
+            setSeats(s.keepOnly(riderIds()));
         }
     }
 
@@ -549,6 +677,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return p.cargo().isPresent() && doorsOpen() && cargo().accepts(CargoRules.young(passenger));
         }
         return riders().size() < p.seats().size();
+    }
+
+    /** effects: returns whether {@code player} would find a seat free aboard */
+    public boolean hasSeatFor(Player player) {
+        return canAddPassenger(player);
     }
 
     /** effects: returns the passengers in seats, in boarding order: everyone who is not in the cargo */
@@ -733,11 +866,21 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         level().playSound(null, getX(), getY(), getZ(), open ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.IRON_DOOR_CLOSE, SoundSource.NEUTRAL, 0.8f, 1.1f);
     }
 
-    /** effects: returns the seat {@code passenger} is in, by order of boarding; the driver's seat goes to whoever boards first if it is free */
-    private int seatOf(Entity passenger) {
-        return riders().indexOf(passenger);
+    /**
+     * effects: returns the seat {@code passenger} is in (D-0038): the one they took boarding and
+     * keep while aboard. A rider a client sees aboard before the seats reach it sits where boarding
+     * would put it.
+     */
+    public int seatOf(Entity passenger) {
+        Seats s = seats();
+        int seat = s.seatOf(passenger.getUUID());
+        if (seat >= 0 || passenger.getVehicle() != this || CargoRules.rides(passenger)) {
+            return seat;
+        }
+        return s.board(passenger.getUUID()).seatOf(passenger.getUUID());
     }
 
+    /** effects: returns whoever sits in the driver's seat of a vehicle that drives itself, or null: nobody there, or no engine */
     @Override
     @Nullable
     public LivingEntity getControllingPassenger() {
@@ -745,10 +888,15 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (p == null || !p.isPowered()) {
             return null;
         }
-        int driverSeat = driverSeat(p);
-        List<Entity> riders = riders();
-        if (driverSeat >= 0 && driverSeat < riders.size() && riders.get(driverSeat) instanceof LivingEntity living) {
-            return living;
+        Seats s = seats();
+        UUID driver = s.driver() < 0 ? null : s.at(s.driver()).orElse(null);
+        if (driver == null) {
+            return null;
+        }
+        for (Entity e : getPassengers()) {
+            if (e instanceof LivingEntity living && driver.equals(e.getUUID()) && !CargoRules.rides(e)) {
+                return living;
+            }
         }
         return null;
     }
@@ -1520,6 +1668,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** The server's per-tick duties: fuel, lights, the horn, running things over. */
     private void serverTick(VehicleProfile p) {
+        dropAbsentRiders();
+        if (offerControls) {
+            offerControls();
+        }
         if (burnsFuel() && fuelRequired()) {
             FuelDebt.Burn burn = fuelDebt.burn(Mth.clamp(fuelRate(), 0.0, FuelDebt.MAX_RATE));
             fuelDebt = burn.next();
@@ -3004,6 +3156,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             tag.putUUID("Trailer", trailerUuid);
         }
         tag.putBoolean("DoorsOpen", doorsOpen());
+        tag.putString("Seats", entityData.get(DATA_SEATS));
         addChestVehicleSaveData(tag, registryAccess());
         // Preserve slots above 255 too; the old ContainerEntity format uses a byte slot index.
         tag.remove("Items");
@@ -3024,6 +3177,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         towerUuid = tag.hasUUID("Tower") ? tag.getUUID("Tower") : null;
         trailerUuid = tag.hasUUID("Trailer") ? tag.getUUID("Trailer") : null;
         entityData.set(DATA_DOORS, tag.getBoolean("DoorsOpen"));
+        // Absent before 1.16.0: the riders a load brings back take their seats again in boarding order.
+        entityData.set(DATA_SEATS, tag.getString("Seats"));
         doorSwing = doorsOpen() ? 1.0f : 0.0f;
         doorSwingO = doorSwing;
         if (id != null) {

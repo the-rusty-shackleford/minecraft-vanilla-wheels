@@ -10,6 +10,13 @@ behind, and, for a hidden garage, **hidden doors**, **vehicle sensors** and **fl
 
 - **Get in:** right-click a vehicle. You take the nearest free seat, the driver's first.
   **Crouch** to get out, as from a boat.
+- **Your seat is yours** while you're aboard. If the driver gets out, nobody is moved into the
+  driver's seat: the vehicle comes to rest by itself (an aircraft settles to the ground, a
+  submarine holds its depth), and **U** (*Take the controls*) moves you into it.
+- **Logging out aboard:** alone, the vehicle goes with you and comes back with you. With others
+  aboard it stays with them, and when you log back in you're put back in your seat wherever the
+  vehicle is now. If it's gone, you're set down on the ground below where you left, or at the
+  surface if you were under water.
 - **Drive:** the movement keys. A standing car turns on the spot with the stick held.
 - **Horn:** **Left Control**, while you ride (it's still sprint everywhere else).
 - **Headlights:** **H** cycles off, on and auto (auto switches them on when it gets dark). The

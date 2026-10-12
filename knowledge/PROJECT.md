@@ -7,6 +7,34 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.16.0 — built and gated 2026-10-11, unreleased (seats kept, take the controls, a crew across a logout; D-0038)
+
+From OtatopMalloy's death on the box (2026-10-11, 23:24 UTC; the server repo's
+`knowledge/operations/death-recovery.md`): he and Bobandy_ timed out of a hovering Huey a quarter of a
+second apart. The game keeps a vehicle in a save only for its one player aboard, so the pilot was saved
+standing in the air and the Huey went into Bobandy_'s save; he logged back in fifty blocks up and fell.
+Rusty asked for the pilot's handover to be rethought ("bailing out like that doesn't get you killed
+later") and chose the take-the-controls key.
+- **Seats are kept** (`domain/Seats`, synced as `DATA_SEATS` and saved as `Seats`): leaving frees only
+  the leaver's seat. Nobody is moved into the driver's seat, and with it empty the server brings the
+  vehicle to rest as with nobody at the wheel. Riders are told once that U takes the controls.
+- **U**, *Take the controls*: from any other seat, into a free driver's seat.
+- **A crew across a logout** (`Crew`): every player aboard keeps `vanillawheels:aboard` (vehicle, seat)
+  in their save. Logging back in not aboard, they are seated in it again wherever it is (loaded, a
+  seat free), else stood on the floor under where they left, or at the surface over them in water,
+  never on a harm, within 8 blocks (`domain/Landing`). A lone rider still takes the vehicle along, as
+  the game does.
+- Network "8" (the take-the-controls payload).
+- Gate (`clean build --no-build-cache`, booth in software on a rootful Xwayland `:7`): 180 JUnit, 130
+  GameTests, the booth's 60 checks. `CrewGameTests` reproduced the death on the old code (5 of its
+  tests then written failed, the lone rider's passed) and pass on the new. Three mutations caught.
+  Rotorcraft 1.2.1, the Huey 1.2.1 and the Chinook 1.1.1 pass on it, and so do Submersibles' 23
+  GameTests.
+- Not done: the release (Rusty's word); seeing it on the box.
+- Filed, not fixed: issue #2, the server's "moved wrongly" resets of reported aircraft moves (on
+  Immersive Aircraft's planes as well). Unpinned, with one candidate: the re-run turns the hull at the
+  previous tick's yaw.
+
 ## 1.15.0 — released 2026-10-11 in pack 1.83.0 (the garage blocks: Hidden Door, Vehicle Sensor, Floor Hatch; D-0035 to D-0037)
 
 Released on Rusty's go ("Ready to apply to the real world now"), tag `v1.15.0` at `e1f306a`; the release gate

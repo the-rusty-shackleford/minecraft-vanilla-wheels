@@ -134,12 +134,13 @@ public final class Controls {
         }
     }
 
-    /** The horn and headlight keys, each tick the player is at a wheel; the get-out key, each tick they ride a body that moves in three dimensions (D-0031). */
+    /** The horn and headlight keys, each tick the player is at a wheel; the get-out key, each tick they ride a body that moves in three dimensions (D-0031); the take-the-controls key, each tick they ride in another seat (D-0038). */
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             hornDown = false;
             Keys.releaseAboard();
+            Keys.TAKE_CONTROLS.setDown(false);
             return;
         }
         Vehicle aboard = mc.player.getVehicle() instanceof Vehicle v && v.verticalControls() ? v : null;
@@ -148,6 +149,14 @@ public final class Controls {
         }
         if (Keys.GET_OUT_PRESS.consume() && aboard != null) {
             PacketDistributor.sendToServer(new Payloads.GetOut(aboard.getId()));
+        }
+        // Let go off a passenger's seat, as the aboard keys are: a release is passed only to keys whose context is live.
+        Vehicle passengerOf = mc.player.getVehicle() instanceof Vehicle v && v.getControllingPassenger() != mc.player ? v : null;
+        if (passengerOf == null) {
+            Keys.TAKE_CONTROLS.setDown(false);
+        }
+        if (Keys.TAKE_CONTROLS_PRESS.consume() && passengerOf != null) {
+            PacketDistributor.sendToServer(new Payloads.TakeControls(passengerOf.getId()));
         }
         boolean lights = Keys.LIGHTS_PRESS.consume();
         Vehicle driven = mc.player.getVehicle() instanceof Vehicle v && v.getControllingPassenger() == mc.player ? v : null;

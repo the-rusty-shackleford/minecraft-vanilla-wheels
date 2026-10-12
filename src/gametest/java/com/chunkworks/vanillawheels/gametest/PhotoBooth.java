@@ -297,6 +297,7 @@ public final class PhotoBooth {
             });
         }));
         t = keys(mc, s, t + 2);
+        t = takeControls(mc, s, t + 2);
         // Third person from the seat, looking a little up so the camera's rays sweep the meadow
         // behind the car, as a hillside's does on a descent: the camera keeps its full distance,
         // as the game's own would, since grass has no visual shape. Its outline once clipped it
@@ -1139,6 +1140,64 @@ public final class PhotoBooth {
             }
         }));
         return t;
+    }
+
+    @org.jetbrains.annotations.Nullable private static Process uDown;
+    @org.jetbrains.annotations.Nullable private static UUID standIn;
+
+    /**
+     * The take-the-controls key on a real press (D-0038): the booth's player rides behind a stand-in
+     * at the wheel; the stand-in leaves, and nobody is moved into the driver's seat, but the line
+     * over the hotbar says the controls are free and names the key; U takes them. Real, because the
+     * key's context (a seat other than the driver's) and its payload are client code no gametest
+     * reaches.
+     * requires: the booth's player drives the box car at {@code t}
+     * effects: adds the steps from {@code t}, the player at the wheel again at the last; returns the last step's tick
+     */
+    private static int takeControls(Minecraft mc, List<Step> s, int t) {
+        s.add(new Step(t, () -> withCar(mc, v -> {
+            ServerPlayer sp = v.getServer().getPlayerList().getPlayer(mc.player.getUUID());
+            net.minecraft.world.entity.decoration.ArmorStand stand = EntityType.ARMOR_STAND.create(v.level());
+            if (sp == null || stand == null) {
+                LOG.error("booth: FAIL a stand-in at the wheel -- no player or stand");
+                return;
+            }
+            sp.stopRiding();
+            stand.setPos(v.getX(), v.getY(), v.getZ());
+            v.level().addFreshEntity(stand);
+            stand.startRiding(v, true);
+            sp.startRiding(v, true);
+            standIn = stand.getUUID();
+        })));
+        s.add(new Step(t += 20, () -> {
+            verdict("behind a stand-in at the wheel, the booth's player is a passenger", () -> mc.player != null && mc.player.getVehicle() instanceof Vehicle v
+                    && v.getControllingPassenger() != null && v.getControllingPassenger() != mc.player ? null : "riding " + (mc.player == null ? null : mc.player.getVehicle()));
+            withCar(mc, v -> {
+                if (standIn != null && ((ServerLevel) v.level()).getEntity(standIn) instanceof net.minecraft.world.entity.decoration.ArmorStand stand) {
+                    stand.stopRiding();
+                    stand.discard();
+                }
+            });
+        }));
+        s.add(new Step(t += 20, () -> {
+            verdict("the stand-in gone, nobody is moved into the driver's seat", () -> mc.player != null && mc.player.getVehicle() instanceof Vehicle v
+                    && v.getControllingPassenger() == null ? null : "driver " + (mc.player != null && mc.player.getVehicle() instanceof Vehicle v ? v.getControllingPassenger() : "-"));
+            String line = boardingLine(mc);
+            verdict("the line over the hotbar says the controls are free and names U", () -> line != null && line.startsWith("Nobody is at the controls") && line.contains("Press U to take them")
+                    ? null : "line " + line);
+            uDown = xkey("down", "u");
+        }));
+        s.add(new Step(t += 20, () -> {
+            verdict("the key helper pressed U", () -> uDown != null && !uDown.isAlive() && uDown.exitValue() == 0
+                    ? null : "helper " + (uDown == null ? "not started" : uDown.isAlive() ? "still running" : "exit " + uDown.exitValue()));
+            verdict("U takes the controls: the booth's player drives", () -> driven(mc) != null ? null : "driving " + driven(mc));
+            xkey("up", "u");
+            if (mc.player != null && mc.player.getVehicle() instanceof Vehicle v) {
+                mc.player.setYRot(v.getYRot());
+                mc.player.yRotO = v.getYRot();
+            }
+        }));
+        return t + 10;
     }
 
     /** effects: returns the vehicle the booth's player drives on the client, or null */

@@ -54,6 +54,7 @@ public final class VanillaWheelsMod {
         NeoForge.EVENT_BUS.addListener(KeyFobs::onEntityJoin);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onDeath);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onLoggedIn);
+        NeoForge.EVENT_BUS.addListener(Crew::onLoggedIn);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onRespawn);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onOpen);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onClose);

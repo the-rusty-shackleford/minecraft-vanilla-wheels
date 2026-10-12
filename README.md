@@ -15,6 +15,10 @@ anywhere. Its network protocol is 7. Nothing changes for a car or a trailer.
 [Hidden Door, the Vehicle Sensor and the Floor Hatch](#hidden-doors-vehicle-sensors-and-floor-hatches-115)
 (D-0035 to D-0037). Network 7, unchanged.
 
+**1.16.0** (built, unreleased; D-0038): a rider keeps their seat, a passenger takes a free driver's
+seat with **U**, and a crew logging out of a vehicle is seated in it again on logging back in, or stood
+somewhere safe, never in the air where their seat was (see [Driving](#driving)). Network 8.
+
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
 burns fuel, shows its gauges on a physical dash, lights the road, honks, plays records,
@@ -145,7 +149,17 @@ with it, which is why the hatch opens for anything rising before it arrives.
 
 ## Driving
 
-Right-click a vehicle to board the nearest free seat, the driver's first. Movement keys
+Right-click a vehicle to board the nearest free seat, the driver's first. A rider keeps their seat
+(1.16.0, D-0038): when someone gets out, only their seat comes free and nobody moves up, so the driver
+leaving leaves nobody at the controls. The vehicle then comes to rest by itself (a car coasts to a
+stop, an aircraft settles to the ground with nobody hurt, a submarine holds its depth), and everyone
+aboard is told "Nobody is at the controls. Press U to take them": **U** (*Take the controls* in
+Controls, live in any seat but the driver's) moves you into the empty driver's seat. Logging out
+aboard, the game takes the vehicle with you only if you are its one player aboard. Otherwise it stays
+with the rest of its crew, and you keep its seat in your save: logging back in, you are seated in it
+again wherever it is now (if it is loaded and has a seat), else stood on the ground under where you
+left (at the surface, under water), never on lava, fire, magma or a cactus, within eight blocks, or,
+with nowhere to stand, given a minute of slow falling and water breathing. Movement keys
 drive and steer; **jump** held while turning above a third of top speed drifts the kart
 way: the nose swings out to a slip angle on the side you turned, steering leans the
 slide tighter or wider, the car keeps sliding the way it was going and comes round only
@@ -631,7 +645,7 @@ in `devtools/art/sounds/SOURCES.md`. These changes leave driving physics unchang
 
 ## Layout
 
-`src/domain` (JDK-only, plain JUnit): `Hull`, `Crash` and `FuelDebt` (D-0031), `Drive` (the step: throttle, drag, rolling,
+`src/domain` (JDK-only, plain JUnit): `Seats` and `Landing` (D-0038), `Hull`, `Crash` and `FuelDebt` (D-0031), `Drive` (the step: throttle, drag, rolling,
 steering by the bicycle rule, grip, drift), `Suspension`, `Terrain` (the drawn pose),
 `CrossSection` (what of a block the vehicle footprint meets), `Impact`, `Tank`, `Tow` (the
 trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
@@ -639,7 +653,7 @@ trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
 `BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
 `WheelSpin`, `BodyPose`, `BakedMesh`).
 `src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`, `CargoRules`, `VehicleKinds`), the `Vehicle` entity
-and its parts, `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `mixin/PlayerMixin` (D-0031), `lift` (the two blocks, the
+and its parts, `Crew` (a rider's vehicle and seat kept in their save, and what logging back in does, D-0038), `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `mixin/PlayerMixin` (D-0031), `lift` (the two blocks, the
 block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary`,
 `Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
 the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,

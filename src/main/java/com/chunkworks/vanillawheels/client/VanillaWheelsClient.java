@@ -83,6 +83,7 @@ public final class VanillaWheelsClient {
         event.register(Keys.UP);
         event.register(Keys.DOWN);
         event.register(Keys.GET_OUT);
+        event.register(Keys.TAKE_CONTROLS);
     }
 
     @SubscribeEvent

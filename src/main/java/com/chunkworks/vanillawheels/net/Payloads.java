@@ -34,14 +34,15 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * (vanilla carries that): the drive state, so the server can burn fuel,
  * hurt what is run over and show other players the wheels; the horn; the
  * headlight mode; and, from any seat aboard a body that moves in three
- * dimensions, the get-out key (D-0031). Each is sent on change or on the
+ * dimensions, the get-out key (D-0031); from a seat other than the driver's,
+ * the take-the-controls key (D-0038). Each is sent on change or on the
  * press, never per tick.
  */
 public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "7";
+    private static final String VERSION = "8";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {
@@ -126,6 +127,18 @@ public final class Payloads {
         }
     }
 
+    /** The take-the-controls key, from a seat other than the driver's (D-0038). */
+    public record TakeControls(int vehicle) implements CustomPacketPayload {
+        public static final Type<TakeControls> TYPE = new Type<>(VanillaWheels.id("take_controls"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, TakeControls> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, TakeControls::vehicle, TakeControls::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
         registrar.playToClient(ContactVelocity.TYPE, ContactVelocity.STREAM_CODEC, (payload, context) -> {
@@ -146,6 +159,11 @@ public final class Payloads {
             if (context.player() instanceof net.minecraft.server.level.ServerPlayer player && player.level().getEntity(payload.vehicle()) instanceof Vehicle v
                     && player.getVehicle() == v && v.verticalControls()) {
                 v.getOut(player);
+            }
+        });
+        registrar.playToServer(TakeControls.TYPE, TakeControls.STREAM_CODEC, (payload, context) -> {
+            if (context.player().level().getEntity(payload.vehicle()) instanceof Vehicle v && context.player().getVehicle() == v) {
+                v.takeControls(context.player());
             }
         });
     }

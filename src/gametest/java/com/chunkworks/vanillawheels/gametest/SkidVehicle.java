@@ -41,6 +41,8 @@ public final class SkidVehicle extends Vehicle {
     @Nullable public double[] hull;
     /** Whether the hull meets the world axis by axis (hullClampAxes) rather than as one move (hullClamp). */
     public boolean axes;
+    /** Whether it holds where it is with nobody at the controls, as a hovering aircraft does: the server steps it nowhere. Not saved. */
+    public boolean hover;
     /** What a crash costs it, or null for none. */
     @Nullable public Crash crash;
     /** Ticks of fuel it burns for each tick it burns. */
@@ -53,6 +55,10 @@ public final class SkidVehicle extends Vehicle {
     @Override
     protected void stepAtTheWheel(VehicleProfile p) {
         steps++;
+        if (hover) {
+            setDeltaMovement(Vec3.ZERO);
+            return;
+        }
         super.stepAtTheWheel(p);
     }
 

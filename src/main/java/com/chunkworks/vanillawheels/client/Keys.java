@@ -31,8 +31,9 @@ import org.lwjgl.glfw.GLFW;
  * Control does not fight sprint and H fights nothing anywhere else. Aboard a body that moves in
  * three dimensions ({@link Vehicle#verticalControls}, D-0031): up on Space, down on Left Shift and
  * get out on R, Immersive Aircraft's keys, which the friends fly with; live in any seat aboard one,
- * so Space and Shift keep their jobs everywhere else. A protocol makes its own keys with
- * {@link RidingKey}.
+ * so Space and Shift keep their jobs everywhere else. Take the controls on U, live in any seat but
+ * the driver's (D-0038): nobody is moved into a free driver's seat without asking. A protocol makes
+ * its own keys with {@link RidingKey}.
  */
 public final class Keys {
     private Keys() {}
@@ -65,12 +66,27 @@ public final class Keys {
         }
     };
 
+    /** Active while the local player rides a vehicle of ours in a seat other than the driver's, with no screen open. */
+    public static final IKeyConflictContext PASSENGER = new IKeyConflictContext() {
+        @Override
+        public boolean isActive() {
+            Minecraft mc = Minecraft.getInstance();
+            return mc.player != null && mc.screen == null && mc.player.getVehicle() instanceof Vehicle v && v.getControllingPassenger() != mc.player;
+        }
+
+        @Override
+        public boolean conflicts(IKeyConflictContext other) {
+            return this == other;
+        }
+    };
+
     public static final String CATEGORY = "key.categories.vanillawheels";
     public static final KeyMapping HORN = new RidingKey("key.vanillawheels.horn", DRIVING, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_CONTROL, CATEGORY);
     public static final KeyMapping LIGHTS = new RidingKey("key.vanillawheels.lights", DRIVING, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, CATEGORY);
     public static final KeyMapping UP = new RidingKey("key.vanillawheels.up", ABOARD, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_SPACE, CATEGORY);
     public static final KeyMapping DOWN = new RidingKey("key.vanillawheels.down", ABOARD, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_SHIFT, CATEGORY);
     public static final KeyMapping GET_OUT = new RidingKey("key.vanillawheels.get_out", ABOARD, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CATEGORY);
+    public static final KeyMapping TAKE_CONTROLS = new RidingKey("key.vanillawheels.take_controls", PASSENGER, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_U, CATEGORY);
 
     /**
      * effects: lets go of the driver's keys. A key's release is passed only to keys whose context
@@ -121,6 +137,7 @@ public final class Keys {
 
     public static final Press LIGHTS_PRESS = new Press(LIGHTS);
     public static final Press GET_OUT_PRESS = new Press(GET_OUT);
+    public static final Press TAKE_CONTROLS_PRESS = new Press(TAKE_CONTROLS);
 
     /** effects: returns which way the rider asks to go: 1 up, -1 down, 0 neither; up wins when both are held */
     public static int lift() {

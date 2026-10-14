@@ -3,6 +3,7 @@ package com.chunkworks.vanillawheels;
 
 import com.chunkworks.vanillawheels.domain.Condition;
 import com.chunkworks.vanillawheels.domain.RecallCost;
+import com.chunkworks.vanillawheels.domain.Whereabouts;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -36,7 +37,10 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * Every motor vehicle paired to a key, as many per player as they pair, one key per vehicle
- * (D-0026; D-0014 had one per player), indexed in overworld SavedData.
+ * (D-0026; D-0014 had one per player), indexed in overworld SavedData. The keys live on the
+ * player's keyring (D-0041, {@link Keyring}), and a recall is asked for from the ring's screen:
+ * a request locates the vehicle, quotes its cost to the screen, and goes through on the player's
+ * Confirm.
  * AF: each entry names the actual deployed vehicle, physical drop, or already-held item, its
  * owner, its one current key token, and the mark that key wears (the vehicle's name and paint).
  * There are no cached cargo copies from which recall could manufacture property.
@@ -62,6 +66,8 @@ public final class RecoveryData extends SavedData {
     private final Map<UUID, Entry> keys = new HashMap<>();
     private final Map<UUID, Entry> located = new HashMap<>();
     private final Map<UUID, Request> requests = new HashMap<>();
+    /** The last word to each player's ring screen: a quote, a refusal, a recall done. */
+    private final Map<UUID, Component> notices = new HashMap<>();
 
     private static final class Request {
         final ServerPlayer player;
@@ -72,6 +78,11 @@ public final class RecoveryData extends SavedData {
         final long started;
         long quotedAt = -1;
         @Nullable RecallCost quote;
+        /** What the quote was made against, for the screen: the tank's size and the condition before. */
+        int capacity;
+        int conditionBefore;
+        /** Whether the player pressed Confirm on the standing quote. */
+        boolean confirmed;
         Request(ServerPlayer player, Entry entry, ServerLevel level, long started) {
             this.player = player; this.binding = entry.binding(); this.key = entry.key(); this.level = level;
             this.chunk = new ChunkPos(entry.position()); this.started = started;
@@ -133,23 +144,35 @@ public final class RecoveryData extends SavedData {
     public boolean isCurrent(@Nullable UUID token) { return token != null && keys.containsKey(token); }
 
     /**
-     * requires: real server interaction.
-     * effects: a key clicked at a motor vehicle (D-0026). A blank key -- or one whose pairing has
-     *     moved on -- pairs it: a new pairing, or for the vehicle's own owner a fresh key that
-     *     retires the old one. The vehicle's current key refreshes its mark (its name and paint).
-     *     Another vehicle's key is refused, as is a vehicle another player holds the key to.
-     *     Pairing leaves the player's other pairings be.
+     * requires: real server interaction; {@code held} is the key fob or keyring in the player's hand.
+     * effects: a key or ring clicked at a motor vehicle (D-0026, D-0041). A blank key -- or one whose
+     *     pairing has moved on -- pairs it: a new pairing, or for the vehicle's own owner a fresh key
+     *     that retires the old one; the blank is used up and the key goes on the player's ring. The
+     *     vehicle's current key, loose or on the ring, refreshes its mark (its name and paint), and a
+     *     loose one is gathered onto the ring. Another vehicle's key is refused, as is a vehicle
+     *     another player holds the key to, and a ring without this vehicle's key says so. Pairing
+     *     leaves the player's other pairings be.
      * throws: none.
      */
-    public boolean bind(ServerPlayer player, Vehicle vehicle, ItemStack key) {
+    public boolean bind(ServerPlayer player, Vehicle vehicle, ItemStack held) {
         if (vehicle.tank().capacity() == 0) return fail(player, "motor_vehicle");
         Entry existing = bindings.get(vehicle.binding());
-        Entry keyed = keys.get(key.get(ModContent.KEY_TOKEN.get()));
         KeyFobs.Mark mark = KeyFobs.Mark.of(vehicle);
+        if (Keyring.isRing(held)) {
+            if (existing != null && existing.owner().equals(player.getUUID()) && Keyring.holds(held, existing.key())) {
+                put(existing.marked(mark));
+                Keyring.edit(player, existing.key(), k -> KeyFobs.mark(k, mark));
+                tell(player, "marked", vehicle.getName());
+                return true;
+            }
+            return fail(player, existing != null && !existing.owner().equals(player.getUUID()) ? "other_owner" : "ring_no_key");
+        }
+        Entry keyed = keys.get(held.get(ModContent.KEY_TOKEN.get()));
         if (keyed != null && existing != null && keyed.binding().equals(existing.binding())) {
             put(existing.marked(mark));
-            KeyFobs.mark(key, mark);
+            KeyFobs.mark(held, mark);
             tell(player, "marked", vehicle.getName());
+            Keyring.gather(player);
             return true;
         }
         if (keyed != null) return fail(player, "other_vehicle", KeyFobs.Mark.NONE.equals(keyed.mark())
@@ -161,9 +184,13 @@ public final class RecoveryData extends SavedData {
         put(new Entry(player.getUUID(), binding, token, Place.VEHICLE, vehicle.level().dimension().location(),
                 vehicle.blockPosition(), vehicle.getUUID(), NONE, mark));
         vehicle.binding(binding);
+        if (existing != null) Keyring.drop(player, existing.key());   // the retired key leaves the ring
+        ItemStack key = new ItemStack(ModContent.KEY_FOB.get());
         key.set(ModContent.KEY_OWNER.get(), player.getUUID()); key.set(ModContent.KEY_TOKEN.get(), token);
         key.set(ModContent.VEHICLE.get(), vehicle.profileId());
         KeyFobs.mark(key, mark);
+        held.shrink(1);
+        if (!Keyring.put(player, key)) KeyFobs.sendHome(player.server, key);
         tell(player, "paired", vehicle.getName());
         return true;
     }
@@ -175,7 +202,7 @@ public final class RecoveryData extends SavedData {
      *     marked, and the lost one stops working. Says so when every key of theirs is with them.
      * throws: none.
      */
-    public boolean replacement(ServerPlayer player, ItemStack key) {
+    public boolean replacement(ServerPlayer player, ItemStack blank) {
         boolean paired = false;
         KeyFobs fobs = KeyFobs.get(player.server);
         for (Entry entry : bindings.values()) {
@@ -184,24 +211,75 @@ public final class RecoveryData extends SavedData {
             if (KeyFobs.onPerson(player, entry.key()) || fobs.waitingFor(entry.key())) continue;
             UUID token = UUID.randomUUID();
             put(entry.keyed(token));
+            ItemStack key = new ItemStack(ModContent.KEY_FOB.get());
             key.set(ModContent.KEY_OWNER.get(), player.getUUID()); key.set(ModContent.KEY_TOKEN.get(), token);
             KeyFobs.mark(key, entry.mark());
+            blank.shrink(1);
+            if (!Keyring.put(player, key)) KeyFobs.sendHome(player.server, key);
             tell(player, "replacement", KeyFobs.Mark.NONE.equals(entry.mark()) ? Component.translatable("vanillawheels.key.another_vehicle") : entry.mark().name());
             return true;
         }
         return fail(player, paired ? "all_here" : "unpaired");
     }
 
-    @Nullable private Entry entryOf(ServerPlayer player, ItemStack key) {
-        Entry entry = keys.get(key.get(ModContent.KEY_TOKEN.get()));
-        return entry != null && key.is(ModContent.KEY_FOB.get()) && player.getUUID().equals(key.get(ModContent.KEY_OWNER.get()))
-                && entry.owner().equals(player.getUUID()) ? entry : null;
+    // --- the keyring's screen (D-0041) ----------------------------------------
+
+    /** One pairing of a player's, as the ring's screen shows it. */
+    public record Row(UUID binding, KeyFobs.Mark mark, boolean onRing, Whereabouts whereabouts) {}
+
+    /** A player's standing recall request: locating until {@code quote} is set, then quoted against the tank and condition given. */
+    public record Progress(UUID binding, @Nullable RecallCost quote, int capacity, int conditionBefore) {}
+
+    /**
+     * requires: server thread
+     * effects: returns the player's pairings in pairing order, each with where the vehicle is as
+     * the index knows it -- the live position when it is loaded in the player's level -- and
+     * whether its key is on them
+     */
+    public List<Row> rows(ServerPlayer player) {
+        List<Row> rows = new ArrayList<>();
+        ResourceLocation here = player.level().dimension().location();
+        for (Entry e : bindings.values()) {
+            if (!e.owner().equals(player.getUUID())) continue;
+            boolean same = e.dimension().equals(here);
+            net.minecraft.world.phys.Vec3 at = net.minecraft.world.phys.Vec3.atCenterOf(e.position());
+            if (same && e.place() != Place.HELD) {
+                Entity live = player.serverLevel().getEntity(e.entity());
+                if (live != null) at = live.position();
+            }
+            double distance = same ? player.position().distanceTo(at) : 0.0;
+            Whereabouts.Kind kind = switch (e.place()) {
+                case VEHICLE -> Whereabouts.Kind.DEPLOYED;
+                case DROP -> Whereabouts.Kind.ON_THE_GROUND;
+                case HELD -> Whereabouts.Kind.COLLECTED;
+            };
+            rows.add(new Row(e.binding(), e.mark(), KeyFobs.onPerson(player, e.key()), new Whereabouts(kind, same, distance)));
+        }
+        return rows;
     }
 
-    /** requires: server thread, key in hand; effects: starts a cancellable hold-to-recall of the key's vehicle, temporarily loading only the target area; throws: none. */
-    public boolean begin(ServerPlayer player, ItemStack key) {
-        Entry entry = entryOf(player, key);
-        if (entry == null) return fail(player, "stale");
+    /** effects: the player's recall request as it stands, or null */
+    @Nullable public Progress progress(ServerPlayer player) {
+        Request r = requests.get(player.getUUID());
+        return r == null ? null : new Progress(r.binding, r.quote, r.capacity, r.conditionBefore);
+    }
+
+    /** effects: the last word said to the player's ring screen; empty for none */
+    public Component notice(ServerPlayer player) {
+        return notices.getOrDefault(player.getUUID(), Component.empty());
+    }
+
+    /**
+     * requires: server thread; the player has the ring's screen open
+     * effects: starts a recall of the vehicle {@code binding} names from the ring: the vehicle is
+     * located with a temporary chunk ticket, its cost quoted to the screen, and it comes on
+     * {@link #confirm}. Refused when the pairing is not the player's, its key is not on them, or
+     * the vehicle is already collected.
+     */
+    public boolean beginFromRing(ServerPlayer player, UUID binding) {
+        Entry entry = bindings.get(binding);
+        if (entry == null || !entry.owner().equals(player.getUUID())) return fail(player, "stale");
+        if (!KeyFobs.onPerson(player, entry.key())) return fail(player, "key_missing");
         if (entry.place() == Place.HELD) return fail(player, "collected");
         ServerLevel level = player.server.getLevel(ResourceKey.create(Registries.DIMENSION, entry.dimension()));
         if (level == null) return fail(player, "missing");
@@ -209,8 +287,22 @@ public final class RecoveryData extends SavedData {
         Request request = new Request(player, entry, level, player.server.overworld().getGameTime());
         requests.put(player.getUUID(), request);
         level.getChunkSource().addRegionTicket(TICKET, request.chunk, 2, player.getUUID());
-        tell(player, "locating");
+        say(player, "locating");
         return true;
+    }
+
+    /** effects: the player takes the standing quote: the recall goes through on the next tick, at that price */
+    public void confirm(ServerPlayer player) {
+        Request r = requests.get(player.getUUID());
+        if (r != null && r.quote != null) r.confirmed = true;
+    }
+
+    /** effects: the player gives the request up; the screen says so */
+    public void cancelByPlayer(ServerPlayer player) {
+        if (requests.containsKey(player.getUUID())) {
+            cancel(player.getUUID());
+            say(player, "cancelled");
+        }
     }
 
     /** requires: server thread; effects: ends a request and releases its chunk ticket; throws: none. */
@@ -314,7 +406,9 @@ public final class RecoveryData extends SavedData {
         for (Request request : List.copyOf(requests.values())) {
             ServerPlayer player = request.player;
             Entry entry = bindings.get(request.binding);
-            if (!player.isAlive() || !player.isUsingItem() || entry == null || entryOf(player, player.getUseItem()) != entry || !request.key.equals(entry.key())) {
+            // The request lives while the ring's screen is open and the key is still on the player.
+            if (!player.isAlive() || !(player.containerMenu instanceof com.chunkworks.vanillawheels.keyring.KeyringMenu) || entry == null
+                    || !request.key.equals(entry.key()) || !KeyFobs.onPerson(player, entry.key())) {
                 cancel(player.getUUID()); continue;
             }
             if (now - request.started > 200) { finish(request, "missing"); continue; }
@@ -332,14 +426,16 @@ public final class RecoveryData extends SavedData {
         return RecallCost.quote(distance, capacity, fuel, new Condition(condition), request.player.hasInfiniteMaterials());
     }
 
+    /** effects: quotes {@code cost} to the screen when it is new (a changed quote wants a fresh Confirm); returns whether the player has confirmed it */
     private boolean confirmed(Request request, RecallCost cost, int oldCondition, int capacity, long now) {
         if (!cost.equals(request.quote)) {
-            request.quote = cost; request.quotedAt = now;
-            tell(request.player, "quote", String.format(java.util.Locale.ROOT, "%.1f", 100.0 * cost.fuelCost() / capacity),
+            request.quote = cost; request.quotedAt = now; request.confirmed = false;
+            request.capacity = capacity; request.conditionBefore = oldCondition;
+            say(request.player, "quote", String.format(java.util.Locale.ROOT, "%.1f", 100.0 * cost.fuelCost() / capacity),
                     String.format(java.util.Locale.ROOT, "%.1f", (oldCondition - cost.conditionAfter().remaining()) / 100.0));
             return false;
         }
-        return now - request.quotedAt >= 20;
+        return request.confirmed;
     }
 
     private List<Integer> freeSlots(ServerPlayer player, int count) {
@@ -370,7 +466,7 @@ public final class RecoveryData extends SavedData {
         KeyFobs.Mark mark = KeyFobs.Mark.of(vehicle);
         Entry entry = bindings.get(request.binding);
         if (entry != null) put(entry.marked(mark));
-        KeyFobs.mark(request.player.getUseItem(), mark);
+        Keyring.edit(request.player, request.key, k -> KeyFobs.mark(k, mark));
         List<ItemStack> packed = chain.stream().map(Vehicle::toItem).toList();
         for (int i = 0; i < chain.size(); i++) {
             held(packed.get(i));
@@ -406,9 +502,15 @@ public final class RecoveryData extends SavedData {
     }
 
     private void finish(Request request, String message) {
-        cancel(request.player.getUUID()); request.player.stopUsingItem(); tell(request.player, message);
+        cancel(request.player.getUUID()); say(request.player, message);
     }
-    private static boolean fail(ServerPlayer player, String message, Object... args) { tell(player, message, args); return false; }
+    private boolean fail(ServerPlayer player, String message, Object... args) { say(player, message, args); return false; }
+    /** effects: tells the player, on the action bar and on their ring's screen if it is open */
+    private void say(ServerPlayer player, String key, Object... args) {
+        Component text = Component.translatable("vanillawheels.key." + key, args);
+        notices.put(player.getUUID(), text);
+        player.displayClientMessage(text, true);
+    }
     private static void tell(ServerPlayer player, String key, Object... args) {
         player.displayClientMessage(Component.translatable("vanillawheels.key." + key, args), true);
     }

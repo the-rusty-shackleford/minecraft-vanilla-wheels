@@ -15,10 +15,11 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 
 /**
- * A key and fob, one per vehicle (D-0026). A blank key used on a motor vehicle pairs it and
- * takes its mark (its name, and a band in its paint); held in the air, a paired key quotes
- * and recalls its vehicle; a blank used in the air replaces a key of the owner's that is gone.
- * A paired key is never lost (KeyFobs).
+ * A key and fob, one per vehicle (D-0026). A blank key used on a motor vehicle pairs it: the key,
+ * named for the vehicle and banded in its paint, goes on the player's keyring (D-0041), and the
+ * blank is used up. A blank used in the air re-issues a key of the owner's that is gone, onto the
+ * ring. A paired key from before the ring, still loose, is gathered onto the ring when used. A
+ * paired key is never lost (KeyFobs).
  * AF/RI: item components are claims only; RecoveryData verifies server ownership.
  */
 public final class KeyFobItem extends Item {
@@ -27,23 +28,17 @@ public final class KeyFobItem extends Item {
 
     @Override public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack key = player.getItemInHand(hand);
-        if (!key.has(ModContent.KEY_TOKEN.get())) {
-            if (player instanceof ServerPlayer server && !RecoveryData.get(server.server).replacement(server, key))
-                return InteractionResultHolder.fail(key);
-            return InteractionResultHolder.consume(key);
-        }
         if (player instanceof ServerPlayer server) {
             RecoveryData data = RecoveryData.get(server.server);
-            if (!data.begin(server, key)) return InteractionResultHolder.fail(key);
+            // A paired key still loose, from before the ring: onto the ring, and the ring opens.
+            if (data.isCurrent(key.get(ModContent.KEY_TOKEN.get()))) {
+                KeyringItem.open(server);
+                return InteractionResultHolder.consume(key);
+            }
+            // A blank, or a key whose pairing has moved on: re-issues a key that is gone, onto the ring.
+            return data.replacement(server, key) ? InteractionResultHolder.consume(key) : InteractionResultHolder.fail(key);
         }
-        player.startUsingItem(hand);
         return InteractionResultHolder.consume(key);
-    }
-
-    @Override public int getUseDuration(ItemStack stack, LivingEntity entity) { return 72000; }
-
-    @Override public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int remaining) {
-        if (entity instanceof ServerPlayer player) RecoveryData.get(player.server).cancel(player.getUUID());
     }
 
     @Override public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
@@ -52,6 +47,5 @@ public final class KeyFobItem extends Item {
         if (paired) {
             tooltip.add(Component.translatable("vanillawheels.key.keeps").withStyle(ChatFormatting.GRAY));
         }
-        tooltip.add(Component.translatable("vanillawheels.key.cost_help").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

@@ -7,7 +7,7 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.17.0 — built, unreleased (docking on the Mechanic Lift, and its back wall; D-0040)
+## 1.17.0 — built, unreleased (docking on the Mechanic Lift, and its back wall; the keyring; D-0040, D-0041)
 
 Rusty, 2026-10-13: dock cars on the lift "so that you can have a garage full of uniformly parked
 cars", centred, staged for Paint and Repair; on the preview, the rams and the half-block rise for the
@@ -26,18 +26,35 @@ move, a short wall at the lift's back, and every vehicle facing the same way.
   when the lift is gone or it is found a block from its spot. `Vehicle.docks()` for a protocol to
   refuse. Network 8 unchanged (no new payload: the release rides the drive-state report).
 - On the box, every car standing on a lift parks itself when the pack arrives (said to Rusty, taken).
+- **The keyring** (D-0041; Rusty, the same day, before the release: keys "get unwieldy quickly"; all bound
+  keys on the ring by themselves, impossible to lose, right-click opens a UI with the recovery costs):
+  `Keyring` (the list of key stacks on the ring, one ring a player, made with the first key, no recipe),
+  `KeyringItem` (use opens `keyring/KeyringMenu` + `client/keyring/KeyringScreen`: a row a vehicle with
+  `domain/Whereabouts` and `RecallCost.share`, Recall → `RecoveryData.beginFromRing` → the quote → Confirm),
+  `KeyFobs` generalised to rings (a ring carrying a live key is live; the drop key refused by `PlayerMixin`,
+  a throw by `ItemTossEvent`), `RecoveryData.bind` makes the key onto the ring and uses the blank up. Loose
+  keys from before join the ring at login (`Keyring.gather`). The hold-to-recall of a loose key is gone.
+  **Network 9** (`KeyringRows`, server to client).
+- On the box: every player's keys move onto a ring at their next login; nobody has to do anything.
 - Dependents: every bundled range admits 1.17.0; nothing else needs a rebuild.
 - Gate (2026-10-13, `clean build --no-build-cache`, the booth in software on a rootful Xwayland `:7` beside
-  Rusty's own client with the config watcher off): 190 JUnit, 141 GameTests (10 new in `LiftGameTests`), the
-  booth's 65 checks (two new: the car on its way mid-glide with the deck up; docked on its spot facing the
-  front). Seven mutations each caught by their own test (D-0040's verification); the one-per-deck guard is
-  doubly held and no mutation of it alone shows. Two findings on the way: the spot's clearance had to be the
-  body's real footprint (a trailer behind the truck's spot sat outside a square of its width), and the
-  booth's player is in survival by the lift's scenes, so a camera placed in the air lands on the ground.
+  Rusty's own client with the config watcher off), with the keyring in: 192 JUnit, 142 GameTests (10 new in
+  `LiftGameTests`; `KeyringGameTests`' 6 in place of `KeyFobGameTests`' 5; `RecoveryGameTests` through the
+  ring), the booth's 67 checks (the car on its way mid-glide with the deck up; docked on its spot facing the
+  front; three keys on one ring; the ring's screen with a row a vehicle; the ring in hand with its key named
+  and banded). Fourteen mutations each caught by their own test (D-0040's and D-0041's verification); the
+  one-per-deck guard is doubly held and no mutation of it alone shows. Findings on the way: the spot's
+  clearance had to be the body's real footprint (a trailer behind the truck's spot sat outside a square of
+  its width); the booth's player is in survival by the lift's scenes, so a camera placed in the air lands on
+  the ground; the first ring lands in the slot the blank left; a 3D element model for the ring drew as
+  nothing (the icon is a flat texture by `devtools/art/keyring.py`); a custom payload is refused down a
+  gametest player's connection (`hasChannel`); a per-tick task scheduled from inside a gametest step
+  crashes the server (a sequence instead).
 - Photos: `run/booth/screenshots/booth-lift-raised.png` (the built car docked on the raised deck, the wall
-  behind), `booth-lift-docking.png` (mid-glide), `booth-lift-docked.png` (the wiki's `img/lift-docked.webp`).
+  behind), `booth-lift-docking.png` (mid-glide), `booth-lift-docked.png` (the wiki's `img/lift-docked.webp`),
+  `booth-keyring.png` (the ring's screen, the wiki's `img/keyring.webp`), `booth-key-held.png` (the ring in hand).
 - **Unreleased**: waits on Rusty's go. Not yet seen: a real car taken on the box, his garage lifts growing
-  their walls.
+  their walls, anyone's keys moving onto a ring at login.
 
 ## 1.16.0 — released 2026-10-12 in pack 1.85.0 (seats kept, take the controls, a crew across a logout; a reported move re-run at its own heading; D-0038, D-0039)
 

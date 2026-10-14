@@ -36,13 +36,14 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * headlight mode; and, from any seat aboard a body that moves in three
  * dimensions, the get-out key (D-0031); from a seat other than the driver's,
  * the take-the-controls key (D-0038). Each is sent on change or on the
- * press, never per tick.
+ * press, never per tick. And one the server sends: the keyring screen's rows
+ * (D-0041), on open and on change.
  */
 public final class Payloads {
     private Payloads() {}
 
     /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "8";
+    private static final String VERSION = "9";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {
@@ -139,8 +140,68 @@ public final class Payloads {
         }
     }
 
+    /**
+     * The keyring screen's rows (D-0041): one per pairing of the player's, the standing recall
+     * request, and the last word said to the screen. Sent whenever any of it changes.
+     */
+    public record KeyringRows(java.util.List<Row> rows, Request request, net.minecraft.network.chat.Component notice) implements CustomPacketPayload {
+        public static final Type<KeyringRows> TYPE = new Type<>(VanillaWheels.id("keyring_rows"));
+
+        /** One vehicle: its name and paint, whether its key is on the player, where it is (a Whereabouts kind), how far, and the share of a tank a recall costs. */
+        public record Row(java.util.UUID binding, net.minecraft.network.chat.Component name, int colour, boolean onRing, int kind,
+                          boolean sameDimension, long about, float share) {}
+
+        /** The player's recall request: none; locating; or quoted, with the fuel as a percentage of the tank and the condition lost in percent. */
+        public record Request(boolean present, java.util.UUID binding, boolean quoted, float fuelPercent, float conditionLoss) {
+            public static final Request NONE = new Request(false, new java.util.UUID(0, 0), false, 0.0f, 0.0f);
+        }
+
+        public static final StreamCodec<RegistryFriendlyByteBuf, KeyringRows> STREAM_CODEC = StreamCodec.of(KeyringRows::write, KeyringRows::read);
+
+        private static void write(RegistryFriendlyByteBuf buf, KeyringRows p) {
+            buf.writeVarInt(p.rows.size());
+            for (Row r : p.rows) {
+                buf.writeUUID(r.binding());
+                net.minecraft.network.chat.ComponentSerialization.STREAM_CODEC.encode(buf, r.name());
+                buf.writeVarInt(r.colour());
+                buf.writeBoolean(r.onRing());
+                buf.writeVarInt(r.kind());
+                buf.writeBoolean(r.sameDimension());
+                buf.writeVarLong(r.about());
+                buf.writeFloat(r.share());
+            }
+            buf.writeBoolean(p.request.present());
+            buf.writeUUID(p.request.binding());
+            buf.writeBoolean(p.request.quoted());
+            buf.writeFloat(p.request.fuelPercent());
+            buf.writeFloat(p.request.conditionLoss());
+            net.minecraft.network.chat.ComponentSerialization.STREAM_CODEC.encode(buf, p.notice);
+        }
+
+        private static KeyringRows read(RegistryFriendlyByteBuf buf) {
+            int n = buf.readVarInt();
+            java.util.List<Row> rows = new java.util.ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                rows.add(new Row(buf.readUUID(), net.minecraft.network.chat.ComponentSerialization.STREAM_CODEC.decode(buf), buf.readVarInt(), buf.readBoolean(),
+                        buf.readVarInt(), buf.readBoolean(), buf.readVarLong(), buf.readFloat()));
+            }
+            Request request = new Request(buf.readBoolean(), buf.readUUID(), buf.readBoolean(), buf.readFloat(), buf.readFloat());
+            return new KeyringRows(java.util.List.copyOf(rows), request, net.minecraft.network.chat.ComponentSerialization.STREAM_CODEC.decode(buf));
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(VERSION);
+        registrar.playToClient(KeyringRows.TYPE, KeyringRows.STREAM_CODEC, (payload, context) -> {
+            if (context.player().containerMenu instanceof com.chunkworks.vanillawheels.keyring.KeyringMenu menu) {
+                menu.accept(payload);
+            }
+        });
         registrar.playToClient(ContactVelocity.TYPE, ContactVelocity.STREAM_CODEC, (payload, context) -> {
             Entity entity = context.player().level().getEntity(payload.vehicle());
             if (entity instanceof Vehicle v && v.getControllingPassenger() == context.player()) {

@@ -5,10 +5,12 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "PlayerMixin",
-    "ServerGamePacketListenerImplMixin"
+    "ServerGamePacketListenerImplMixin",
+    "ServerPlayerMixin"
   ],
   "client": [
-    "ClientPacketListenerMixin"
+    "ClientPacketListenerMixin",
+    "LocalPlayerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

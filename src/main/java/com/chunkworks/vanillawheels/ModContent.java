@@ -126,6 +126,11 @@ public final class ModContent {
         ITEMS.addAlias(VanillaWheels.id("wrench"), ResourceLocation.withDefaultNamespace("iron_ingot"));
     }
     public static final DeferredItem<KeyFobItem> KEY_FOB = ITEMS.registerItem("key_fob", KeyFobItem::new, new Item.Properties().stacksTo(1));
+    /** Every key a player holds, on one ring that cannot be lost (D-0041). Never crafted: it appears with the first key. */
+    public static final DeferredItem<KeyringItem> KEYRING = ITEMS.registerItem("keyring", KeyringItem::new, new Item.Properties().stacksTo(1));
+    /** The keys on a ring, each as the key fob it is, in the order they were put on. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.List<ItemStack>>> KEYRING_KEYS = COMPONENTS.register("keyring_keys",
+            () -> DataComponentType.<java.util.List<ItemStack>>builder().persistent(ItemStack.CODEC.listOf()).networkSynchronized(ItemStack.LIST_STREAM_CODEC).build());
     /** A tank's worth of fuel: hold use at a vehicle to pour. Full when crafted. */
     public static final DeferredItem<GasCanItem> GAS_CAN = ITEMS.registerItem("gas_can",
             props -> new GasCanItem(props.component(FUEL.get(), GasCanItem.CAPACITY)), new Item.Properties().stacksTo(1));
@@ -143,6 +148,9 @@ public final class ModContent {
     /** The client's copy needs no position: it reads the server's verdicts from the data slots. */
     public static final DeferredHolder<MenuType<?>, MenuType<LiftMenu>> LIFT_MENU = MENUS.register("mechanic_lift",
             () -> new MenuType<>((id, inventory) -> new LiftMenu(id, inventory, net.minecraft.world.inventory.ContainerLevelAccess.NULL), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
+    /** The keyring's screen (D-0041): no slots; the rows come down in a payload of their own. */
+    public static final DeferredHolder<MenuType<?>, MenuType<com.chunkworks.vanillawheels.keyring.KeyringMenu>> KEYRING_MENU = MENUS.register("keyring",
+            () -> new MenuType<>((id, inventory) -> new com.chunkworks.vanillawheels.keyring.KeyringMenu(id, inventory), net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
 
     /** Individually craftable sections joining into one redstone shutter. Its shape is the block
      * entity's travel, so it is dynamic: a cached per-state shape would be the entity-less closed
@@ -246,6 +254,7 @@ public final class ModContent {
             event.accept(ENGINE);
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(KEY_FOB);
+            event.accept(KEYRING);
             event.accept(GAS_CAN);
             event.accept(EMPTY_GAS_CAN);
         } else if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
@@ -279,6 +288,7 @@ public final class ModContent {
                 output.accept(VEHICLE_SENSOR_ITEM.get());
                 output.accept(FLOOR_HATCH_ITEM.get());
                 output.accept(KEY_FOB.get());
+                output.accept(KEYRING.get());
                 output.accept(WHEEL.get());
                 output.accept(ENGINE.get());
                 output.accept(GAS_CAN.get());

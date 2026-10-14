@@ -2697,7 +2697,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
-        if (held.is(ModContent.KEY_FOB.get())) {
+        if (held.is(ModContent.KEY_FOB.get()) || Keyring.isRing(held)) {
             if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, held);
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
@@ -2773,7 +2773,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (p == null) {
             return InteractionResult.PASS;
         }
-        if (player.getItemInHand(hand).is(ModContent.KEY_FOB.get())) {
+        if (player.getItemInHand(hand).is(ModContent.KEY_FOB.get()) || Keyring.isRing(player.getItemInHand(hand))) {
             if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, player.getItemInHand(hand));
             return InteractionResult.sidedSuccess(level().isClientSide());
         }

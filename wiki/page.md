@@ -108,21 +108,25 @@ and jiggles when it's low.
 
 With an empty hunger bar you're too hungry to work. In creative one click fixes it for free.
 
-## Keys and recall
+## Keys, the keyring and recall
 
 Craft a **Vehicle Key Fob** from two iron ingots, redstone and an ender pearl, and use the blank
 key on a vehicle to pair it: one key per vehicle, as many vehicles as you like. The key is named
-for its vehicle and banded in its paint.
+for its vehicle and banded in its paint, and it goes straight onto your **keyring**: a ring that
+appears with your first key and holds every key you ever pair. Keys you held before the ring join
+it the next time you log in.
 
-![A paired key's tooltip](img/key.webp)
+![The keyring's screen](img/keyring.webp)
 
-- **A paired key is never lost.** Toss it, drop it when you die, put it in a chest, or let
-  someone else pick it up, and it comes back to you: when you respawn, when you log in, or as
-  soon as you have room. Only `/clear` or the creative bin can destroy one. To replace a lost
-  key, use a blank key in the air.
-- **Recall:** hold use with the key to find the vehicle and see what bringing it back costs. Keep
-  holding for a second and it comes into your inventory, with the trailer it's towing, all cargo
-  and damage kept.
+- **The ring is never lost.** You can't drop it, it refuses chests, bags, bundles, frames and
+  other people's inventories, and it comes back to you when you respawn. Only `/clear` or the creative
+  bin can destroy it; after that, a blank key used in the air re-issues your keys one by one.
+- **Use the ring** to see your vehicles: each row says where the vehicle is, about how far, and
+  what bringing it back costs as a share of its tank. Press **Recall** and the row shows the exact
+  price once the vehicle is found; **Confirm** brings it into your inventory as a packed item,
+  with the trailer it's towing, all cargo and damage kept. **Cancel** or close the screen and
+  nothing is charged.
+- Click a vehicle with the ring to refresh its key's name and colour after a rename or repaint.
 
 | Distance | Fuel it costs, of a full tank |
 |---|---|

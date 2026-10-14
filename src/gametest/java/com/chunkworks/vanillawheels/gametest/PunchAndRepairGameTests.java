@@ -104,9 +104,12 @@ public final class PunchAndRepairGameTests {
     }
 
     private static void pair(ServerPlayer owner, Vehicle v) {
+        int selected = owner.getInventory().selected;
+        owner.getInventory().selected = 8;   // the ring the key makes lands in the first empty slot, not this hand
         owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.KEY_FOB.get()));
         v.interactAt(owner, Vec3.ZERO, InteractionHand.MAIN_HAND);
         owner.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        owner.getInventory().selected = selected;
     }
 
     private static void done(GameTestHelper helper, ServerPlayer... players) {

@@ -76,17 +76,31 @@ public final class RecoveryGameTests {
         return stack;
     }
 
+    /** effects: {@code player} pairs {@code vehicle} with a blank through the real interaction; returns the key as it sits on their ring */
     private static ItemStack pair(GameTestHelper helper, ServerPlayer player, Vehicle vehicle) {
-        ItemStack fob = new ItemStack(ModContent.KEY_FOB.get());
-        player.setItemInHand(InteractionHand.MAIN_HAND, fob);
+        player.getInventory().selected = 8;   // the ring a first key makes lands in the first empty slot, not this hand
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.KEY_FOB.get()));
         vehicle.interactAt(player, Vec3.ZERO, InteractionHand.MAIN_HAND);
-        helper.assertTrue(fob.has(ModContent.KEY_TOKEN.get()), "real interaction paired the key");
-        return fob;
+        helper.assertTrue(player.getMainHandItem().isEmpty(), "the blank was used up");
+        var ring = Keyring.ringOf(player);
+        helper.assertTrue(ring != null && !Keyring.keys(ring.stack()).isEmpty(), "the key went on the ring");
+        ItemStack key = Keyring.keys(ring.stack()).getLast().copy();
+        helper.assertTrue(key.has(ModContent.KEY_TOKEN.get()), "real interaction paired the key");
+        return key;
     }
 
-    private static void recall(GameTestHelper helper, ServerPlayer player) {
-        var result = ModContent.KEY_FOB.get().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
-        helper.assertTrue(result.getResult().consumesAction(), "real fob use started recall");
+    /**
+     * effects: recalls {@code vehicle} from the ring as a player does: the ring's screen opened, Recall
+     * pressed, Confirm pressed once the quote is up. The wait is a sequence, which the framework keeps
+     * apart from its tick map, so this may be called from inside a scheduled step.
+     */
+    private static void recall(GameTestHelper helper, ServerPlayer player, Vehicle vehicle) {
+        RecoveryData data = RecoveryData.get(player.server);
+        KeyringItem.open(player);
+        helper.assertTrue(data.beginFromRing(player, vehicle.binding()), "the ring started the recall");
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(data.progress(player) != null && data.progress(player).quote() != null, "quoted"))
+                .thenExecute(() -> data.confirm(player));
     }
 
     private static List<ItemStack> packed(ServerPlayer player) {
@@ -119,7 +133,7 @@ public final class RecoveryGameTests {
                 helper.assertValueEqual(vehicle.getRemovalReason(), Entity.RemovalReason.UNLOADED_TO_CHUNK, "real chunk unload, not discard");
                 helper.assertTrue(level.getEntity(vehicle.getUUID()) == null, "vehicle no longer exists in loaded world");
                 helper.assertTrue(level.getEntity(trailer.getUUID()) == null, "trailer also unloaded");
-                requested[0] = true; recall(helper, player);
+                requested[0] = true; recall(helper, player, vehicle);
             }
             if (requested[0] && packed(player).size() == 2) {
                 ItemStack car = packed(player).stream().filter(s -> CAR.equals(s.get(ModContent.VEHICLE.get()))).findFirst().orElseThrow();
@@ -193,7 +207,8 @@ public final class RecoveryGameTests {
         ServerPlayer collector = player(helper); drop.setNoPickUpDelay(); drop.playerTouch(collector);
         helper.assertTrue(drop.isRemoved(), "real player pickup removed physical drop");
         helper.assertValueEqual(packed(collector).size(), 1, "collector holds the sole wreck");
-        helper.assertTrue(!ModContent.KEY_FOB.get().use(helper.getLevel(), owner, InteractionHand.MAIN_HAND).getResult().consumesAction(), "owner cannot duplicate collected property");
+        KeyringItem.open(owner);
+        helper.assertTrue(!RecoveryData.get(owner.server).beginFromRing(owner, vehicle.binding()), "owner cannot duplicate collected property");
         helper.assertTrue(packed(owner).isEmpty(), "owner receives no copy");
         owner.connection.disconnect(Component.literal("test complete")); collector.connection.disconnect(Component.literal("test complete")); helper.succeed();
     }
@@ -201,8 +216,12 @@ public final class RecoveryGameTests {
     @GameTest(template = "arena", timeoutTicks = 140)
     public void disconnectDuringRecallLeavesPropertyInWorld(GameTestHelper helper) {
         Vehicle vehicle = car(helper); vehicle.setItem(0, namedCargo());
-        ServerPlayer player = player(helper); pair(helper, player, vehicle); recall(helper, player);
+        ServerPlayer player = player(helper); pair(helper, player, vehicle);
+        RecoveryData data = RecoveryData.get(player.server);
+        KeyringItem.open(player);
+        helper.assertTrue(data.beginFromRing(player, vehicle.binding()), "Recall started");
         helper.runAtTickTime(5, () -> player.connection.disconnect(Component.literal("disconnect during recall")));
+        helper.runAtTickTime(20, () -> data.confirm(player));   // a Confirm from a player who is gone: the request died with the connection
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(!vehicle.isRemoved(), "disconnected player's already-saved inventory cannot receive a transfer");
             helper.assertValueEqual(vehicle.tank().ticks(), 24000, "canceled recall charges no fuel");
@@ -215,7 +234,7 @@ public final class RecoveryGameTests {
     public void creativeRecallPreservesFuelAndCondition(GameTestHelper helper) {
         Vehicle vehicle = car(helper); vehicle.setFuel(12); vehicle.setCondition(3456);
         ServerPlayer player = player(helper); player.setGameMode(GameType.CREATIVE);
-        pair(helper, player, vehicle); recall(helper, player);
+        pair(helper, player, vehicle); recall(helper, player, vehicle);
         helper.runAtTickTime(60, () -> {
             ItemStack item = packed(player).getFirst();
             helper.assertValueEqual(item.get(ModContent.FUEL.get()), 12, "creative pays no fuel");
@@ -254,7 +273,7 @@ public final class RecoveryGameTests {
         vehicle.setItem(0, new ItemStack(Items.APPLE, 7));
         trailer.setCondition(6500);
         trailer.setItem(0, new ItemStack(Items.EMERALD, 3));
-        pair(helper, player, vehicle); recall(helper, player);
+        pair(helper, player, vehicle); recall(helper, player, vehicle);
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(vehicle.isRemoved() && trailer.isRemoved(), "both physical vehicles returned");
             helper.assertValueEqual(packed(player).size(), 2, "exactly two inventory items");
@@ -264,7 +283,7 @@ public final class RecoveryGameTests {
             ItemStack towed = packed(player).stream().filter(s -> TRAILER.equals(s.get(ModContent.VEHICLE.get()))).findFirst().orElseThrow();
             helper.assertValueEqual(towed.get(ModContent.CONDITION.get()), 6500, "trailer condition preserved");
             helper.assertValueEqual(VehicleCargo.unpack(towed.get(ModContent.CARGO.get())).getFirst().getCount(), 3, "trailer cargo returned");
-            ModContent.KEY_FOB.get().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
+            helper.assertTrue(!RecoveryData.get(player.server).beginFromRing(player, vehicle.binding()), "a collected vehicle is not recalled again");
             helper.assertValueEqual(packed(player).size(), 2, "repeat recall cannot make copies");
             player.connection.disconnect(Component.literal("test complete")); helper.succeed();
         });
@@ -273,7 +292,7 @@ public final class RecoveryGameTests {
     @GameTest(template = "arena", timeoutTicks = 140)
     public void emptyTankPaysHalfDurabilityAndRecallMayReturnAWreck(GameTestHelper helper) {
         Vehicle vehicle = car(helper); vehicle.setFuel(0); vehicle.setCondition(25);
-        ServerPlayer player = player(helper); pair(helper, player, vehicle); recall(helper, player);
+        ServerPlayer player = player(helper); pair(helper, player, vehicle); recall(helper, player, vehicle);
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(vehicle.isRemoved(), "recall succeeds without fuel");
             ItemStack stack = packed(player).getFirst();
@@ -288,7 +307,7 @@ public final class RecoveryGameTests {
         Vehicle vehicle = car(helper); ServerPlayer player = player(helper);
         pair(helper, player, vehicle);
         for (int slot = 1; slot < 36; slot++) player.getInventory().setItem(slot, new ItemStack(Items.STONE, 64));
-        recall(helper, player);
+        recall(helper, player, vehicle);
         helper.runAtTickTime(35, () -> {
             helper.assertTrue(!vehicle.isRemoved(), "full inventory leaves vehicle in place");
             helper.assertValueEqual(vehicle.tank().ticks(), 24000, "no fuel charged for refusal");
@@ -298,7 +317,7 @@ public final class RecoveryGameTests {
             helper.getLevel().addFreshEntity(trailer); vehicle.hitch(trailer);
             Entity cow = EntityType.COW.create(helper.getLevel()); cow.setPos(trailer.position());
             helper.getLevel().addFreshEntity(cow); cow.startRiding(trailer, true);
-            recall(helper, player);
+            recall(helper, player, vehicle);
         });
         helper.runAtTickTime(80, () -> {
             helper.assertTrue(!vehicle.isRemoved(), "occupied vehicle remains");
@@ -311,15 +330,23 @@ public final class RecoveryGameTests {
     public void replacementInvalidatesTheOldFobAndSavedIndexKeepsOnePairing(GameTestHelper helper) {
         Vehicle vehicle = car(helper); ServerPlayer player = player(helper);
         ItemStack old = pair(helper, player, vehicle).copy();
+        // The ring gone, as a /clear leaves it: a blank in the air re-issues the key onto a fresh ring.
+        var place = Keyring.ringOf(player);
+        player.getInventory().setItem(place.cell(), ItemStack.EMPTY);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.KEY_FOB.get()));
-        ModContent.KEY_FOB.get().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
-        ItemStack replacement = player.getMainHandItem().copy();
+        helper.assertTrue(ModContent.KEY_FOB.get().use(helper.getLevel(), player, InteractionHand.MAIN_HAND).getResult().consumesAction(), "the blank re-issued the key");
+        helper.assertTrue(player.getMainHandItem().isEmpty(), "and was used up");
+        var ring = Keyring.ringOf(player);
+        helper.assertTrue(ring != null && Keyring.keys(ring.stack()).size() == 1, "a fresh ring with the one key");
+        ItemStack replacement = Keyring.keys(ring.stack()).getFirst();
         RecoveryData data = RecoveryData.get(player.server);
         RecoveryData restored = RecoveryData.load(data.save(new CompoundTag(), helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
-        helper.assertTrue(!restored.begin(player, old), "serialized index rejects the old key");
+        helper.assertTrue(!restored.isCurrent(old.get(ModContent.KEY_TOKEN.get())), "serialized index rejects the old key");
+        helper.assertTrue(restored.isCurrent(replacement.get(ModContent.KEY_TOKEN.get())), "and keeps the replacement");
         player.setItemInHand(InteractionHand.MAIN_HAND, old);
-        helper.assertTrue(!ModContent.KEY_FOB.get().use(helper.getLevel(), player, InteractionHand.MAIN_HAND).getResult().consumesAction(), "old physical fob rejected");
-        player.setItemInHand(InteractionHand.MAIN_HAND, replacement); recall(helper, player);
+        helper.assertTrue(!ModContent.KEY_FOB.get().use(helper.getLevel(), player, InteractionHand.MAIN_HAND).getResult().consumesAction(), "old physical fob rejected: every key is on the ring");
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        recall(helper, player, vehicle);
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(vehicle.isRemoved(), "replacement recalls the original vehicle");
             player.connection.disconnect(Component.literal("test complete")); helper.succeed();
@@ -333,7 +360,7 @@ public final class RecoveryGameTests {
         ItemEntity drop = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds()).getFirst();
         helper.assertTrue(drop.isInvulnerable(), "bound wreck survives hostile surroundings");
         ItemStack stale = drop.getItem().copy();
-        recall(helper, player);
+        recall(helper, player, vehicle);
         helper.runAtTickTime(60, () -> {
             helper.assertTrue(drop.isRemoved(), "the actual wreck was recovered");
             helper.assertValueEqual(packed(player).size(), 1, "one wreck in inventory");

@@ -19,11 +19,25 @@ public record RecallCost(int fuelCost, int fuelAfter, Condition conditionAfter) 
      * Creative pays neither fuel nor condition. All fractional costs round upward once.
      * throws: IllegalArgumentException for invalid inputs.
      */
+    /**
+     * requires: distance finite and not negative
+     * effects: returns the share of a full tank a recall over {@code distance} blocks costs,
+     * 0.01..1: a twentieth at a thousand blocks, growing with the square; a vehicle in another
+     * dimension ({@code sameDimension} false) pays the whole tank. What the keyring quotes a row
+     * with before the vehicle is found (D-0041), and what {@link #quote} charges.
+     * throws: IllegalArgumentException for an invalid distance
+     */
+    public static double share(double distance, boolean sameDimension) {
+        if (!Double.isFinite(distance) || distance < 0) throw new IllegalArgumentException("Invalid recall distance");
+        if (!sameDimension) return 1.0;
+        return Math.clamp(0.05 * Math.pow(distance / 1000.0, 2), 0.01, 1.0);
+    }
+
     public static RecallCost quote(double distance, int capacity, int fuel, Condition condition, boolean creative) {
         if (!Double.isFinite(distance) || distance < 0 || capacity < 1 || fuel < 0 || fuel > capacity || condition == null)
             throw new IllegalArgumentException("Invalid recall inputs");
         if (creative) return new RecallCost(0, fuel, condition);
-        double fraction = Math.clamp(0.05 * Math.pow(distance / 1000.0, 2), 0.01, 1.0);
+        double fraction = share(distance, true);
         int cost = (int) Math.ceil(capacity * fraction);
         int missing = Math.max(0, cost - fuel);
         int damage = (int) (((long) missing * Condition.MAX + 2L * capacity - 1) / (2L * capacity));

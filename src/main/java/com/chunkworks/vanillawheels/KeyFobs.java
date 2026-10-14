@@ -39,6 +39,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerListener;
 import net.minecraft.world.inventory.Slot;
@@ -49,6 +50,7 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -58,27 +60,34 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Keys that are never lost (Rusty, 2026-09-29; D-0026). A key paired as its vehicle's current key
- * lives only on its owner: their inventory, or a bag Carried says they carry. Tossed, spilled at a
- * death, dropped inside a bag or a box, put in a chest, handed to a frame or a pot, or found on
- * anyone else, it goes home: into its owner's inventory or bag at once when they are online,
- * alive and have room, else into this record until they log in, respawn or make room. A blank
- * key, or one whose pairing has moved on, is an ordinary item. Every key wears its vehicle's
- * mark: named for it, and banded in its paint.
+ * Keys that are never lost (Rusty, 2026-09-29; D-0026), and the keyring they live on (D-0041).
+ * A key paired as its vehicle's current key is <em>live</em>; so is a ring carrying one. A live
+ * stack lives only on its owner: their inventory, or a bag Carried says they carry. Tossed,
+ * spilled at a death, dropped inside a bag or a box, put in a chest, handed to a frame or a pot,
+ * or found on anyone else, it goes home: onto its owner's ring at once when they are online and
+ * alive (a loose key joins the ring; a ring's keys join their ring), else into this record until
+ * they log in, respawn or make room. A blank key, one whose pairing has moved on, and a ring with
+ * no live key are ordinary items. Every key wears its vehicle's mark: named for it, and banded
+ * in its paint.
  *
- * <p>AF: {@code pending.get(t)} is the key with token {@code t} waiting for its owner, in the
- * order they went home; {@code watch} holds the blocks right-clicked this tick with a live key in
- * hand. RI: every pending stack is one key, one per token. Server thread only.
+ * <p>AF: {@code pending} is the stacks -- keys and rings -- waiting for their owners, in the order
+ * they went home; {@code watch} holds the blocks right-clicked this tick with a live stack in
+ * hand; {@code tossed} the live stacks a player tried to drop this tick. RI: every pending stack is
+ * one key or one ring. Server thread only.
  */
 public final class KeyFobs extends SavedData {
     private static final Factory<KeyFobs> FACTORY = new Factory<>(KeyFobs::new, KeyFobs::load);
     /** How deep a key is looked for inside bags, boxes and bundles within one another. */
     private static final int NESTING = 4;
-    private final Map<UUID, ItemStack> pending = new LinkedHashMap<>();
+    private final List<ItemStack> pending = new ArrayList<>();
     private final List<Watch> watch = new ArrayList<>();
+    private final List<Tossed> tossed = new ArrayList<>();
 
     /** A block right-clicked by a player holding a live key: checked once the click is over. */
     private record Watch(ServerPlayer player, UUID token, ServerLevel level, BlockPos pos) {}
+
+    /** A live stack a player tried to toss: the toss refused, the stack is looked for on them once the tick is over. */
+    private record Tossed(ServerPlayer player, ItemStack stack) {}
 
     /** requires: server thread; effects: returns the world's record, made on first use */
     public static KeyFobs get(MinecraftServer server) {
@@ -125,68 +134,107 @@ public final class KeyFobs extends SavedData {
         key.set(ModContent.KEY_COLOUR.get(), mark.colour());
     }
 
-    /** effects: the token of {@code stack} if it is a key paired as its vehicle's current key, else null */
+    /**
+     * effects: the token that makes {@code stack} live -- a key paired as its vehicle's current key,
+     * or the first such key on a ring -- else null
+     */
     @Nullable
     static UUID liveToken(MinecraftServer server, ItemStack stack) {
-        if (!stack.is(ModContent.KEY_FOB.get())) {
-            return null;
+        RecoveryData data = RecoveryData.get(server);
+        if (stack.is(ModContent.KEY_FOB.get())) {
+            UUID token = stack.get(ModContent.KEY_TOKEN.get());
+            return data.isCurrent(token) ? token : null;
         }
-        UUID token = stack.get(ModContent.KEY_TOKEN.get());
-        return RecoveryData.get(server).isCurrent(token) ? token : null;
+        for (ItemStack key : Keyring.keys(stack)) {
+            UUID token = key.get(ModContent.KEY_TOKEN.get());
+            if (data.isCurrent(token)) {
+                return token;
+            }
+        }
+        return null;
     }
 
-    /** effects: whether the key with {@code token} is on {@code player}: their inventory or a bag they carry */
+    /** effects: whether {@code stack} is live: a current key, or a ring carrying one */
+    static boolean isLive(MinecraftServer server, ItemStack stack) {
+        return liveToken(server, stack) != null;
+    }
+
+    /** effects: whether {@code stack} is the key with {@code token}, or a ring carrying it */
+    static boolean holdsToken(ItemStack stack, UUID token) {
+        return stack.is(ModContent.KEY_FOB.get()) ? token.equals(stack.get(ModContent.KEY_TOKEN.get())) : Keyring.holds(stack, token);
+    }
+
+    /** effects: whose {@code stack} is: a key's owner, or a ring's; null for neither */
+    @Nullable
+    static UUID ownerOf(ItemStack stack) {
+        return Keyring.isRing(stack) ? Keyring.ownerOf(stack) : stack.get(ModContent.KEY_OWNER.get());
+    }
+
+    /**
+     * effects: whether {@code player} keeps {@code stack} against the drop key (D-0041): on the
+     * server a live key or ring; on a client, which cannot tell a live key from one whose pairing
+     * moved on, any paired key and any ring with keys on it -- the server's word settles it
+     */
+    public static boolean keeps(Player player, ItemStack stack) {
+        if (player.level() instanceof ServerLevel level) {
+            return isLive(level.getServer(), stack);
+        }
+        return stack.is(ModContent.KEY_FOB.get()) ? stack.has(ModContent.KEY_TOKEN.get()) : !Keyring.keys(stack).isEmpty();
+    }
+
+    /** effects: whether the key with {@code token} is on {@code player}: loose or on a ring, in their inventory or a bag they carry */
     public static boolean onPerson(ServerPlayer player, UUID token) {
-        return Carried.has(player, s -> s.is(ModContent.KEY_FOB.get()) && token.equals(s.get(ModContent.KEY_TOKEN.get())));
+        return Carried.has(player, s -> holdsToken(s, token));
     }
 
     // --- going home ---------------------------------------------------------
 
     /**
-     * requires: {@code stack} is a key, taken out of wherever it was
-     * effects: gives it to its owner -- inventory, else a bag they carry -- when they are online and
-     * alive, telling them; what does not fit, or waits for an absent or dead owner, is kept here
+     * requires: {@code stack} is a key or a ring, taken out of wherever it was
+     * effects: gives it to its owner -- onto their ring -- when they are online and alive, telling
+     * them; what cannot be placed, or waits for an absent or dead owner, is kept here
      */
     public static void sendHome(MinecraftServer server, ItemStack stack) {
-        UUID token = stack.get(ModContent.KEY_TOKEN.get());
-        UUID owner = stack.get(ModContent.KEY_OWNER.get());
-        if (token == null || owner == null || stack.isEmpty()) {
+        UUID owner = ownerOf(stack);
+        if (owner == null || stack.isEmpty() || (!stack.is(ModContent.KEY_FOB.get()) && !Keyring.isRing(stack))) {
             return;
         }
-        ItemStack key = stack.copyWithCount(1);
+        ItemStack home = stack.copyWithCount(1);
         ServerPlayer p = server.getPlayerList().getPlayer(owner);
-        if (p != null && give(p, key)) {
+        if (p != null && give(p, home)) {
             return;
         }
         KeyFobs data = get(server);
-        if (data.pending.putIfAbsent(token, key) == null) {
-            data.setDirty();
-        }
+        data.pending.add(home);
+        data.setDirty();
     }
 
-    /** effects: puts {@code key} on {@code player} if they are alive and it fits, telling them; returns whether it did */
-    private static boolean give(ServerPlayer player, ItemStack key) {
+    /**
+     * effects: puts {@code stack} on {@code player} if they are alive and it can be placed -- a key
+     * onto their ring, a ring's keys onto their ring -- telling them; returns whether it was
+     */
+    private static boolean give(ServerPlayer player, ItemStack stack) {
         if (!player.isAlive() || player.hasDisconnected()) {
             return false;
         }
-        Component name = key.getHoverName();
-        ItemStack placing = key.copy();
-        Carried.give(player, placing);
-        if (!placing.isEmpty()) {
+        Component name = stack.getHoverName();
+        boolean placed = Keyring.isRing(stack) ? Keyring.absorb(player, stack) : Keyring.put(player, stack);
+        if (!placed) {
             return false;
         }
         player.displayClientMessage(Component.translatable("vanillawheels.key.home", name), true);
         return true;
     }
 
-    /** effects: hands {@code player} every key waiting for them that fits */
+    /** effects: hands {@code player} every key and ring waiting for them that can be placed, and gathers any loose key onto their ring */
     void deliver(ServerPlayer player) {
+        Keyring.gather(player);
         if (pending.isEmpty()) {
             return;
         }
-        for (Iterator<Map.Entry<UUID, ItemStack>> it = pending.entrySet().iterator(); it.hasNext(); ) {
-            ItemStack key = it.next().getValue();
-            if (player.getUUID().equals(key.get(ModContent.KEY_OWNER.get())) && give(player, key)) {
+        for (Iterator<ItemStack> it = pending.iterator(); it.hasNext(); ) {
+            ItemStack stack = it.next();
+            if (player.getUUID().equals(ownerOf(stack)) && give(player, stack)) {
                 it.remove();
                 setDirty();
             }
@@ -225,12 +273,12 @@ public final class KeyFobs extends SavedData {
         return result;
     }
 
-    /** effects: {@link #pullNested} over {@code cells}, emptying each key taken and rewriting each container changed; returns whether any was */
+    /** effects: {@link #pullNested} over {@code cells}, emptying each key or ring taken and rewriting each container changed; returns whether any was */
     private static boolean pullFrom(MinecraftServer server, List<ItemStack> cells, Predicate<ItemStack> away, List<ItemStack> out, int depth) {
         boolean changed = false;
         for (int i = 0; i < cells.size(); i++) {
             ItemStack cell = cells.get(i);
-            if (liveToken(server, cell) != null && away.test(cell)) {
+            if (isLive(server, cell) && away.test(cell)) {
                 out.add(cell.copy());
                 cells.set(i, ItemStack.EMPTY);
                 changed = true;
@@ -245,9 +293,9 @@ public final class KeyFobs extends SavedData {
         return changed;
     }
 
-    /** effects: whether {@code stack} could hold a key: it is one, or it has contents to look in */
+    /** effects: whether {@code stack} could hold a key: it is one, or a ring, or it has contents to look in */
     private static boolean mayHoldKey(ItemStack stack) {
-        return stack.is(ModContent.KEY_FOB.get()) || stack.has(DataComponents.CONTAINER) || stack.has(DataComponents.BUNDLE_CONTENTS);
+        return stack.is(ModContent.KEY_FOB.get()) || Keyring.isRing(stack) || stack.has(DataComponents.CONTAINER) || stack.has(DataComponents.BUNDLE_CONTENTS);
     }
 
     // --- where they are caught ------------------------------------------------
@@ -262,7 +310,7 @@ public final class KeyFobs extends SavedData {
             return;
         }
         MinecraftServer server = level.getServer();
-        if (liveToken(server, drop.getItem()) != null) {
+        if (isLive(server, drop.getItem())) {
             event.setCanceled(true);
             sendHome(server, drop.getItem());
             return;
@@ -276,16 +324,28 @@ public final class KeyFobs extends SavedData {
     }
 
     /**
+     * effects: a player's toss of a live key or ring (the drop key, a throw out of a screen) is
+     * refused; the stack is looked for on them once the tick is over and sent home if the game
+     * took it out all the same
+     */
+    public static void onToss(ItemTossEvent event) {
+        if (event.getPlayer() instanceof ServerPlayer player && isLive(player.server, event.getEntity().getItem())) {
+            event.setCanceled(true);
+            get(player.server).tossed.add(new Tossed(player, event.getEntity().getItem().copy()));
+        }
+    }
+
+    /**
      * effects: at a player's death, before anything drops -- to the ground or into another mod's
-     * grave -- every live key on them, bags included, goes home: theirs wait for their respawn.
-     * With keepInventory, nothing moves.
+     * grave -- every live key and ring on them, bags included, goes home: theirs wait for their
+     * respawn. With keepInventory, nothing moves.
      */
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || player.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY)) {
             return;
         }
         MinecraftServer server = player.server;
-        Predicate<ItemStack> live = s -> liveToken(server, s) != null;
+        Predicate<ItemStack> live = s -> isLive(server, s);
         int n = Carried.count(player, live);
         if (n > 0) {
             List<ItemStack> keys = new ArrayList<>();
@@ -359,15 +419,16 @@ public final class KeyFobs extends SavedData {
                 || slot.container instanceof net.minecraft.world.CompoundContainer)) {
             return;   // looked at when the menu closes
         }
+        MinecraftServer server = player.server;
         Predicate<ItemStack> away = key -> {
-            if (!player.getUUID().equals(key.get(ModContent.KEY_OWNER.get()))) {
+            if (!player.getUUID().equals(ownerOf(key))) {
                 return true;   // not this player's: home to its owner
             }
             // Its owner's: on their person, or in a bag they carry (Carried writes through: Backpacks+ stores each edit at once).
-            return !ownInventory && !onPerson(player, key.get(ModContent.KEY_TOKEN.get()));
+            UUID token = liveToken(server, key);
+            return !ownInventory && (token == null || !onPerson(player, token));
         };
-        MinecraftServer server = player.server;
-        if (liveToken(server, stack) != null) {
+        if (isLive(server, stack)) {
             if (away.test(stack)) {
                 ItemStack taken = stack.copy();
                 slot.set(ItemStack.EMPTY);
@@ -397,12 +458,10 @@ public final class KeyFobs extends SavedData {
 
     private static void refuseHandOver(PlayerInteractEvent event, net.minecraft.world.entity.Entity target) {
         ItemStack held = event.getItemStack();
-        if (target instanceof Vehicle || target instanceof Vehicle.Part || !held.is(ModContent.KEY_FOB.get())) {
+        if (target instanceof Vehicle || target instanceof Vehicle.Part || (!held.is(ModContent.KEY_FOB.get()) && !Keyring.isRing(held))) {
             return;
         }
-        // The client cannot tell a live key from one whose pairing moved on: it holds back any paired one.
-        boolean live = event.getLevel() instanceof ServerLevel level ? liveToken(level.getServer(), held) != null : held.has(ModContent.KEY_TOKEN.get());
-        if (live && event instanceof net.neoforged.bus.api.ICancellableEvent cancellable) {
+        if (keeps(event.getEntity(), held) && event instanceof net.neoforged.bus.api.ICancellableEvent cancellable) {
             cancellable.setCanceled(true);
         }
     }
@@ -420,10 +479,24 @@ public final class KeyFobs extends SavedData {
         }
     }
 
-    /** effects: after the tick's clicks, pulls a key out of any block that took it and sends it home; once a second, hands waiting keys to owners who are here */
+    /**
+     * effects: after the tick's clicks, pulls a key out of any block that took it and sends it home,
+     * and sends home a live stack the game took out of a player who tried to toss it; once a
+     * second, hands waiting keys and rings to owners who are here
+     */
     public static void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
         KeyFobs data = get(server);
+        if (!data.tossed.isEmpty()) {
+            List<Tossed> dropped = List.copyOf(data.tossed);
+            data.tossed.clear();
+            for (Tossed t : dropped) {
+                UUID token = liveToken(server, t.stack());
+                if (token != null && !onPerson(t.player(), token)) {
+                    sendHome(server, t.stack());
+                }
+            }
+        }
         if (!data.watch.isEmpty()) {
             List<Watch> clicked = List.copyOf(data.watch);
             data.watch.clear();
@@ -444,9 +517,9 @@ public final class KeyFobs extends SavedData {
         }
     }
 
-    /** effects: removes and returns the key with {@code token} from the block at {@code pos}, by its container or its item handler; empty if it holds none */
+    /** effects: removes and returns the key with {@code token}, or the ring carrying it, from the block at {@code pos}, by its container or its item handler; empty if it holds none */
     private static ItemStack takeFrom(ServerLevel level, BlockPos pos, UUID token) {
-        Predicate<ItemStack> it = s -> s.is(ModContent.KEY_FOB.get()) && token.equals(s.get(ModContent.KEY_TOKEN.get()));
+        Predicate<ItemStack> it = s -> holdsToken(s, token);
         if (level.getBlockEntity(pos) instanceof Container container) {
             for (int i = 0; i < container.getContainerSize(); i++) {
                 if (it.test(container.getItem(i))) {
@@ -469,14 +542,14 @@ public final class KeyFobs extends SavedData {
 
     // --- saving -------------------------------------------------------------
 
-    /** requires: valid saved NBT; effects: restores the keys waiting for their owners; unreadable rows are skipped */
+    /** requires: valid saved NBT; effects: restores the keys and rings waiting for their owners; unreadable rows are skipped */
     public static KeyFobs load(CompoundTag tag, HolderLookup.Provider registries) {
         KeyFobs result = new KeyFobs();
         for (Tag row : tag.getList("Pending", Tag.TAG_COMPOUND)) {
             CompoundTag value = (CompoundTag) row;
             ItemStack.parse(registries, value.getCompound("Key"))
-                    .filter(s -> s.is(ModContent.KEY_FOB.get()) && s.has(ModContent.KEY_TOKEN.get()))
-                    .ifPresent(s -> result.pending.put(s.get(ModContent.KEY_TOKEN.get()), s));
+                    .filter(s -> s.is(ModContent.KEY_FOB.get()) && s.has(ModContent.KEY_TOKEN.get()) || Keyring.isRing(s))
+                    .ifPresent(result.pending::add);
         }
         return result;
     }
@@ -484,17 +557,22 @@ public final class KeyFobs extends SavedData {
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         ListTag list = new ListTag();
-        for (ItemStack key : pending.values()) {
+        for (ItemStack stack : pending) {
             CompoundTag row = new CompoundTag();
-            row.put("Key", key.save(registries));
+            row.put("Key", stack.save(registries));
             list.add(row);
         }
         tag.put("Pending", list);
         return tag;
     }
 
-    /** effects: returns whether the key with {@code token} waits for its owner */
+    /** effects: returns whether the key with {@code token} waits for its owner, loose or on a ring */
     public boolean waitingFor(UUID token) {
-        return pending.containsKey(token);
+        for (ItemStack stack : pending) {
+            if (holdsToken(stack, token)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

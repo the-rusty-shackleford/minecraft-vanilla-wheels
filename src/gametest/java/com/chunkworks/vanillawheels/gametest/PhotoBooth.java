@@ -119,6 +119,7 @@ public final class PhotoBooth {
     private static List<Step> steps;
     private static UUID car;
     private static BlockPos liftPos = BlockPos.ZERO;
+    private static int ringRows = -1;
     /** The car left on the deck for the lift to take, and where it was left. */
     private static int dockCar = -1;
     private static Vec3 dockFrom = Vec3.ZERO;
@@ -544,30 +545,56 @@ public final class PhotoBooth {
                     && menu.getSlot(LiftMenu.REPAIR).getItem().isEmpty() ? null : "repair button did not complete");
             onServer(mc, sp -> {
                 sp.closeContainer();
-                if (sp.serverLevel().getBlockEntity(liftPos) instanceof LiftBlockEntity lift && lift.vehicleOnDeck() != null) {
+                ServerLevel level = sp.serverLevel();
+                if (level.getBlockEntity(liftPos) instanceof LiftBlockEntity lift && lift.vehicleOnDeck() != null) {
                     Vehicle vehicle = lift.vehicleOnDeck();
-                    ItemStack key = new ItemStack(ModContent.KEY_FOB.get());
-                    sp.getInventory().setItem(0, key);
-                    com.chunkworks.vanillawheels.RecoveryData.get(sp.server).bind(sp, vehicle, key);
+                    vehicle.setCustomName(net.minecraft.network.chat.Component.literal("Workshop car"));
+                    // The keyring (D-0041): three vehicles paired with blanks, their keys on the one ring. Two stand off
+                    // to the east, one of them wrecked on the ground, so the rows read differently.
+                    Vehicle far = Vehicle.create(level, BOX_CAR, vehicle.position().add(40.0, 0.0, 0.0), 90.0f);
+                    far.setCustomName(net.minecraft.network.chat.Component.literal("Hauler"));
+                    far.setPaint(DyeColor.RED);
+                    Vehicle wreck = Vehicle.create(level, BOX_CAR, vehicle.position().add(16.0, 0.0, 6.0), 0.0f);
+                    wreck.setCustomName(net.minecraft.network.chat.Component.literal("Old banger"));
+                    level.addFreshEntity(far);
+                    level.addFreshEntity(wreck);
+                    sp.getInventory().selected = 8;   // the ring lands in the first empty slot, not the hand the blanks go into
+                    for (Vehicle v : new Vehicle[] {vehicle, far, wreck}) {
+                        sp.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.KEY_FOB.get()));
+                        v.interactAt(sp, Vec3.ZERO, InteractionHand.MAIN_HAND);
+                    }
+                    sp.getInventory().selected = 0;
+                    wreck.kill();
                     ItemStack example = vehicle.toItem(); example.remove(ModContent.BINDING.get());
                     example.set(ModContent.CONDITION.get(), 0); sp.getInventory().setItem(1, example);
                     sp.containerMenu.broadcastChanges();
+                    ringRows = 0;
                 }
             });
         }));
         s.add(new Step(t += 20, () -> {
             if (mc.player != null) mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
-            int x = (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 16;
-            int y = (mc.getWindow().getGuiScaledHeight() - 166) / 2 + 150;
-            pointAt(mc, x, y);
-        }));
-        s.add(new Step(t += 12, () -> {
-            shoot(mc, "booth-key-fob");
             int x = (mc.getWindow().getGuiScaledWidth() - 176) / 2 + 34;
             int y = (mc.getWindow().getGuiScaledHeight() - 166) / 2 + 150;
             pointAt(mc, x, y);
         }));
         s.add(new Step(t += 12, () -> { shoot(mc, "booth-broken-item"); if (mc.player != null) mc.player.closeContainer(); }));
+        // The ring's screen, opened as a use of the ring opens it.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            var place = com.chunkworks.vanillawheels.Keyring.ringOf(sp);
+            verdict("the three keys went on one ring", () -> place != null && com.chunkworks.vanillawheels.Keyring.keys(place.stack()).size() == 3 ? null : "ring " + place);
+            com.chunkworks.vanillawheels.KeyringItem.open(sp);
+        })));
+        s.add(new Step(t += 20, () -> {
+            shoot(mc, "booth-keyring");
+            verdict("the ring's screen opens with a row a vehicle", () -> mc.screen instanceof com.chunkworks.vanillawheels.client.keyring.KeyringScreen
+                    && mc.player != null && mc.player.containerMenu instanceof com.chunkworks.vanillawheels.keyring.KeyringMenu menu
+                    && menu.shown().rows().size() == 3 ? null : "screen " + mc.screen + " rows " + (mc.player == null ? "?" : mc.player.containerMenu));
+            if (mc.player != null && mc.player.containerMenu instanceof com.chunkworks.vanillawheels.keyring.KeyringMenu menu) {
+                for (var row : menu.shown().rows()) LOG.info("booth: ring row {} kind {} about {} share {}", row.name().getString(), row.kind(), row.about(), row.share());
+            }
+            if (mc.player != null) mc.player.closeContainer();
+        }));
         // Docking (D-0040): the built car gone, a fresh one left askew on the deck's front corner with nobody
         // aboard; the lift takes it -- the deck up, the car sliding and turning -- and sets it down on its
         // spot, backed up to the wall, facing the front.
@@ -796,12 +823,16 @@ public final class PhotoBooth {
             shoot(mc, "booth-repair");
             int row = hudSteel(mc, 0);
             verdict("and the crosshair on it shows its wrench row", () -> row > 300 ? null : "steel pixels " + row);
-            // Its key (D-0026): a blank paired at the car, held; a second blank beside it for the grey band.
+            // Its key (D-0026, D-0041): a blank paired at the car goes onto the ring, and the ring is held.
             onServer(mc, sp -> {
                 if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
                     sp.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModContent.KEY_FOB.get()));
                     car.interactAt(sp, Vec3.ZERO, InteractionHand.MAIN_HAND);
-                    sp.getInventory().setItem(1, new ItemStack(ModContent.KEY_FOB.get()));
+                    var place = com.chunkworks.vanillawheels.Keyring.ringOf(sp);
+                    if (place != null && com.chunkworks.carried.api.Carried.INVENTORY.equals(place.store()) && place.cell() != sp.getInventory().selected) {
+                        ItemStack ring = sp.getInventory().removeItem(place.cell(), 1);
+                        sp.setItemInHand(InteractionHand.MAIN_HAND, ring);
+                    }
                     sp.containerMenu.broadcastChanges();
                 }
             });
@@ -810,9 +841,11 @@ public final class PhotoBooth {
             int condition = clientCondition(mc, carId);
             verdict("the client shows the repair within twelve ticks", () -> condition == 7_250 ? null : "condition " + condition + " (" + seen[0] + " at four ticks)");
             ItemStack held = mc.player == null ? ItemStack.EMPTY : mc.player.getMainHandItem();
+            ItemStack key = com.chunkworks.vanillawheels.Keyring.keys(held).isEmpty() ? ItemStack.EMPTY : com.chunkworks.vanillawheels.Keyring.keys(held).getLast();
             shoot(mc, "booth-key-held");
-            verdict("the paired key is named for its car", () -> held.getHoverName().getString().startsWith("Key to") ? null : "named " + held.getHoverName().getString());
-            verdict("and banded in its paint", () -> held.has(ModContent.KEY_COLOUR.get()) ? null : "no band colour on " + held);
+            verdict("the ring is in hand with the paired key on it, named for its car", () -> com.chunkworks.vanillawheels.Keyring.isRing(held)
+                    && key.getHoverName().getString().startsWith("Key to") ? null : "held " + held + " key " + key.getHoverName().getString());
+            verdict("and banded in its paint", () -> key.has(ModContent.KEY_COLOUR.get()) ? null : "no band colour on " + key);
             onServer(mc, sp -> {
                 if (sp.serverLevel().getEntity(carId) instanceof Vehicle car) {
                     sp.attack(car);

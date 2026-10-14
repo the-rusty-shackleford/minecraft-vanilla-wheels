@@ -61,6 +61,7 @@ public final class VanillaWheelsClient {
     @SubscribeEvent
     public static void onScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
         event.register(ModContent.LIFT_MENU.get(), com.chunkworks.vanillawheels.client.lift.LiftScreen::new);
+        event.register(ModContent.KEYRING_MENU.get(), com.chunkworks.vanillawheels.client.keyring.KeyringScreen::new);
     }
 
     @SubscribeEvent

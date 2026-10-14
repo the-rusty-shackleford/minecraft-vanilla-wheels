@@ -52,6 +52,7 @@ public final class VanillaWheelsMod {
         NeoForge.EVENT_BUS.addListener(RecoveryData::onEntityTick);
         NeoForge.EVENT_BUS.addListener(RecoveryData::onTick);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onEntityJoin);
+        NeoForge.EVENT_BUS.addListener(KeyFobs::onToss);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onDeath);
         NeoForge.EVENT_BUS.addListener(KeyFobs::onLoggedIn);
         NeoForge.EVENT_BUS.addListener(Crew::onLoggedIn);

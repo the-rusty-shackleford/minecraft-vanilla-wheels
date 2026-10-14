@@ -33,6 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * instead. And a rider holding Shift is not drawn crouching: the crouch would drop the eye and with
  * it the seat, which hangs from the eye. Rotorcraft had this for its aircraft (its D-0001); it moved
  * here when a second protocol needed it.
+
  */
 @Mixin(Player.class)
 public abstract class PlayerMixin {

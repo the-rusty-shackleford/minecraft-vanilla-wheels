@@ -6,7 +6,7 @@
     {"from": "../minecraft-trailblazer/run/booth/screenshots/booth-dash.png", "to": "img/dash.webp"},
     {"from": "../minecraft-trailblazer/run/booth/screenshots/booth-night-lamps-front.png", "to": "img/headlights.webp"},
     {"from": "run/booth/screenshots/booth-wrenches-hurt-a.png", "to": "img/condition.webp", "crop": [360, 568, 920, 720], "screen": true},
-    {"from": "run/booth/screenshots/booth-key-fob.png", "to": "img/key.webp", "crop": [446, 515, 1280, 712], "screen": true},
+    {"from": "run/booth/screenshots/booth-keyring.png", "to": "img/keyring.webp", "crop": [156, 41, 1124, 679], "screen": true},
     {"from": "run/booth/screenshots/booth-lift-raised.png", "to": "img/lift.webp"},
     {"from": "run/booth/screenshots/booth-lift-repair-ready.png", "to": "img/lift-menu.webp", "crop": [198, 84, 1078, 442], "screen": true},
     {"from": "run/booth/screenshots/booth-lift-docked.png", "to": "img/lift-docked.webp"},

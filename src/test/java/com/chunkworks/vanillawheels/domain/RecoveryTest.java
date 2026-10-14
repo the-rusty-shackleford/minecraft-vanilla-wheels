@@ -44,6 +44,37 @@ class RecoveryTest {
         assertEquals(12, new Condition(0).repairCost(12));
     }
 
+    @Test void theShareOfATankGrowsWithTheSquareOfTheDistanceAndAnotherDimensionPaysItAll() {
+        assertEquals(0.01, RecallCost.share(0, true), 1e-12, "the floor");
+        assertEquals(0.01, RecallCost.share(250, true), 1e-12, "a twentieth of a twentieth, floored");
+        assertEquals(0.05, RecallCost.share(1000, true), 1e-12);
+        assertEquals(0.2, RecallCost.share(2000, true), 1e-12);
+        assertEquals(0.8, RecallCost.share(4000, true), 1e-12);
+        assertEquals(1.0, RecallCost.share(4473, true), 1e-3, "the cap");
+        assertEquals(1.0, RecallCost.share(30_000_000, true), 1e-12);
+        assertEquals(1.0, RecallCost.share(10, false), 1e-12, "another dimension, however near");
+        assertThrows(IllegalArgumentException.class, () -> RecallCost.share(-1, true));
+        assertThrows(IllegalArgumentException.class, () -> RecallCost.share(Double.POSITIVE_INFINITY, true));
+    }
+
+    @Test void whereaboutsSayHowFarToTwoFiguresAndWhetherARecallMayBeAsked() {
+        var near = new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 7.4);
+        assertEquals(7, near.about());
+        assertEquals(87, new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 87.2).about());
+        assertEquals(100, new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 99.6).about(), "rounds up across a hundred");
+        assertEquals(1200, new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 1234).about());
+        assertEquals(4500, new Whereabouts(Whereabouts.Kind.ON_THE_GROUND, true, 4473).about());
+        assertEquals(12_000, new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 12_345).about());
+        assertEquals(0, new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 0).about());
+        assertTrue(near.recallable());
+        assertTrue(new Whereabouts(Whereabouts.Kind.ON_THE_GROUND, true, 10).recallable(), "a packed wreck on the ground comes back");
+        assertFalse(new Whereabouts(Whereabouts.Kind.COLLECTED, true, 0).recallable(), "one in a hand does not");
+        assertEquals(0.2, new Whereabouts(Whereabouts.Kind.DEPLOYED, true, 2000).share(), 1e-12);
+        assertEquals(1.0, new Whereabouts(Whereabouts.Kind.DEPLOYED, false, 2000).share(), 1e-12);
+        assertThrows(IllegalArgumentException.class, () -> new Whereabouts(null, true, 1));
+        assertThrows(IllegalArgumentException.class, () -> new Whereabouts(Whereabouts.Kind.DEPLOYED, true, -1));
+    }
+
     @Test void invalidValuesCannotEnterTheDomain() {
         assertThrows(IllegalArgumentException.class, () -> new Condition(-1));
         assertThrows(IllegalArgumentException.class, () -> new Condition(10001));

@@ -21,11 +21,15 @@ somewhere safe, never in the air where their seat was (see [Driving](#driving)).
 re-runs a driver's reported move at the heading the client made it at (D-0039): a turning Huey's hull
 was tested a tick behind and the move refused, "moved wrongly". Network 8.
 
-**1.17.0** (built, unreleased; D-0040): the Mechanic Lift **docks** a vehicle left standing on its deck
--- the deck rises, the vehicle slides to its spot, backed up to the lift's new back wall, centred and
-facing the front, and is held there until its driver's throttle lets it go -- so a garage of lifts is a
-row of cars parked alike (see [Docking](#docking-a-vehicle-1170)). The lift has a back wall between
-its back posts; a lift from before grows one when it loads. Network 8, unchanged.
+**1.17.0** (built, unreleased; D-0040, D-0041): the Mechanic Lift **docks** a vehicle left standing on
+its deck -- the deck rises, the vehicle slides to its spot, backed up to the lift's new back wall,
+centred and facing the front, and is held there until its driver's throttle lets it go -- so a garage
+of lifts is a row of cars parked alike (see [Docking](#docking-a-vehicle-1170)). The lift has a back
+wall between its back posts; a lift from before grows one when it loads. And every key lives on a
+**keyring** that cannot be lost: pairing a vehicle puts the key on it, keys from before move onto it
+at login, and using the ring opens a screen that says where each vehicle is, what a recall costs, and
+recalls one on a Confirm (see [Keys](#damage-repairs-and-recovery-keys-180)). Network 9: the ring's
+screen has a message of its own.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
@@ -367,26 +371,40 @@ up to whole ingots; repair restores full condition without changing fuel or carg
 Full repairs cost 20 steel for Trailblazer, 18 iron for Farmer's Pickup and 12 steel
 for Trailer. Creative repairs require and consume no materials.
 
-Craft a Vehicle Key Fob from two iron ingots, redstone and an ender pearl. Use a blank one
-on a motor vehicle to pair it: one key per vehicle, as many vehicles as you like (D-0026; before
-1.10.0 a player had one pairing, and a second replaced the first). A key is named for its
-vehicle ("Key to Hauler") and banded in its paint; a blank key's band is grey. Click the vehicle
-with its own key to refresh the mark after a rename or a repaint; recall refreshes it too. A key
-at another vehicle is refused. A blank used on a vehicle you already hold the key to issues a
-new key, and the old one stops working and becomes an ordinary item.
+Craft a Vehicle Key Fob from two iron ingots, redstone and an ender pearl. Use the blank on a
+motor vehicle to pair it: one key per vehicle, as many vehicles as you like (D-0026; before
+1.10.0 a player had one pairing, and a second replaced the first). The blank is used up and the
+key goes on your **keyring** (1.17.0, D-0041, `Keyring`): one ring a player, made by itself with
+the first key, never crafted. A key is named for its vehicle ("Key to Hauler") and banded in its
+paint. Click the vehicle with the ring (or, from before the ring, its loose key) to refresh the
+mark after a rename or a repaint; recall refreshes it too. The ring at a vehicle it has no key to
+says so and pairs nothing: pairing is the blank's job. A blank used on a vehicle you already hold
+the key to issues a new key, and the old one leaves the ring and stops working. A paired key still
+loose from before 1.17.0 -- in an inventory, a bag, or waiting to come home -- joins the ring at
+the owner's next login, or when used.
 
-**A paired key is never lost.** It lives on you: your inventory, or a bag you carry. Tossed,
-dropped at a death, put in a chest (or an ender chest, a frame, a pot), dropped inside a bag or a
-shulker box, or found on anyone else, it comes straight back to you -- at your respawn if you
-died, at your login if you were away, and within a second of making room if your inventory and
-bags were full. Only a `/clear` or the creative inventory's bin can take one; for that, use a
-blank key in the air: it becomes the first of your keys that is neither on you nor on its way
-back, marked, and the lost one stops working.
+**The ring is never lost.** It lives in your inventory proper: bags, bundles and shulker boxes
+refuse it. The drop key does nothing to it (`ServerPlayerMixin` and `LocalPlayerMixin`, and
+`ItemTossEvent` for a throw out of a screen); put in a chest (or an ender chest, a frame, a pot) or
+in a stranger's inventory, it comes straight back to you; at a death it is
+lifted off you before anything drops and is back in your inventory at your respawn, with or
+without keepInventory; if you were away it comes at your login, and if you had no room, within a
+second of making some. Only a `/clear` or the creative inventory's bin can take it; for that, use
+a blank key in the air: it re-issues the first of your keys that is neither on you nor on its way
+back, onto a fresh ring, and the lost one stops working. A loose live key from before is kept the
+same way.
 
-Hold use with the paired fob to locate the vehicle and preview its cost. Continue
-holding for one second to bring it and its currently hitched trailer into inventory,
-preserving all cargo and damage. Release to cancel. Passengers, animals, open vehicle
-chests or insufficient inventory space prevent recall and charge nothing.
+**Use the ring to open it.** A row a vehicle: its paint and name, where it is as the index last
+knew it -- about how many blocks away and whether in your dimension, packed on the ground, or
+packed and in someone's hands -- and the share of its tank a recall from there costs
+(`domain/Whereabouts`, `RecallCost.share`). **Recall** on a row has the server find the vehicle
+(a temporary chunk ticket) and put the exact quote in the row, fuel and any condition lost if the
+tank is short; **Confirm** brings the vehicle and its hitched trailer into your inventory as
+packed items, cargo and damage kept; **Cancel**, closing the screen, or a changed quote (you
+moved) starts over, and nothing is charged until Confirm. Passengers, animals, open vehicle
+chests or insufficient inventory space refuse the recall in the row and charge nothing. The rows
+come down in one payload (`KeyringRows`) whenever they change; the buttons are the menu's own
+button clicks, so nothing of the ring is trusted from the client.
 
 | Distance | Fuel bill, as a fraction of a full tank |
 |---|---|
@@ -697,11 +715,12 @@ in `devtools/art/sounds/SOURCES.md`. These changes leave driving physics unchang
 steering by the bicycle rule, grip, drift), `Suspension`, `Terrain` (the drawn pose),
 `CrossSection` (what of a block the vehicle footprint meets), `Impact`, `Tank`, `Tow` (the
 trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
-`LiftMotion`, `LiftStatus`, `Docking` (D-0040) and `Assembly`, `Paint`, and the mesh library (`Obj`,
+`LiftMotion`, `LiftStatus`, `Docking` (D-0040) and `Assembly`, `Paint`, `RecallCost` and `Whereabouts` (D-0041), and the mesh library (`Obj`,
 `BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
 `WheelSpin`, `BodyPose`, `BakedMesh`).
 `src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`, `CargoRules`, `VehicleKinds`), the `Vehicle` entity
-and its parts, `Crew` (a rider's vehicle and seat kept in their save, and what logging back in does, D-0038), `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `mixin/PlayerMixin` (D-0031), `lift` (the two blocks, the
+and its parts, `Keyring` and `KeyringItem` with `keyring/KeyringMenu` and `client/keyring/KeyringScreen` (D-0041), `KeyFobs`
+(never lost) and `RecoveryData` (the pairings and recalls), `Crew` (a rider's vehicle and seat kept in their save, and what logging back in does, D-0038), `ShapeBoxes` (collision shapes' boxes, unpacked once for the footprint), the items, `net/Payloads`, `WheelsConfig`, `mixin/PlayerMixin` (D-0031), `lift` (the two blocks, the
 block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary`,
 `Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
 the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,
@@ -745,9 +764,12 @@ wall too) and hitches again when the car backs onto it; a lead loads a cow and t
 more, shut doors refuse, a lead click with no led animal near says so, the door click shuts them in and a lead at the open door unloads
 them behind; the tow link survives a save; six punches in a row pack a car as it is and a
 pause starts the count again, a rider or another player's key stops them, a damaged car
-repairs a step a click for hunger and then seats; a key per car is named for it, refused at
-another car, and comes back from a toss, a chest, a dropped bag, a stranger, a death and a
-logout. The footprint's course (`FootprintGameTests`) drives the Trailblazer-bodied box truck,
+repairs a step a click for hunger and then seats; pairing makes the keyring and puts a key per
+car on it, named for it; the ring refreshes its own key's mark and pairs nothing; the drop key
+does nothing to it and it comes back from a throw, a chest, a stranger, a frame, a dropped bag
+and a death, one ring; a loose key joins it at login; a blank in the air is refused while every
+key is on it and re-issues one after a clear; its rows say where each vehicle is, Recall waits
+for Confirm, Cancel charges nothing and Confirm packs the vehicle. The footprint's course (`FootprintGameTests`) drives the Trailblazer-bodied box truck,
 climb 1, both at speed and creeping from a standstill: up a flight of stairs and a flight whose
 top step is the landing, up half slabs, down stairs and under a lintel; its nose stops at a
 riser two high, a fence line's post, a wall's post and a fence corner's cell, and each stop is

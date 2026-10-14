@@ -41,13 +41,13 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 /**
- * Draws a whole Mechanic Lift from its controller: a cube per deck cell and
- * a slim column per post cell on a steel-plate texture, a hazard band along
- * the deck's outer edge, the lot raised
- * by the block entity's {@code raise} while a job runs. The blocks
- * themselves are invisible; this is all anyone sees of the lift. Light is
- * sampled above the controller, since the controller sits inside a solid
- * cell of its own.
+ * Draws a whole Mechanic Lift from its controller: a cube per deck cell, a
+ * slim column per post cell and the back wall's bar between the back posts
+ * ({@link Footprint#bars}) on a steel-plate texture, a hazard band along
+ * the deck's outer edge, the lot raised by the block entity's {@code raise}
+ * while a job runs. The blocks themselves are invisible; this is all anyone
+ * sees of the lift. Light is sampled above the controller, since the
+ * controller sits inside a solid cell of its own.
  */
 public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> {
     private static final ResourceLocation TEXTURE = VanillaWheels.id("textures/block/mechanic_lift.png");
@@ -55,8 +55,6 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
     private static final ResourceLocation STRIPE_TEXTURE = VanillaWheels.id("textures/block/mechanic_lift_stripe.png");
     /** The hazard band's width across the deck's edge, blocks. */
     private static final float BAND = 2.0f / 16.0f;
-    private static final float POST_MIN = 5.0f / 16.0f;
-    private static final float POST_MAX = 11.0f / 16.0f;
 
     public LiftRenderer(BlockEntityRendererProvider.Context context) {}
 
@@ -78,17 +76,23 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
         for (Cell c : Footprint.cells()) {
             if (c.isDeck()) {
                 int[] o = h.offset(c);
-                top(pose, deck, o[0], o[1], o[2], 0.0f, 1.0f, light);
+                top(pose, deck, o[0], o[1], o[2], 0.0f, 1.0f, 0.0f, 1.0f, light);
             }
         }
         VertexConsumer plate = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
         for (Cell c : Footprint.cells()) {
             int[] o = h.offset(c);
             if (c.isDeck()) {
-                sides(pose, plate, o[0], o[1], o[2], 0.0f, 1.0f, light);
+                sides(pose, plate, o[0], o[1], o[2], 0.0f, 1.0f, 0.0f, 1.0f, light);
             } else {
-                top(pose, plate, o[0], o[1], o[2], POST_MIN, POST_MAX, light);
-                sides(pose, plate, o[0], o[1], o[2], POST_MIN, POST_MAX, light);
+                for (double[] bar : Footprint.bars(c)) {
+                    double[] a = h.local(bar[0], bar[2]);
+                    double[] b = h.local(bar[1], bar[3]);
+                    float x0 = (float) Math.min(a[0], b[0]), x1 = (float) Math.max(a[0], b[0]);
+                    float z0 = (float) Math.min(a[1], b[1]), z1 = (float) Math.max(a[1], b[1]);
+                    top(pose, plate, o[0], o[1], o[2], x0, x1, z0, z1, light);
+                    sides(pose, plate, o[0], o[1], o[2], x0, x1, z0, z1, light);
+                }
             }
         }
         // The hazard band: along every deck edge with no deck cell beyond it, a hair above the plate.
@@ -127,15 +131,15 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
         return ((long) x << 32) ^ (z & 0xFFFFFFFFL);
     }
 
-    /** The top face of a cube at cell (x, y, z) spanning {@code min}..{@code max} across. */
-    private static void top(PoseStack pose, VertexConsumer out, int x, int y, int z, float min, float max, int light) {
-        float x0 = x + min, x1 = x + max, z0 = z + min, z1 = z + max, y1 = y + 1;
+    /** The top face of a box at cell (x, y, z) spanning {@code xMin}..{@code xMax} and {@code zMin}..{@code zMax} of the cell. */
+    private static void top(PoseStack pose, VertexConsumer out, int x, int y, int z, float xMin, float xMax, float zMin, float zMax, int light) {
+        float x0 = x + xMin, x1 = x + xMax, z0 = z + zMin, z1 = z + zMax, y1 = y + 1;
         quad(pose, out, x0, y1, z1, x1, y1, z1, x1, y1, z0, x0, y1, z0, 0, 1, 0, light);
     }
 
-    /** The bottom and the four sides of a cube at cell (x, y, z) spanning {@code min}..{@code max} across, full height. */
-    private static void sides(PoseStack pose, VertexConsumer out, int x, int y, int z, float min, float max, int light) {
-        float x0 = x + min, x1 = x + max, z0 = z + min, z1 = z + max, y0 = y, y1 = y + 1;
+    /** The bottom and the four sides of a box at cell (x, y, z) spanning {@code xMin}..{@code xMax} and {@code zMin}..{@code zMax} of the cell, full height. */
+    private static void sides(PoseStack pose, VertexConsumer out, int x, int y, int z, float xMin, float xMax, float zMin, float zMax, int light) {
+        float x0 = x + xMin, x1 = x + xMax, z0 = z + zMin, z1 = z + zMax, y0 = y, y1 = y + 1;
         quad(pose, out, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, 0, -1, 0, light);
         // north (-z), south (+z)
         quad(pose, out, x0, y1, z0, x1, y1, z0, x1, y0, z0, x0, y0, z0, 0, 0, -1, light);

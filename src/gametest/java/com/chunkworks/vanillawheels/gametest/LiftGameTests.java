@@ -19,8 +19,11 @@ package com.chunkworks.vanillawheels.gametest;
 
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
+import com.chunkworks.vanillawheels.api.VanillaWheels;
+import com.chunkworks.vanillawheels.domain.Docking;
 import com.chunkworks.vanillawheels.domain.Footprint;
 import com.chunkworks.vanillawheels.domain.Footprint.Cell;
+import com.chunkworks.vanillawheels.domain.Input;
 import com.chunkworks.vanillawheels.domain.LiftMotion;
 import com.chunkworks.vanillawheels.domain.LiftStatus;
 import com.chunkworks.vanillawheels.lift.LiftBlockEntity;
@@ -34,6 +37,7 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
@@ -78,8 +82,17 @@ public final class LiftGameTests {
     private static final int SIZE = 15;
     private static final int FLOOR = 2;
     private static final ResourceLocation BOX_CAR = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_car");
+    private static final ResourceLocation BOX_TRAILER = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_trailer");
+    /** The box car's body stretched to eight blocks: longer than any lift takes. */
+    private static final ResourceLocation BOX_LONG = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_long");
     /** The controller's cell for a lift facing north: the deck runs south from it, centred in the arena. */
     private static final BlockPos CONTROLLER = new BlockPos(7, FLOOR, 3);
+    /** A second lift's controller, facing east: its deck runs west from it along the arena's south side. */
+    private static final BlockPos EAST_CONTROLLER = new BlockPos(13, FLOOR, 11);
+    /** The deck's top, where a vehicle's feet stand. */
+    private static final double DECK = FLOOR + 1;
+    private static final Input STICK_RIGHT = new Input(0, 1, false, true, true);
+    private static final Input GAS = new Input(1, 0, false, true, true);
 
     public LiftGameTests() {}
 
@@ -148,6 +161,28 @@ public final class LiftGameTests {
         helper.assertTrue(r.consumesAction(), "the click opened something: " + r);
         helper.assertTrue(sp.containerMenu instanceof LiftMenu, "the lift's menu: " + sp.containerMenu);
         return (LiftMenu) sp.containerMenu;
+    }
+
+    private static double bodyLength(GameTestHelper helper, ResourceLocation id) {
+        return VanillaWheels.profile(helper.getLevel().registryAccess(), id).orElseThrow().value().body().length();
+    }
+
+    /** effects: stands a fuelled box car on {@code lift}'s spot, docked as Build leaves one, and returns it */
+    private static Vehicle parked(GameTestHelper helper, LiftBlockEntity lift) {
+        Vehicle car = Vehicle.create(helper.getLevel(), BOX_CAR, lift.spot(bodyLength(helper, BOX_CAR)), lift.heading().yaw());
+        car.setFuel(car.tank().capacity());
+        car.dock(lift, false);
+        helper.getLevel().addFreshEntity(car);
+        return car;
+    }
+
+    /** effects: stands a fuelled, free {@code id} at {@code at} in the arena facing {@code yaw}, and returns it */
+    private static Vehicle stand(GameTestHelper helper, ResourceLocation id, Vec3 at, float yaw) {
+        Vehicle v = Vehicle.create(helper.getLevel(), id, helper.absoluteVec(at), yaw);
+        helper.assertTrue(v != null, id + " is registered");
+        v.setFuel(v.tank().capacity());
+        helper.getLevel().addFreshEntity(v);
+        return v;
     }
 
     private static void load(LiftMenu menu, int chassis, int wheels, int engine, int dye) {
@@ -269,8 +304,7 @@ public final class LiftGameTests {
         LiftMenu menu = open(helper, sp, CONTROLLER);
         menu.broadcastChanges();
         helper.assertTrue(!menu.repairVisible() && !menu.getSlot(LiftMenu.REPAIR).isActive(), "no repair section on an empty deck");
-        Vehicle car = Vehicle.create(helper.getLevel(), BOX_CAR, lift.spawn(), 180);
-        helper.getLevel().addFreshEntity(car);
+        Vehicle car = parked(helper, lift);
         car.setFuel(1234); car.setItem(0, new ItemStack(Items.DIAMOND, 7));
         menu.broadcastChanges();
         helper.assertTrue(!menu.repairVisible(), "healthy vehicle hides repair section");
@@ -311,8 +345,8 @@ public final class LiftGameTests {
         ServerPlayer sp = player(helper, GameType.CREATIVE);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "lift placed");
         LiftBlockEntity lift = lift(helper, CONTROLLER);
-        Vehicle car = Vehicle.create(helper.getLevel(), BOX_CAR, lift.spawn(), 180);
-        car.setCondition(0); helper.getLevel().addFreshEntity(car);
+        Vehicle car = parked(helper, lift);
+        car.setCondition(0);
         LiftMenu menu = open(helper, sp, CONTROLLER); menu.broadcastChanges();
         helper.assertTrue(menu.getSlot(LiftMenu.REPAIR).getItem().isEmpty(), "no repair material supplied");
         helper.assertTrue(menu.repairReady() && menu.clickMenuButton(sp, LiftMenu.REPAIR_BUTTON), "creative repairs without material");
@@ -367,7 +401,10 @@ public final class LiftGameTests {
         Vehicle car = cars.get(0);
         helper.assertValueEqual(car.profileId(), BOX_CAR, "the chassis' vehicle");
         helper.assertValueEqual(car.getYRot(), Footprint.Heading.NORTH.yaw(), "facing the front");
-        helper.assertTrue(car.position().distanceTo(lift.spawn()) < 0.01, "on the deck's centre: " + car.position() + " vs " + lift.spawn());
+        Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
+        helper.assertTrue(car.position().distanceTo(spot) < 0.01, "on its spot, backed up to the wall: " + car.position() + " vs " + spot);
+        helper.assertTrue(car.docked(), "born docked");
+        helper.assertValueEqual(lift.dockedVehicle(), car, "the lift's vehicle");
         helper.assertTrue(menu.getSlot(LiftMenu.CHASSIS).getItem().isEmpty(), "the chassis was used");
         helper.assertTrue(menu.getSlot(LiftMenu.WHEELS).getItem().isEmpty(), "all four wheels were used");
         helper.assertTrue(menu.getSlot(LiftMenu.ENGINE).getItem().isEmpty(), "the engine was used");
@@ -427,8 +464,7 @@ public final class LiftGameTests {
         menu.broadcastChanges();
         helper.assertValueEqual(menu.paintStatus(), LiftStatus.Paint.NO_VEHICLE, "a car beside the deck is not on it");
         helper.assertTrue(!menu.clickMenuButton(sp, LiftMenu.PAINT_BUTTON), "refused");
-        Vehicle car = Vehicle.create(helper.getLevel(), BOX_CAR, lift.spawn(), Footprint.Heading.NORTH.yaw());
-        helper.getLevel().addFreshEntity(car);
+        Vehicle car = parked(helper, lift);
         load(menu, 0, 0, 0, 0);
         helper.assertValueEqual(menu.paintStatus(), LiftStatus.Paint.NO_DYE, "a car but no dye");
         load(menu, 0, 0, 0, 2);
@@ -446,6 +482,252 @@ public final class LiftGameTests {
         helper.runAtTickTime(LiftMotion.JOB + 2, () -> {
             helper.assertTrue(!lift.busy(), "the job ended");
             helper.assertValueEqual(lift.raise(0.0f), 0.0, "the deck is down");
+            helper.succeed();
+        });
+    }
+
+    // --- docking (D-0040) ---------------------------------------------------
+
+    @GameTest(template = "arena", timeoutTicks = 120)
+    public void aVehicleLeftStandingOnTheDeckIsTakenToItsSpotFacingTheFront(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        // Off centre, askew, nobody aboard: the deck runs z 3..9, x 5..10.
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(6.3, DECK, 4.6), 135.0f);
+        Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
+        Vec3 start = car.position();
+        helper.assertTrue(start.distanceTo(spot) > 1.0, "it starts well off the spot");
+        helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TAKING, "about to be taken");
+        helper.runAtTickTime(Docking.REST - 2, () -> helper.assertTrue(!car.docked() && !lift.busy(), "not before it has stood still for REST ticks"));
+        int taken = Docking.REST + 2;
+        helper.runAtTickTime(taken, () -> {
+            helper.assertTrue(car.docked(), "the lift has taken it");
+            helper.assertTrue(lift.busy(), "the rams run");
+            helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TAKING, "taking");
+            helper.assertTrue(car.position().distanceTo(start) < 0.01, "still where it stood through the rise");
+        });
+        helper.runAtTickTime(taken + LiftMotion.UP + LiftMotion.HOLD / 2, () -> {
+            helper.assertTrue(lift.raise(0.0f) > LiftMotion.LIFT * 0.9, "the deck is up while it slides: " + lift.raise(0.0f));
+            double gone = car.position().distanceTo(start), left = car.position().distanceTo(spot);
+            helper.assertTrue(gone > 0.1 && left > 0.1, "half way through the hold it is between: gone " + gone + ", left " + left);
+            helper.assertValueEqual(car.getY(), spot.y, "on the deck's top throughout");
+            // The drawn suspension carries the deck's raise while the job runs; the body's own lift is what is left.
+            var s = car.suspension(1.0f);
+            double own = s.lift() - car.deckRaise(1.0f);
+            helper.assertTrue(Math.abs(own) < 0.3 && Math.abs(s.pitch()) < 0.1 && Math.abs(s.roll()) < 0.1,
+                    "posed level on the deck as it slides: lift " + own + " pitch " + s.pitch() + " roll " + s.roll());
+        });
+        helper.runAtTickTime(taken + LiftMotion.JOB + 2, () -> {
+            helper.assertTrue(!lift.busy(), "the job ended");
+            helper.assertTrue(car.position().distanceTo(spot) < 0.01, "on its spot: " + car.position() + " vs " + spot);
+            helper.assertValueEqual(car.getYRot(), Footprint.Heading.NORTH.yaw(), "facing the front");
+            helper.assertTrue(car.docked(), "and held");
+            helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.DOCKED, "docked");
+            helper.assertValueEqual(lift.dockedVehicle(), car, "the lift's vehicle");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 120)
+    public void aVehicleBackedInIsTurnedToFaceTheFrontOnALiftFacingEast(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, EAST_CONTROLLER, Direction.EAST).consumesAction(), "placed facing east");
+        LiftBlockEntity lift = lift(helper, EAST_CONTROLLER);
+        // The deck runs west from the controller: x 8..14, z 9..14. The front looks east (yaw -90); backed in looks west.
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(10.4, DECK, 11.9), 90.0f);
+        Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
+        helper.runAtTickTime(Docking.REST + 2 + LiftMotion.JOB + 2, () -> {
+            helper.assertTrue(car.docked(), "taken");
+            helper.assertTrue(car.position().distanceTo(spot) < 0.01, "on its spot: " + car.position() + " vs " + spot);
+            helper.assertValueEqual(car.getYRot(), Footprint.Heading.EAST.yaw(), "spun half a turn to face the front");
+            // Backed up to the wall: the tail GAP off the wall's face, which is BAR_MIN into the deck's last cell to the west.
+            double wall = helper.absolutePos(EAST_CONTROLLER).getX() + 1 - Footprint.WALL_FACE;
+            helper.assertValueEqual(Math.round((car.getX() - bodyLength(helper, BOX_CAR) / 2 - wall) * 1000) / 1000.0, Docking.GAP, "its tail a gap off the wall");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public void aDriverAboardKeepsTheLiftWaitingUntilTheyStepOut(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(6.5, DECK, 5.5), 180.0f);
+        ServerPlayer driver = player(helper, GameType.SURVIVAL);
+        // Three ticks on the deck first, so the server has stood it on the ground as a drive onto the deck would.
+        helper.runAtTickTime(3, () -> {
+            helper.assertTrue(car.onGround(), "stood on the deck");
+            helper.assertTrue(driver.startRiding(car, true), "the driver boards");
+            helper.assertValueEqual(car.getControllingPassenger(), driver, "at the wheel");
+        });
+        helper.runAtTickTime(3 + Docking.REST + 5, () -> {
+            helper.assertTrue(!car.docked() && !lift.busy(), "not taken with a driver aboard");
+            helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.DRIVER, "step out");
+            driver.stopRiding();
+        });
+        helper.runAtTickTime(3 + Docking.REST + 5 + Docking.REST + 3, () -> {
+            helper.assertTrue(car.docked() && lift.busy(), "taken once they stepped out");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 120)
+    public void aHeldVehicleIgnoresTheStickAndTheThrottleLetsItGo(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle car = parked(helper, lift);
+        Vec3 spot = car.position();
+        car.setScriptedInput(STICK_RIGHT);
+        helper.runAtTickTime(20, () -> {
+            helper.assertTrue(car.docked(), "still docked with the stick held");
+            helper.assertTrue(car.position().distanceTo(spot) < 0.001, "not an inch: " + car.position());
+            helper.assertValueEqual(car.getYRot(), Footprint.Heading.NORTH.yaw(), "not a degree");
+            helper.assertTrue(!lift.busy(), "a parked car needs no job");
+            car.setScriptedInput(GAS);
+        });
+        helper.runAtTickTime(22, () -> helper.assertTrue(!car.docked(), "the throttle let it go"));
+        helper.runAtTickTime(60, () -> {
+            helper.assertTrue(car.getZ() < spot.z - 0.5, "driven off toward the front: " + car.position() + " from " + spot);
+            helper.assertTrue(!car.docked(), "and not taken back while it moves");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 120)
+    public void aSecondVehicleOnATakenDeckIsLeftAlone(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle car = parked(helper, lift);
+        // On the deck's front-left corner, clear of the docked car.
+        Vehicle other = stand(helper, BOX_CAR, new Vec3(5.9, DECK, 4.0), 90.0f);
+        Vec3 start = other.position();
+        helper.runAtTickTime(Docking.REST + LiftMotion.JOB + 5, () -> {
+            helper.assertTrue(!other.docked(), "the deck is the first car's");
+            helper.assertTrue(other.position().distanceTo(start) < 0.05, "left where it stood: " + other.position());
+            helper.assertValueEqual(other.getYRot(), 90.0f, "and as it stood");
+            helper.assertTrue(car.docked() && car.position().distanceTo(lift.spot(bodyLength(helper, BOX_CAR))) < 0.01, "the first car holds its spot");
+            helper.assertTrue(!lift.busy(), "no job ran");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public void aBodyTooLongForTheDeckIsNeverTaken(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        helper.assertTrue(bodyLength(helper, BOX_LONG) > Docking.LONGEST, "the long box is longer than the lift takes");
+        Vehicle bus = stand(helper, BOX_LONG, new Vec3(7.5, DECK, 6.0), 180.0f);
+        Vec3 start = bus.position();
+        helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TOO_BIG, "too big");
+        helper.runAtTickTime(Docking.REST + LiftMotion.JOB + 5, () -> {
+            helper.assertTrue(!bus.docked() && !lift.busy(), "never taken");
+            helper.assertTrue(bus.position().distanceTo(start) < 0.05, "left where it stood");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 160)
+    public void aTowingVehicleWaitsAndOneWhoseSpotIsBlockedWaitsAndBothAreTakenOnceFree(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        // The car near the front of the deck facing the front, the trailer hitched behind it, both on the deck.
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 4.0), 180.0f);
+        Vehicle trailer = stand(helper, BOX_TRAILER, new Vec3(7.5, DECK, 4.0 + 26 / 16.0 + 34 / 16.0 + 0.3), 180.0f);
+        car.hitch(trailer);
+        helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TOWING, "unhitch first");
+        helper.runAtTickTime(Docking.REST + 5, () -> {
+            helper.assertTrue(!car.docked() && !trailer.docked() && !lift.busy(), "neither is taken while hitched");
+            trailer.unhitch();
+        });
+        helper.runAtTickTime(Docking.REST + 5 + Docking.REST + 5, () -> {
+            // Unhitched, the trailer stands where the car's spot is: the car is blocked, and the trailer, standing
+            // where its own spot is not, is blocked by the car in turn; nothing moves.
+            helper.assertTrue(!car.docked() && !trailer.docked() && !lift.busy(), "nothing is taken while the other stands in the way");
+            helper.assertTrue(lift.dockStatus() == LiftStatus.Dock.BLOCKED, "blocked: " + lift.dockStatus());
+            trailer.discard();
+        });
+        helper.runAtTickTime(Docking.REST + 5 + Docking.REST + 5 + Docking.REST + 3 + LiftMotion.JOB, () -> {
+            helper.assertTrue(car.docked(), "the car is taken once the trailer is gone");
+            helper.assertTrue(car.position().distanceTo(lift.spot(bodyLength(helper, BOX_CAR))) < 0.01, "to its spot");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public void aTrailerAloneDocksLikeACar(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle trailer = stand(helper, BOX_TRAILER, new Vec3(6.8, DECK, 5.0), 160.0f);
+        helper.runAtTickTime(Docking.REST + 2 + LiftMotion.JOB + 2, () -> {
+            helper.assertTrue(trailer.docked(), "taken");
+            helper.assertTrue(trailer.position().distanceTo(lift.spot(bodyLength(helper, BOX_TRAILER))) < 0.01, "on its own spot, by its own length");
+            helper.assertValueEqual(trailer.getYRot(), Footprint.Heading.NORTH.yaw(), "facing the front");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void breakingTheLiftFreesTheDockedVehicleAndASaveKeepsItDocked(GameTestHelper helper) {
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle car = parked(helper, lift);
+        CompoundTag tag = new CompoundTag();
+        car.saveWithoutId(tag);
+        Vehicle again = Vehicle.create(helper.getLevel(), BOX_CAR, car.position(), 180.0f);
+        again.load(tag);
+        helper.assertTrue(again.docked(), "loaded docked");
+        helper.assertValueEqual(again.dockedAt(), helper.absolutePos(CONTROLLER), "on its lift");
+        helper.setBlock(CONTROLLER, Blocks.AIR);
+        helper.runAtTickTime(3, () -> {
+            helper.assertValueEqual(liftBlocks(helper), 0, "the lift is gone");
+            helper.assertTrue(!car.docked(), "the car is free");
+            helper.assertTrue(car.dockedAt() == null, "and belongs to no lift");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void aLiftFromBeforeTheWallGrowsOneOnLoadWhereItsCellsAreFree(GameTestHelper helper) {
+        layFloor(helper);
+        // Laid by commands as 1.16.0 placed it: the controller and parts 1..33, no wall. Stone stands in the wall's middle cell.
+        BlockPos stone = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(0, 1, 5));
+        helper.setBlock(stone, Blocks.STONE);
+        for (int i = 33; i >= 1; i--) {
+            helper.setBlock(LiftControllerBlock.at(CONTROLLER, Direction.NORTH, Footprint.cell(i)),
+                    ModContent.LIFT_PART.get().defaultBlockState().setValue(LiftPartBlock.FACING, Direction.NORTH).setValue(LiftPartBlock.INDEX, i));
+        }
+        helper.setBlock(CONTROLLER, ModContent.LIFT_CONTROLLER.get().defaultBlockState().setValue(LiftControllerBlock.FACING, Direction.NORTH));
+        helper.assertValueEqual(liftBlocks(helper), 34, "the old lift, whole");
+        helper.runAtTickTime(2, () -> {
+            for (int right : new int[] {-1, 1}) {
+                BlockPos at = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(right, 1, 5));
+                BlockState s = helper.getBlockState(at);
+                helper.assertTrue(s.is(ModContent.LIFT_PART.get()), "a wall cell grew at " + right + ": " + s);
+                helper.assertValueEqual(s.getValue(LiftPartBlock.INDEX), Footprint.indexOf(new Cell(right, 1, 5)), "with its index");
+                helper.assertValueEqual(s.getValue(LiftPartBlock.FACING), Direction.NORTH, "facing the lift's way");
+            }
+            helper.assertTrue(helper.getBlockState(stone).is(Blocks.STONE), "the stone is left to itself");
+            helper.assertValueEqual(liftBlocks(helper), 36, "two cells grew");
+            helper.setBlock(CONTROLLER, Blocks.AIR);
+        });
+        helper.runAtTickTime(4, () -> {
+            helper.assertValueEqual(liftBlocks(helper), 0, "the grown cells go with the lift");
             helper.succeed();
         });
     }

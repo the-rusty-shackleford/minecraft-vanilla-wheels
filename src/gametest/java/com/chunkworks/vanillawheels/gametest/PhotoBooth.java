@@ -119,6 +119,9 @@ public final class PhotoBooth {
     private static List<Step> steps;
     private static UUID car;
     private static BlockPos liftPos = BlockPos.ZERO;
+    /** The car left on the deck for the lift to take, and where it was left. */
+    private static int dockCar = -1;
+    private static Vec3 dockFrom = Vec3.ZERO;
     private static UUID trailerId;
     /** The box car the trailer is hitched to, repaired and punched up at the end of the wrench scene. */
     private static UUID carId;
@@ -565,6 +568,57 @@ public final class PhotoBooth {
             pointAt(mc, x, y);
         }));
         s.add(new Step(t += 12, () -> { shoot(mc, "booth-broken-item"); if (mc.player != null) mc.player.closeContainer(); }));
+        // Docking (D-0040): the built car gone, a fresh one left askew on the deck's front corner with nobody
+        // aboard; the lift takes it -- the deck up, the car sliding and turning -- and sets it down on its
+        // spot, backed up to the wall, facing the front.
+        s.add(new Step(t += 2, () -> onServer(mc, sp -> {
+            ServerLevel level = sp.serverLevel();
+            if (level.getBlockEntity(liftPos) instanceof LiftBlockEntity lift && lift.vehicleOnDeck() != null) {
+                lift.vehicleOnDeck().discard();
+            }
+            // The camera again, since the screens since the build turned the view: on the ground (the player
+            // is in survival now and would fall there anyway) a block and a half before the lift, looking a
+            // little down, so the whole deck, the back wall and the car fall in the frame's middle band.
+            double y = level.getMinBuildHeight() + 5;
+            sp.teleportTo(level, X, y - 1.0, Z - 1.5, 0.0f, 16.0f);
+            Vec3 at = new Vec3(liftPos.getX() - 1.2, liftPos.getY() + 1, liftPos.getZ() + 1.4);
+            Vehicle v = Vehicle.create(level, BOX_CAR, at, 135.0f);
+            if (v == null) {
+                LOG.error("booth: FAIL the box car is registered for docking");
+                return;
+            }
+            v.setFuel(v.tank().capacity());
+            level.addFreshEntity(v);
+            dockCar = v.getId();
+            dockFrom = at;
+        })));
+        s.add(new Step(t += com.chunkworks.vanillawheels.domain.Docking.REST + 2 + LiftMotion.UP + LiftMotion.HOLD / 2, () -> {
+            double up = mc.level != null && mc.level.getBlockEntity(liftPos) instanceof LiftBlockEntity lift ? lift.raise(0.0f) : -1.0;
+            shoot(mc, "booth-lift-docking");
+            verdict("the lift takes a car left on its deck: the deck is up while it slides", () -> up > LiftMotion.LIFT * 0.9 ? null : "raise " + up);
+            if (mc.level != null && mc.level.getEntity(dockCar) instanceof Vehicle v) {
+                var sus = v.suspension(0.0f);
+                LOG.info("booth: the client's car mid-glide at {} yaw {} lift {} pitch {} roll {} deckRaise {}", v.position(), v.getYRot(), sus.lift(), sus.pitch(), sus.roll(), v.deckRaise(0.0f));
+            }
+            onServer(mc, sp -> verdict("and the car is on its way", () -> sp.serverLevel().getEntity(dockCar) instanceof Vehicle v && v.docked()
+                    && v.position().distanceTo(dockFrom) > 0.1 ? null : "car " + sp.serverLevel().getEntity(dockCar)));
+        }));
+        s.add(new Step(t += LiftMotion.HOLD / 2 + LiftMotion.DOWN + 10, () -> {
+            int blue = count(mc, PhotoBooth::lightBlue);
+            shoot(mc, "booth-lift-docked");
+            verdict("the docked car is drawn on the deck", () -> blue > 300 ? null : "light-blue pixels " + blue);
+            onServer(mc, sp -> {
+                ServerLevel level = sp.serverLevel();
+                if (level.getEntity(dockCar) instanceof Vehicle v && level.getBlockEntity(liftPos) instanceof LiftBlockEntity lift) {
+                    Vec3 spot = lift.spot(v.profile().body().length());
+                    double off = v.position().distanceTo(spot);
+                    verdict("docked on its spot, backed up to the wall, facing the front", () -> v.docked() && off < 0.02
+                            && v.getYRot() == lift.heading().yaw() && !lift.busy() ? null : "docked " + v.docked() + " off " + off + " yaw " + v.getYRot());
+                } else {
+                    LOG.error("booth: FAIL the docking car and the lift are there -- {} {}", level.getEntity(dockCar), level.getBlockEntity(liftPos));
+                }
+            });
+        }));
         // The trailer: hitched behind a car off to the east, doors open, two cows aboard, seen from the side.
         s.add(new Step(t += 2, () -> onServer(mc, sp -> {
             sp.setGameMode(GameType.CREATIVE);

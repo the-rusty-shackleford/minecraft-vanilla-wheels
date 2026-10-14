@@ -29,6 +29,7 @@ import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.FuelDebt;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
+import com.chunkworks.vanillawheels.domain.LiftMotion;
 import com.chunkworks.vanillawheels.domain.RayBox;
 import com.chunkworks.vanillawheels.domain.Seats;
 import com.chunkworks.vanillawheels.domain.Rotation;
@@ -137,6 +138,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private static final EntityDataAccessor<Integer> DATA_OPEN = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     /** Who sits where (D-0038): {@link Seats#encode}'s form, the server's to change. */
     private static final EntityDataAccessor<String> DATA_SEATS = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.STRING);
+    /** Docked on a Mechanic Lift (D-0040): held at its spot until its driver's throttle lets it go. The server's to set; the driver's client clears its copy as it drives off. */
+    private static final EntityDataAccessor<Boolean> DATA_DOCKED = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.BOOLEAN);
     /** The seats as last decoded, and the text and profile they were decoded from. */
     @Nullable private Seats seats;
     @Nullable private String seatsText;
@@ -164,6 +167,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     private Drive drive = Drive.atRest(0.0);
     /** Whether the last tick stepped the drive here: the wheel was this instance's. */
     private boolean wasAtTheWheel;
+    /** The controller of the Mechanic Lift this is docked on (D-0040), server side; null when free. */
+    @Nullable private BlockPos dockedAt;
+    /** Ticks left of the lift's job that is taking this: the glide to the spot runs through its hold. Zero once held. */
+    private int dockTicks;
+    /** Where the glide started: the position and heading as the lift took this. */
+    private double dockFromX, dockFromZ, dockFromYaw;
+    /** The spot and heading this is held at, learned from the lift (NaN until it is, after a load). */
+    private double dockX = Double.NaN, dockY, dockZ;
+    private float dockYaw;
+    /** The watch on this body's stillness, for the lift under it to take it (server). */
+    private com.chunkworks.vanillawheels.domain.Docking.Rest rest = com.chunkworks.vanillawheels.domain.Docking.Rest.MOVING;
     private Suspension suspension = Suspension.LEVEL;
     private Suspension suspensionO = Suspension.LEVEL;
     /** The terrain pose's memory: the eased body and its springs, absolute height. Null until first posed. */
@@ -350,6 +364,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         builder.define(DATA_DOORS, false);
         builder.define(DATA_OPEN, 0);
         builder.define(DATA_SEATS, "");
+        builder.define(DATA_DOCKED, false);
     }
 
     @Override
@@ -1091,6 +1106,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /** effects: links {@code trailer} behind this vehicle, both ways, with a clunk */
     public void hitch(Vehicle trailer) {
+        trailer.undock();
         entityData.set(DATA_TRAILER, trailer.getId());
         trailer.entityData.set(DATA_TOWER, getId());
         trailerUuid = trailer.getUUID();
@@ -1438,7 +1454,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         wasAtTheWheel = atTheWheel;
         if (atTheWheel) {
-            stepAtTheWheel(p);
+            if (!heldDocked(p)) {
+                stepAtTheWheel(p);
+            }
         } else if (!towedHere) {
             setDeltaMovement(Vec3.ZERO);
             wheelTravel += entityData.get(DATA_SPEED);
@@ -1715,6 +1733,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             runOver(p);
         }
         catchTrailer(p);
+        watchForTheLift();
         if (tickCount % 20 == 0) {
             relink();
         }
@@ -2035,6 +2054,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** effects: takes the driver's state as their client reports it */
     public void onDriveState(float speed, float steer, int throttle, boolean drifting, float burn) {
         if (!Float.isFinite(speed) || !Float.isFinite(steer) || !Float.isFinite(burn)) return;
+        if (throttle != 0 && docked()) undock();   // the driver drives off the lift (D-0040)
         speed = Mth.clamp(speed, (float) (-tuning.maxSpeed() * Drive.BOOST_CAP), (float) (tuning.maxSpeed() * Drive.BOOST_CAP));
         steer = Mth.clamp(steer, (float) -tuning.steer(), (float) tuning.steer());
         burn = Mth.clamp(burn, 0, 1);
@@ -2404,23 +2424,181 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 Mth.lerp(partialTick, suspensionO.roll(), suspension.roll()));
     }
 
+    // --- docking on a Mechanic Lift (D-0040) ------------------------------
+
+    /**
+     * effects: returns whether a Mechanic Lift may take this body when it is left standing on
+     * its deck ({@link com.chunkworks.vanillawheels.domain.Docking}): every ground vehicle; a
+     * protocol built on this one may say no for its own
+     */
+    public boolean docks() {
+        return true;
+    }
+
+    /** effects: returns whether this is docked on a lift: held at its spot */
+    public boolean docked() {
+        return entityData.get(DATA_DOCKED);
+    }
+
+    /** effects: returns the controller of the lift this is docked on, or null when free (server side) */
+    @Nullable
+    public BlockPos dockedAt() {
+        return dockedAt;
+    }
+
+    /**
+     * effects: docks this on {@code lift} (server): from now on held at its spot, after a glide
+     * there through the lift's job if {@code glide}, else at once -- Build stands a new vehicle
+     * on its spot already
+     */
+    public void dock(com.chunkworks.vanillawheels.lift.LiftBlockEntity lift, boolean glide) {
+        dockedAt = lift.getBlockPos();
+        dockTicks = glide ? LiftMotion.JOB : 0;
+        dockFromX = getX();
+        dockFromZ = getZ();
+        dockFromYaw = getYRot();
+        learnSpot(lift);
+        rest = com.chunkworks.vanillawheels.domain.Docking.Rest.MOVING;
+        entityData.set(DATA_DOCKED, true);
+    }
+
+    /** effects: takes the spot and heading this is held at from {@code lift} */
+    private void learnSpot(com.chunkworks.vanillawheels.lift.LiftBlockEntity lift) {
+        VehicleProfile p = profile();
+        Vec3 spot = lift.spot(p == null ? 1.0 : p.body().length());
+        dockX = spot.x;
+        dockY = spot.y;
+        dockZ = spot.z;
+        dockYaw = lift.heading().yaw();
+    }
+
+    /** effects: lets this go: free to drive, roll and be taken again. On a client, only this copy's view, until the server's word */
+    public void undock() {
+        dockedAt = null;
+        dockTicks = 0;
+        dockX = Double.NaN;
+        entityData.set(DATA_DOCKED, false);
+    }
+
+    /**
+     * effects: holds this at its dock while docked, on the side at the wheel: the drive at rest,
+     * no move of its own; the server glides it to the spot and keeps it there
+     * ({@link #holdOnTheLift}). The throttle lets it go: the driver's, on their client at once
+     * (the server follows when their drive state arrives, {@link #onDriveState}); a script's,
+     * on the server. Returns whether this tick was held, so the caller steps the drive if not.
+     */
+    private boolean heldDocked(VehicleProfile p) {
+        if (!docked()) {
+            return false;
+        }
+        int throttle = level().isClientSide() ? Controls.input(this).throttle() : scripted != null ? scripted.throttle() : 0;
+        if (throttle != 0) {
+            undock();
+            return false;
+        }
+        if (level().isClientSide()) {
+            drive = Drive.atRest(Math.toRadians(getYRot()));
+            setDeltaMovement(Vec3.ZERO);
+            showSpeed(0.0f);
+        } else {
+            holdOnTheLift(p);
+        }
+        return true;
+    }
+
+    /**
+     * effects: one server tick docked with nobody at the wheel: through the lift's job, glides
+     * toward the spot and turns to face the lift's front ({@link com.chunkworks.vanillawheels.domain.Docking#progress});
+     * after it, keeps this on the spot. Let go when the lift is gone, or when this is found
+     * further than {@link com.chunkworks.vanillawheels.domain.Docking#HOLD} from the spot:
+     * something -- a key's recall, a command -- moved it away.
+     */
+    private void holdOnTheLift(VehicleProfile p) {
+        // The lift is looked for every tick (a chunk's map, no allocation); the spot is learned from it once,
+        // at the dock or on the first tick after a load.
+        com.chunkworks.vanillawheels.lift.LiftBlockEntity lift = dockedAt == null ? null : liftAt(dockedAt);
+        if (lift == null) {
+            undock();
+            return;
+        }
+        if (Double.isNaN(dockX)) {
+            learnSpot(lift);
+        }
+        if (dockTicks > 0) {
+            dockTicks--;
+            double g = com.chunkworks.vanillawheels.domain.Docking.progress(dockTicks);
+            setPos(com.chunkworks.vanillawheels.domain.Docking.at(dockFromX, dockX, g), dockY, com.chunkworks.vanillawheels.domain.Docking.at(dockFromZ, dockZ, g));
+            // The turn runs past 180 or below -180 on its way; at its end the heading is the lift's own number.
+            setYRot(g >= 1.0 ? dockYaw : (float) com.chunkworks.vanillawheels.domain.Docking.yawAt(dockFromYaw, dockYaw, g));
+        } else {
+            double dx = getX() - dockX, dy = getY() - dockY, dz = getZ() - dockZ;
+            double offSq = dx * dx + dy * dy + dz * dz;
+            if (offSq > com.chunkworks.vanillawheels.domain.Docking.HOLD * com.chunkworks.vanillawheels.domain.Docking.HOLD) {
+                undock();
+                return;
+            }
+            if (offSq > 1.0e-8 || Mth.degreesDifferenceAbs(getYRot(), dockYaw) > 1.0e-3f) {
+                setPos(dockX, dockY, dockZ);
+                setYRot(dockYaw);
+            }
+        }
+        double heading = Math.toRadians(getYRot());
+        if (drive.speed() != 0.0 || drive.heading() != heading || drive.steer() != 0.0) {
+            drive = Drive.atRest(heading);
+            syncDriveData();
+        }
+        setDeltaMovement(Vec3.ZERO);
+    }
+
+    /**
+     * effects: a body left standing on a lift's deck is taken by it (server): not docked, one
+     * that docks, nobody at its wheel, neither towing nor towed, still on the ground for
+     * {@link com.chunkworks.vanillawheels.domain.Docking#REST} ticks -- then the lift under its
+     * centre takes it if it may ({@link com.chunkworks.vanillawheels.lift.LiftBlockEntity#take})
+     */
+    private void watchForTheLift() {
+        if (docked() || !docks() || getControllingPassenger() != null || tower() != null || trailer() != null) {
+            rest = com.chunkworks.vanillawheels.domain.Docking.Rest.MOVING;
+            return;
+        }
+        rest = rest.observe(drive.speed() == 0.0 && onGround());
+        if (!rest.ready()) {
+            return;   // not yet, or asked already: quiet until it moves
+        }
+        com.chunkworks.vanillawheels.lift.LiftBlockEntity lift = liftUnder();
+        if (lift != null && !lift.take(this)) {
+            rest = com.chunkworks.vanillawheels.domain.Docking.Rest.MOVING;   // refused: ask again in REST ticks
+        }
+    }
+
+    /** effects: returns the lift whose controller is at {@code pos}, or null */
+    @Nullable
+    private com.chunkworks.vanillawheels.lift.LiftBlockEntity liftAt(BlockPos pos) {
+        return level().getBlockEntity(pos) instanceof com.chunkworks.vanillawheels.lift.LiftBlockEntity lift ? lift : null;
+    }
+
+    /** effects: returns the Mechanic Lift whose deck is under this vehicle's centre, or null off a lift */
+    @Nullable
+    private com.chunkworks.vanillawheels.lift.LiftBlockEntity liftUnder() {
+        BlockPos under = BlockPos.containing(getX(), getY() - 0.01, getZ());
+        net.minecraft.world.level.block.state.BlockState state = level().getBlockState(under);
+        if (state.is(ModContent.LIFT_PART.get())) {
+            return liftAt(com.chunkworks.vanillawheels.lift.LiftPartBlock.controller(state, under));
+        }
+        if (state.is(ModContent.LIFT_CONTROLLER.get())) {
+            return liftAt(under);
+        }
+        return null;
+    }
+
     /**
      * effects: returns how far the Mechanic Lift under this vehicle has its deck raised, blocks:
      * the deck is drawn rising half a block through a job, and a vehicle standing on it rises
      * with it, riders and all. Zero off a lift, or with no job running.
      */
     public double deckRaise(float partialTick) {
-        BlockPos under = BlockPos.containing(getX(), getY() - 0.01, getZ());
-        net.minecraft.world.level.block.state.BlockState state = level().getBlockState(under);
-        BlockPos controller;
-        if (state.is(ModContent.LIFT_PART.get())) {
-            controller = com.chunkworks.vanillawheels.lift.LiftPartBlock.controller(state, under);
-        } else if (state.is(ModContent.LIFT_CONTROLLER.get())) {
-            controller = under;
-        } else {
-            return 0.0;
-        }
-        return level().getBlockEntity(controller) instanceof com.chunkworks.vanillawheels.lift.LiftBlockEntity lift && lift.busy() ? lift.raise(partialTick) : 0.0;
+        com.chunkworks.vanillawheels.lift.LiftBlockEntity lift = liftUnder();
+        return lift != null && lift.busy() ? lift.raise(partialTick) : 0.0;
     }
 
     /** effects: returns how far the wheels have rolled, blocks, interpolated */
@@ -3168,6 +3346,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
         tag.putBoolean("DoorsOpen", doorsOpen());
         tag.putString("Seats", entityData.get(DATA_SEATS));
+        if (dockedAt != null) {
+            tag.putLong("Docked", dockedAt.asLong());
+        }
         addChestVehicleSaveData(tag, registryAccess());
         // Preserve slots above 255 too; the old ContainerEntity format uses a byte slot index.
         tag.remove("Items");
@@ -3190,6 +3371,12 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         entityData.set(DATA_DOORS, tag.getBoolean("DoorsOpen"));
         // Absent before 1.16.0: the riders a load brings back take their seats again in boarding order.
         entityData.set(DATA_SEATS, tag.getString("Seats"));
+        // Docked (1.17.0): held on its spot again as it loads, the spot learned from the lift on the first
+        // tick; a glide cut short by the save is finished at once.
+        dockedAt = tag.contains("Docked") ? BlockPos.of(tag.getLong("Docked")) : null;
+        dockTicks = 0;
+        dockX = Double.NaN;
+        entityData.set(DATA_DOCKED, dockedAt != null);
         doorSwing = doorsOpen() ? 1.0f : 0.0f;
         doorSwingO = doorSwing;
         if (id != null) {

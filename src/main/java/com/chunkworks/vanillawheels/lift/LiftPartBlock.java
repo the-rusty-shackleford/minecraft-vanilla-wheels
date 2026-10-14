@@ -41,14 +41,16 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * Every cell of a Mechanic Lift but the controller: a deck cell is a full
- * cube to stand a vehicle on, a post cell a slim column. The state carries
- * the lift's facing and the cell's index, which is enough to find the
- * controller with no level lookup, so every hook here forwards there.
+ * cube to stand a vehicle on, a post cell a slim column, a wall cell a bar
+ * across the back ({@link Footprint#bars}). The state carries the lift's
+ * facing and the cell's index, which is enough to find the controller with
+ * no level lookup, so every hook here forwards there.
  */
 public final class LiftPartBlock extends HorizontalDirectionalBlock {
     public static final MapCodec<LiftPartBlock> CODEC = simpleCodec(LiftPartBlock::new);
     public static final IntegerProperty INDEX = IntegerProperty.create("index", 1, Footprint.PARTS);
-    private static final VoxelShape POST = Block.box(5, 0, 5, 11, 16, 11);
+    /** The bars' shapes by state, made as asked for: a post's column, a back post's run to the wall, the wall. */
+    private static final java.util.Map<BlockState, VoxelShape> BARS = new java.util.concurrent.ConcurrentHashMap<>();
 
     public LiftPartBlock(Properties props) {
         super(props);
@@ -78,7 +80,20 @@ public final class LiftPartBlock extends HorizontalDirectionalBlock {
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return Footprint.cell(state.getValue(INDEX)).isDeck() ? net.minecraft.world.phys.shapes.Shapes.block() : POST;
+        return Footprint.cell(state.getValue(INDEX)).isDeck() ? net.minecraft.world.phys.shapes.Shapes.block() : BARS.computeIfAbsent(state, LiftPartBlock::bars);
+    }
+
+    /** effects: returns the shape of the bars in the cell {@code state} names, turned to the lift's facing */
+    private static VoxelShape bars(BlockState state) {
+        Footprint.Heading h = LiftControllerBlock.heading(state.getValue(FACING));
+        VoxelShape shape = net.minecraft.world.phys.shapes.Shapes.empty();
+        for (double[] bar : Footprint.bars(Footprint.cell(state.getValue(INDEX)))) {
+            double[] a = h.local(bar[0], bar[2]);
+            double[] b = h.local(bar[1], bar[3]);
+            shape = net.minecraft.world.phys.shapes.Shapes.or(shape, net.minecraft.world.phys.shapes.Shapes.box(
+                    Math.min(a[0], b[0]), 0.0, Math.min(a[1], b[1]), Math.max(a[0], b[0]), 1.0, Math.max(a[1], b[1])));
+        }
+        return shape;
     }
 
     /** effects: with this part gone for good, takes the controller with it, which takes the rest */

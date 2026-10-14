@@ -7,6 +7,38 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.17.0 — built, unreleased (docking on the Mechanic Lift, and its back wall; D-0040)
+
+Rusty, 2026-10-13: dock cars on the lift "so that you can have a garage full of uniformly parked
+cars", centred, staged for Paint and Repair; on the preview, the rams and the half-block rise for the
+move, a short wall at the lift's back, and every vehicle facing the same way.
+- **The back wall**: a bar between the back posts, the posts' thickness; three new cells, indices 34
+  to 36 appended so saved lifts keep theirs; an old lift grows it on its first tick after loading
+  where the cells are free (`LiftBlockEntity.growWall`). Rusty's six garage lifts have their backs to
+  the hall's walls, so the bars land against them.
+- **Docking** (`domain/Docking`, `Vehicle.heldDocked` / `holdOnTheLift` / `watchForTheLift`,
+  `LiftBlockEntity.take`): a vehicle left standing on the deck, nobody at the wheel, not towing or
+  towed, still for 10 ticks, is taken: the job runs and through the hold it glides to its spot (the
+  deck's centre line, tail a quarter block off the wall, facing the front; a half turn if backed in).
+  Held there, the stick dead, until the throttle lets it go. Build stands a new vehicle docked.
+  Refused and named in the menu's status line: towing, too big (`fits`: the Pickup just, the Huey
+  never), taken, blocked (another vehicle in the spot), a driver aboard. Saved as `Docked`; let go
+  when the lift is gone or it is found a block from its spot. `Vehicle.docks()` for a protocol to
+  refuse. Network 8 unchanged (no new payload: the release rides the drive-state report).
+- On the box, every car standing on a lift parks itself when the pack arrives (said to Rusty, taken).
+- Dependents: every bundled range admits 1.17.0; nothing else needs a rebuild.
+- Gate (2026-10-13, `clean build --no-build-cache`, the booth in software on a rootful Xwayland `:7` beside
+  Rusty's own client with the config watcher off): 190 JUnit, 141 GameTests (10 new in `LiftGameTests`), the
+  booth's 65 checks (two new: the car on its way mid-glide with the deck up; docked on its spot facing the
+  front). Seven mutations each caught by their own test (D-0040's verification); the one-per-deck guard is
+  doubly held and no mutation of it alone shows. Two findings on the way: the spot's clearance had to be the
+  body's real footprint (a trailer behind the truck's spot sat outside a square of its width), and the
+  booth's player is in survival by the lift's scenes, so a camera placed in the air lands on the ground.
+- Photos: `run/booth/screenshots/booth-lift-raised.png` (the built car docked on the raised deck, the wall
+  behind), `booth-lift-docking.png` (mid-glide), `booth-lift-docked.png` (the wiki's `img/lift-docked.webp`).
+- **Unreleased**: waits on Rusty's go. Not yet seen: a real car taken on the box, his garage lifts growing
+  their walls.
+
 ## 1.16.0 — released 2026-10-12 in pack 1.85.0 (seats kept, take the controls, a crew across a logout; a reported move re-run at its own heading; D-0038, D-0039)
 
 From OtatopMalloy's death on the box (2026-10-11, 23:24 UTC; the server repo's

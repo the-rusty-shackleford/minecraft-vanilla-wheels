@@ -150,10 +150,12 @@ Steel comes from [Metals and Materials](/wiki/metals-and-materials).
 ![A car built on a raised lift](img/lift.webp)
 
 - **Placing:** the lift item lays the whole lift at once, a five-by-six deck with a post on
-  each corner, facing you. It needs every cell clear and solid ground under the deck.
+  each corner and a short wall across the back, facing you. It needs every cell clear and
+  solid ground under the deck. The wall is the back; you walk up to the front.
 - **Using it:** right-click any block of it. There's a slot each for the chassis, the wheels,
   the engine and a dye.
-  - **Build** puts the vehicle on the deck, facing the front, and uses exactly its parts.
+  - **Build** puts the vehicle on the deck, parked against the wall facing the front, and uses
+    exactly its parts.
   - **Paint** colours the vehicle standing on the deck with the dye, using one.
   - **Repair** appears while a damaged vehicle is on the deck: add the material it shows and
     press Repair. A full repair costs 20 steel for a Trailblazer, 18 iron for a Farmer's Pickup
@@ -162,6 +164,25 @@ Steel comes from [Metals and Materials](/wiki/metals-and-materials).
 - Break any block of the lift and the whole lift comes back as one item.
 
 ![The lift's menu with its Repair panel](img/lift-menu.webp)
+
+### Parking on a lift
+
+A lift **parks** whatever you leave on it. Drive onto the deck, get out, and half a second
+later the rams run: the deck comes up, the vehicle slides to the middle and backs up to the
+wall, turning to face the front if it wasn't, and the deck sets it down. It stays put, square
+and centred, until someone in the driver's seat presses the throttle, which lets it go. A
+garage of lifts is a row of vehicles parked alike, and a parked vehicle is in the right place
+for Paint and Repair.
+
+![A car parked on a lift, backed up to its wall](img/lift-docked.webp)
+
+- Anything that fits parks: cars, pickups and trailers, the Farmer's Pickup with its nose a
+  little over the front edge. Helicopters are too long and are left alone.
+- A truck with a trailer hitched isn't taken; unhitch the trailer first, and move it off if it
+  stands where the truck would go. The menu's status line says what the lift is waiting for.
+- One vehicle to a lift. A second one left on the deck stays where it is.
+- Lifts from before this version grow their back wall by themselves, and a vehicle already
+  standing on one parks itself the first time it is seen standing still.
 
 ## Towing
 

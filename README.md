@@ -15,11 +15,17 @@ anywhere. Its network protocol is 7. Nothing changes for a car or a trailer.
 [Hidden Door, the Vehicle Sensor and the Floor Hatch](#hidden-doors-vehicle-sensors-and-floor-hatches-115)
 (D-0035 to D-0037). Network 7, unchanged.
 
-**1.16.0** (built, unreleased; D-0038): a rider keeps their seat, a passenger takes a free driver's
+**1.16.0** (pack 1.85.0; D-0038): a rider keeps their seat, a passenger takes a free driver's
 seat with **U**, and a crew logging out of a vehicle is seated in it again on logging back in, or stood
 somewhere safe, never in the air where their seat was (see [Driving](#driving)). And the server
 re-runs a driver's reported move at the heading the client made it at (D-0039): a turning Huey's hull
 was tested a tick behind and the move refused, "moved wrongly". Network 8.
+
+**1.17.0** (built, unreleased; D-0040): the Mechanic Lift **docks** a vehicle left standing on its deck
+-- the deck rises, the vehicle slides to its spot, backed up to the lift's new back wall, centred and
+facing the front, and is held there until its driver's throttle lets it go -- so a garage of lifts is a
+row of cars parked alike (see [Docking](#docking-a-vehicle-1170)). The lift has a back wall between
+its back posts; a lift from before grows one when it loads. Network 8, unchanged.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
@@ -505,7 +511,8 @@ A protocol can build vehicles of its own on this one (D-0030), as Rotorcraft bui
   - a tick at the wheel: `takeTheWheel`, `stepAtTheWheel`, `poseAtTheWheel`;
   - towing: `follow`, `poseTowed`;
   - `footprintClamp`;
-  - the server's policies: `burnsFuel`, `runsOver`, `breaksFragile`;
+  - the server's policies: `burnsFuel`, `runsOver`, `breaksFragile`, `docks` (whether a Mechanic
+    Lift takes it when left on the deck, 1.17.0);
   - the engine loop: `engineRunning`, `engineLoad`;
   - helpers for a subclass: `columns`, `rideTheGround`, `sharePose`, `takeSharedPose`,
     `playerAtTheHead`, `showSpeed`, `pose`.
@@ -615,19 +622,58 @@ Materials'. Install that required mod separately on both client and server;
 Mod Hub includes the shared version in our pack.
 
 The **Mechanic Lift** is one item that places a whole lift: a deck five blocks wide and
-six long with a one-block post on each corner, thirty-four blocks laid at once facing
-you, refused with a message unless every cell is clear and every deck cell has solid
-ground under it. Break any block of it and the whole lift goes, dropping one lift item
-(none in creative); replace a block with a command and the rest goes without a drop; a
-vehicle standing on it is left where it is. Right-click any block of it for the menu: a
-slot each for the chassis, the wheels, the engine and a dye. **Build** spawns the vehicle
-on the deck facing the front, takes exactly its parts, and refuses when a job is running,
-when the parts match no vehicle, or when the deck is not clear -- the button is greyed
-with the server's verdict and the status line says which. **Paint** colours the vehicle
-standing on the deck with the dye in the slot and takes one; a chassis in the slot is
-never painted, since paint only ever finds an entity on the deck. Either job raises the
-deck half a block for two seconds with the rams' sound, and the vehicle on it rises with
-the deck, riders and all. Closing the menu hands the parts back.
+six long with a one-block post on each corner and a one-block wall between the two back
+posts (1.17.0), thirty-seven blocks laid at once facing you, refused with a message unless
+every cell is clear and every deck cell has solid ground under it. The wall is the lift's
+back; the controller block is the deck's front-centre cell. Break any block of it and the
+whole lift goes, dropping one lift item (none in creative); replace a block with a command
+and the rest goes without a drop; a vehicle standing on it is left where it is. Right-click
+any block of it for the menu: a slot each for the chassis, the wheels, the engine and a
+dye. **Build** spawns the vehicle on its docking spot (below), docked, facing the front,
+takes exactly its parts, and refuses when a job is running, when the parts match no
+vehicle, or when the spot is not clear -- the button is greyed with the server's verdict
+and the status line says which. **Paint** colours the vehicle standing on the deck with the
+dye in the slot and takes one; a chassis in the slot is never painted, since paint only
+ever finds an entity on the deck. Either job raises the deck half a block for two seconds
+with the rams' sound, and the vehicle on it rises with the deck, riders and all. Closing
+the menu hands the parts back.
+
+A lift placed before 1.17.0 has no wall: it grows one the first time its controller ticks
+after loading, in whichever of the three cells is free (air or anything replaceable). A
+cell holding a block of yours is left to it, and the lift is drawn with the whole wall
+regardless; break that block and the wall fills in on the next load. Lifts laid by command
+(`setblock`) with parts 1..33 only are grown the same way: the wall's cells are indices 34
+to 36, appended so that no saved lift's indices moved.
+
+### Docking a vehicle (1.17.0)
+
+A vehicle **left standing on a lift's deck is taken by it** (D-0040, `domain/Docking`): with
+nobody at the wheel, neither towing nor towed, still on the ground for half a second, and
+its centre over the deck, the lift runs its job and through the hold the vehicle glides to
+its **spot** -- centred across the deck, backed up to the wall with its tail a quarter block
+off the wall's face, nose to the front -- turning the short way to face the front (a vehicle
+that came in backwards is spun half a turn). From then on it is **docked**: held on its
+spot, its steering dead, until a throttle lets it go -- the driver's (W or S; their client
+lets go at once and the server follows when their drive state arrives) or a script's. A
+released vehicle that stops on the deck again is simply taken again. Build stands a new
+vehicle on its spot docked. Paint and Repair work on the docked vehicle as on any on the
+deck.
+
+What the lift refuses, and says so in the menu's status line while that vehicle is on the
+deck: a vehicle **towing or towed** ("Unhitch the trailer"); one **too big** for the deck
+(wider than five blocks or longer than `Docking.LONGEST`, the stretch from the wall's gap to
+a block and a half past the front edge -- the Farmer's Pickup just docks, its nose over the
+front edge; the Huey and the Chinook never); the deck **taken** by another docked vehicle;
+the spot **blocked** by another vehicle standing in it (a trailer just unhitched behind the
+truck, say); and a **driver** at the wheel, who need only step out. A protocol built on this
+one may refuse docking for its vehicles through the `docks()` hook (below).
+
+A docked vehicle stays docked across a save (`Docked`, its lift's controller position) and
+is set on its spot again as it loads. It is let go when its lift is gone, or when it is found
+more than a block from its spot: a key's recall, a command, anything that moved it away.
+Hitching a docked trailer to a truck lets it go too. A vehicle that was already standing on a
+lift when 1.17.0 arrives is taken the first time it is seen standing still: every car in a
+garage of lifts parks itself.
 
 `vanillawheels:vehicle` and `vanillawheels:chassis` carry the profile id in the
 `vanillawheels:vehicle` component (paint, fuel and the disc in their own); one of each per
@@ -651,7 +697,7 @@ in `devtools/art/sounds/SOURCES.md`. These changes leave driving physics unchang
 steering by the bicycle rule, grip, drift), `Suspension`, `Terrain` (the drawn pose),
 `CrossSection` (what of a block the vehicle footprint meets), `Impact`, `Tank`, `Tow` (the
 trailer's kinematics), `Cargo` (the animals' room), the lift's `Footprint`,
-`LiftMotion`, `LiftStatus` and `Assembly`, `Paint`, and the mesh library (`Obj`,
+`LiftMotion`, `LiftStatus`, `Docking` (D-0040) and `Assembly`, `Paint`, and the mesh library (`Obj`,
 `BbModel` over a `Json` reader of its own, `Mesh`, `Transform`, `Rotation`, `Dial`,
 `WheelSpin`, `BodyPose`, `BakedMesh`).
 `src/main`: `api` (`VehicleProfile` and its codec, `VanillaWheels`, `CargoRules`, `VehicleKinds`), the `Vehicle` entity
@@ -660,8 +706,8 @@ block entity, the menu, the item), and `client` (`VehicleRenderer`, `MeshLibrary
 `Appearance`, `Controls`, `Keys`, `EngineSound`, `Radio`, `Headlamps`, `LightsIndicator`,
 the item renderer, `lift/LiftRenderer`, `lift/LiftScreen`). `src/gametest`: a box car of its own (mesh,
 texture and profile generated by `devtools/art/build.py`), a box trailer, the box skids made by
-its own vehicle kind (`SkidVehicle`, D-0030), 94 gametests and the photo booth -- a mod of its own,
-never shipped.
+its own vehicle kind (`SkidVehicle`, D-0030), a box long enough that no lift takes it, 141 gametests
+and the photo booth -- a mod of its own, never shipped.
 
 ## Building and looking at it
 
@@ -684,8 +730,15 @@ and burns for a survival one, takes and ejects a disc, cycles its lamps
 and lights them by itself at night, and its profile round-trips through the codec; a
 lift is placed through its item facing each way and refused over a blocked cell, a hole
 and a cow, broken from any block for one drop, worked through its real menu by a mock
-player (Build spawns the car facing the front and takes exactly its parts; Paint colours
-the car on the deck and refuses one beside it), and keeps its job across a save; the car
+player (Build stands the car docked on its spot facing the front and takes exactly its parts;
+Paint colours the car on the deck and refuses one beside it), keeps its job across a save, and
+docks (D-0040): a car left askew on the deck is taken to its spot facing the front, still through
+the rise and between mid-hold; one backed in on an east-facing lift is spun to face the front with
+its tail a gap off the wall; a driver aboard keeps it waiting; held, the stick does nothing and the
+throttle lets it go; a second car on a taken deck, a box too long, a truck with its trailer hitched
+and one whose spot the unhitched trailer stands in are all left alone, the truck taken once the
+trailer is gone; a trailer alone docks by its own length; breaking the lift frees the car and a save
+keeps it docked; a lift laid without the wall grows one where its cells are free; the car
 catches the trailer's tongue, tows it straight and through a turn with the tongue on the
 hitch, lets go on a click, rolls back clear and stays behind as the car drives off (against a
 wall too) and hitches again when the car backs onto it; a lead loads a cow and two calves through open doors and no

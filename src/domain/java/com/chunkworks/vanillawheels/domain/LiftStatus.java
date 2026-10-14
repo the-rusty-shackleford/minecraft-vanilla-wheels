@@ -18,8 +18,9 @@
 package com.chunkworks.vanillawheels.domain;
 
 /**
- * What the lift's two buttons can do right now, decided from the facts
- * in a fixed order so the message names the first thing in the way.
+ * What the lift's buttons can do right now, and what it says of the
+ * vehicle on its deck, decided from the facts in a fixed order so the
+ * message names the first thing in the way.
  */
 public final class LiftStatus {
     private LiftStatus() {}
@@ -29,6 +30,13 @@ public final class LiftStatus {
 
     /** Whether Paint may run: a job is running; no vehicle on the deck; no dye in the slot; ready. */
     public enum Paint { BUSY, NO_VEHICLE, NO_DYE, READY }
+
+    /**
+     * What the lift says of the vehicle on its deck (D-0040): none there; docked; being
+     * taken, or about to be; it tows or is towed; too big for the deck; the deck is another
+     * vehicle's; another vehicle stands where it would go; someone is at its wheel.
+     */
+    public enum Dock { NONE, DOCKED, TAKING, TOWING, TOO_BIG, TAKEN, BLOCKED, DRIVER }
 
     /**
      * effects: returns the build status: BUSY while {@code busy}, else
@@ -64,5 +72,37 @@ public final class LiftStatus {
             return Paint.NO_DYE;
         }
         return Paint.READY;
+    }
+
+    /**
+     * effects: returns the dock status: NONE unless {@code vehicle}; for one {@code docked}
+     * here, TAKING while {@code busy} (the glide) else DOCKED; else the first thing in the way
+     * in a fixed order -- TOWING, TOO_BIG unless {@code fits}, TAKEN, BLOCKED unless
+     * {@code clear}, DRIVER -- the hard refusals before the one a step out of the seat mends;
+     * else TAKING, since the lift will take it once it stands still
+     */
+    public static Dock dock(boolean vehicle, boolean docked, boolean busy, boolean towing, boolean fits, boolean taken, boolean clear, boolean driver) {
+        if (!vehicle) {
+            return Dock.NONE;
+        }
+        if (docked) {
+            return busy ? Dock.TAKING : Dock.DOCKED;
+        }
+        if (towing) {
+            return Dock.TOWING;
+        }
+        if (!fits) {
+            return Dock.TOO_BIG;
+        }
+        if (taken) {
+            return Dock.TAKEN;
+        }
+        if (!clear) {
+            return Dock.BLOCKED;
+        }
+        if (driver) {
+            return Dock.DRIVER;
+        }
+        return Dock.TAKING;
     }
 }

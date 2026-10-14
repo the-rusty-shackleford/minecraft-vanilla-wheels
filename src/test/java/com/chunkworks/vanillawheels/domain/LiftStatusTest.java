@@ -21,7 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/** Partitions: every combination of the three facts for each button; busy wins, then the parts, then the deck. */
+/**
+ * Partitions: every combination of the three facts for each button; busy wins, then the
+ * parts, then the deck. The dock verdict: every combination of its eight facts against the
+ * stated order -- no vehicle; docked (taking while busy); towing; too big; taken; blocked;
+ * a driver; else taking.
+ */
 final class LiftStatusTest {
 
     @Test
@@ -45,6 +50,24 @@ final class LiftStatusTest {
                     assertEquals(expected, LiftStatus.paint(busy, vehicle, dye), busy + " " + vehicle + " " + dye);
                 }
             }
+        }
+    }
+
+    @Test
+    void dockStatusInPrecedence() {
+        boolean[] both = {false, true};
+        for (boolean vehicle : both) for (boolean docked : both) for (boolean busy : both) for (boolean towing : both)
+                for (boolean fits : both) for (boolean taken : both) for (boolean clear : both) for (boolean driver : both) {
+            LiftStatus.Dock expected = !vehicle ? LiftStatus.Dock.NONE
+                    : docked ? (busy ? LiftStatus.Dock.TAKING : LiftStatus.Dock.DOCKED)
+                    : towing ? LiftStatus.Dock.TOWING
+                    : !fits ? LiftStatus.Dock.TOO_BIG
+                    : taken ? LiftStatus.Dock.TAKEN
+                    : !clear ? LiftStatus.Dock.BLOCKED
+                    : driver ? LiftStatus.Dock.DRIVER
+                    : LiftStatus.Dock.TAKING;
+            assertEquals(expected, LiftStatus.dock(vehicle, docked, busy, towing, fits, taken, clear, driver),
+                    vehicle + " " + docked + " " + busy + " " + towing + " " + fits + " " + taken + " " + clear + " " + driver);
         }
     }
 }

@@ -31,7 +31,8 @@ import net.minecraft.world.entity.player.Inventory;
 
 /**
  * The lift's screen: the four slots, Build and Paint, a line saying what
- * the greyed button waits for, and a bar while a job runs. Every state
+ * the greyed button waits for -- or what keeps the lift from taking the
+ * vehicle on its deck (D-0040) -- and a bar while a job runs. Every state
  * shown is the server's, read from the menu's data slots.
  */
 public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
@@ -124,7 +125,13 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
             g.drawString(font, Component.translatable("vanillawheels.lift.repair_cost", menu.repairCost()), 215, 51, 0x404040, false);
             g.drawString(font, Component.translatable(menu.repairReady() ? "vanillawheels.lift.repair_ready" : "vanillawheels.lift.repair_material"), 190, 73, 0x404040, false);
         }
+        LiftStatus.Dock dock = menu.dockStatus();
         Component status = menu.jobTicks() > 0 ? Component.translatable("vanillawheels.lift.status.busy")
+                : dock == LiftStatus.Dock.TOWING ? Component.translatable("vanillawheels.lift.status.dock.towing")
+                : dock == LiftStatus.Dock.TOO_BIG ? Component.translatable("vanillawheels.lift.status.dock.too_big")
+                : dock == LiftStatus.Dock.TAKEN ? Component.translatable("vanillawheels.lift.status.dock.taken")
+                : dock == LiftStatus.Dock.BLOCKED ? Component.translatable("vanillawheels.lift.status.dock.blocked")
+                : dock == LiftStatus.Dock.DRIVER ? Component.translatable("vanillawheels.lift.status.dock.driver")
                 : menu.buildStatus() == LiftStatus.Build.READY ? Component.translatable("vanillawheels.lift.status.build_ready")
                 : menu.paintStatus() == LiftStatus.Paint.READY ? Component.translatable("vanillawheels.lift.status.paint_ready")
                 : menu.paintStatus() == LiftStatus.Paint.NO_DYE ? Component.translatable("vanillawheels.lift.status.no_dye")

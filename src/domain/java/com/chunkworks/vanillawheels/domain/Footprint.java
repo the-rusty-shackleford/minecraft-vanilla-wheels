@@ -23,9 +23,11 @@ import java.util.function.Predicate;
 
 /**
  * The Mechanic Lift's shape: a deck five cells wide and six long, one
- * cell high, with a one-cell post on each corner of the deck. The
- * controller is the deck's front-centre cell; every other cell is a part
- * with an index, and the index alone finds the controller again.
+ * cell high, with a one-cell post on each corner of the deck and a
+ * one-cell wall between the two back posts (D-0040), so the lift has an
+ * obvious back. The controller is the deck's front-centre cell; every
+ * other cell is a part with an index, and the index alone finds the
+ * controller again.
  *
  * <p>Cells are in the lift's own frame, offsets from the controller:
  * {@code right} across the deck (negative to the left), {@code back}
@@ -33,8 +35,10 @@ import java.util.function.Predicate;
  * turns them into world offsets; the front is where the controller looks,
  * the deck lies behind it.
  *
- * <p>RI: cells() has WIDTH * LENGTH + 4 * POST entries, distinct, the
- *     controller first; indexOf and cell are inverse on 1..PARTS.
+ * <p>RI: cells() has WIDTH * LENGTH + 4 * POST + (WIDTH - 2) entries,
+ *     distinct, the controller first, the wall last (its cells were added
+ *     in 1.17.0, after the deck and the posts, so a lift saved before keeps
+ *     every index it has); indexOf and cell are inverse on 1..PARTS.
  * AF: the list of cells, in index order, is the lift.
  */
 public final class Footprint {
@@ -44,14 +48,33 @@ public final class Footprint {
     public static final int LENGTH = 6;
     /** Blocks in each corner post, above the deck. */
     public static final int POST = 1;
-    /** Cells besides the controller. */
-    public static final int PARTS = WIDTH * LENGTH - 1 + 4 * POST;
+    /** Cells besides the controller: the deck, the posts, the back wall. */
+    public static final int PARTS = WIDTH * LENGTH - 1 + 4 * POST + (WIDTH - 2);
+    /**
+     * Where a post or the wall stands within its cell, across the slim way, as a share of the
+     * cell: the posts are columns six sixteenths square in the middle, the wall a bar as thick
+     * along the deck, flush with the posts' faces.
+     */
+    public static final double BAR_MIN = 5.0 / 16.0;
+    public static final double BAR_MAX = 11.0 / 16.0;
+    /** The depth of the wall's front face from the deck's front edge, blocks: what a docked body backs up to. */
+    public static final double WALL_FACE = LENGTH - 1 + BAR_MIN;
 
     /** One cell of the lift, offsets from the controller in the lift's frame. */
     public record Cell(int right, int up, int back) {
-        /** effects: returns whether this is a deck cell (on the ground row) rather than a post */
+        /** effects: returns whether this is a deck cell (on the ground row) rather than a post or the wall */
         public boolean isDeck() {
             return up == 0;
+        }
+
+        /** effects: returns whether this is a post cell: above the deck on a corner */
+        public boolean isPost() {
+            return up > 0 && Math.abs(right) == WIDTH / 2;
+        }
+
+        /** effects: returns whether this is a cell of the back wall: above the deck's back row, between the posts */
+        public boolean isWall() {
+            return up > 0 && Math.abs(right) < WIDTH / 2;
         }
     }
 
@@ -90,6 +113,19 @@ public final class Footprint {
             };
         }
 
+        /**
+         * effects: returns where a point within a cell lands within its block, as fractions (x, z)
+         * of the block, given the point's fractions {@code right} across the cell and {@code back}
+         * along it in the lift's frame: a fraction along an axis the turn sends negative is
+         * measured from the block's far side
+         */
+        public double[] local(double right, double back) {
+            int rx = -dz, rz = dx;
+            double x = rx != 0 ? (rx > 0 ? right : 1.0 - right) : (dx > 0 ? 1.0 - back : back);
+            double z = rz != 0 ? (rz > 0 ? right : 1.0 - right) : (dz > 0 ? 1.0 - back : back);
+            return new double[] {x, z};
+        }
+
         /** effects: returns the yaw, degrees in the game's sense, of something that looks the way the front does */
         public float yaw() {
             return switch (this) {
@@ -121,12 +157,37 @@ public final class Footprint {
                 }
             }
         }
+        // The wall last: the indices before it are what lifts saved before 1.17.0 carry.
+        for (int right = -half + 1; right <= half - 1; right++) {
+            cells.add(new Cell(right, 1, LENGTH - 1));
+        }
         return List.copyOf(cells);
     }
 
     /** effects: returns every cell, the controller at index 0, the parts at 1..PARTS */
     public static List<Cell> cells() {
         return CELLS;
+    }
+
+    /**
+     * effects: returns the bars standing in {@code c}, each as fractions of the cell in the
+     * lift's frame (rightMin, rightMax, backMin, backMax), full height: none for a deck cell;
+     * a front post's column; a back post's column run on to the cell's edge toward the wall;
+     * the wall right across its cell -- so the back row's bars meet end to end
+     */
+    public static List<double[]> bars(Cell c) {
+        if (c.isDeck()) {
+            return List.of();
+        }
+        if (c.isWall()) {
+            return List.of(new double[] {0.0, 1.0, BAR_MIN, BAR_MAX});
+        }
+        if (c.back() == LENGTH - 1) {
+            return c.right() < 0
+                    ? List.of(new double[] {BAR_MIN, 1.0, BAR_MIN, BAR_MAX})
+                    : List.of(new double[] {0.0, BAR_MAX, BAR_MIN, BAR_MAX});
+        }
+        return List.of(new double[] {BAR_MIN, BAR_MAX, BAR_MIN, BAR_MAX});
     }
 
     /**
@@ -196,12 +257,13 @@ public final class Footprint {
     }
 
     /**
-     * effects: returns where a built vehicle stands, as an offset from the
-     * controller's corner (x, y, z), for a lift facing {@code h}: the
-     * centre of the deck, one block up, on top of it
+     * effects: returns the point on the deck's centre line {@code depth}
+     * blocks back from its front edge, on top of the deck, as an offset
+     * from the controller's corner (x, y, z), for a lift facing {@code h};
+     * the deck's own centre is at depth LENGTH / 2
      */
-    public static double[] spawn(Heading h) {
-        double back = (LENGTH - 1) / 2.0;
+    public static double[] onDeck(Heading h, double depth) {
+        double back = depth - 0.5;
         return new double[] {
                 0.5 - back * h.dx,
                 1.0,

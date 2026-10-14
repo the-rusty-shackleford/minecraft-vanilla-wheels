@@ -41,11 +41,12 @@ import net.minecraft.world.item.ItemStack;
 /**
  * The lift's menu: chassis, wheels, engine and dye, plus a repair slot
  * visible only for a damaged mounted vehicle. The server decides what
- * each button may do every tick and sends the answer down seven data
- * slots, so the screen greys a button with the server's truth and no
- * round trip; a click is refused server-side by the same rule. The client's
- * copy holds no position at all. The slots are transient: closing the menu
- * hands the parts back.
+ * each button may do every tick, and what the lift says of the vehicle on
+ * its deck (D-0040), and sends the answers down eight data slots, so the
+ * screen greys a button with the server's truth and no round trip; a click
+ * is refused server-side by the same rule. The client's copy holds no
+ * position at all. The slots are transient: closing the menu hands the
+ * parts back.
  *
  * <p>Build wants exactly the vehicle's own parts ({@link Assembly}); Paint
  * wants a vehicle on the deck and a dye, and only ever paints an entity
@@ -64,7 +65,7 @@ public final class LiftMenu extends AbstractContainerMenu {
 
     private final SimpleContainer parts = new SimpleContainer(PARTS);
     private final ContainerLevelAccess access;
-    private final ContainerData data = new SimpleContainerData(7);
+    private final ContainerData data = new SimpleContainerData(8);
     private final Player owner;
 
     public LiftMenu(int id, Inventory inventory, ContainerLevelAccess access) {
@@ -151,6 +152,12 @@ public final class LiftMenu extends AbstractContainerMenu {
     /** effects: returns a display copy of the required repair material */
     public ItemStack repairMaterial() { return data.get(6) > 0 ? new ItemStack(net.minecraft.world.item.Item.byId(data.get(6))) : ItemStack.EMPTY; }
 
+    /** effects: returns what the lift says of the vehicle on its deck, as synced by the server */
+    public LiftStatus.Dock dockStatus() {
+        LiftStatus.Dock[] all = LiftStatus.Dock.values();
+        return all[Math.min(all.length - 1, Math.max(0, data.get(7)))];
+    }
+
     // --- the server's truth -----------------------------------------------
 
     @Nullable
@@ -192,6 +199,7 @@ public final class LiftMenu extends AbstractContainerMenu {
             data.set(0, build(lift).ordinal());
             data.set(1, paint(lift).ordinal());
             data.set(2, lift.jobTicks());
+            data.set(7, lift.dockStatus().ordinal());
             Vehicle vehicle = lift.vehicleOnDeck();
             boolean damaged = vehicle != null && vehicle.profile() != null && vehicle.condition() < 10000;
             data.set(3, damaged ? vehicle.condition() + 1 : 0);

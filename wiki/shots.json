@@ -9,6 +9,7 @@
     {"from": "run/booth/screenshots/booth-key-fob.png", "to": "img/key.webp", "crop": [446, 515, 1280, 712], "screen": true},
     {"from": "run/booth/screenshots/booth-lift-raised.png", "to": "img/lift.webp"},
     {"from": "run/booth/screenshots/booth-lift-repair-ready.png", "to": "img/lift-menu.webp", "crop": [198, 84, 1078, 442], "screen": true},
+    {"from": "run/booth/screenshots/booth-lift-docked.png", "to": "img/lift-docked.webp"},
     {"from": "run/booth/screenshots/booth-garage-rolling.png", "to": "img/garage-rolling.webp"},
     {"from": "run/booth/screenshots/booth-garage-open.png", "to": "img/garage-open.webp"}
   ]

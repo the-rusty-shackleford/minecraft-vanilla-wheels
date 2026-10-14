@@ -7,7 +7,13 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.17.0 — built, unreleased (docking on the Mechanic Lift, and its back wall; the keyring; D-0040, D-0041)
+## 1.17.0 — released 2026-10-14 in pack 1.86.0 (docking on the Mechanic Lift, and its back wall; the keyring; D-0040, D-0041)
+
+Released on Rusty's go ("go"), tag `v1.17.0` at `9eef31e`; the release gate (`clean build --no-build-cache`,
+booth in software on `:7`) green on that commit: 192 JUnit, 142 GameTests, 67 booth checks; sha1 `33778320`
+on GitHub and on the server (the server repo's `knowledge/releases/pack-1.86.0.md`). Nobody online; restarted
+at once; Done 2.786 s, 20.000 TPS, the Yggdrasil key fetched. Not yet seen on the box: a car taken by a lift, a
+lift growing its wall, keys moving onto a ring, a recall from the ring's screen.
 
 Rusty, 2026-10-13: dock cars on the lift "so that you can have a garage full of uniformly parked
 cars", centred, staged for Paint and Repair; on the preview, the rams and the half-block rise for the
@@ -53,8 +59,7 @@ move, a short wall at the lift's back, and every vehicle facing the same way.
 - Photos: `run/booth/screenshots/booth-lift-raised.png` (the built car docked on the raised deck, the wall
   behind), `booth-lift-docking.png` (mid-glide), `booth-lift-docked.png` (the wiki's `img/lift-docked.webp`),
   `booth-keyring.png` (the ring's screen, the wiki's `img/keyring.webp`), `booth-key-held.png` (the ring in hand).
-- **Unreleased**: waits on Rusty's go. Not yet seen: a real car taken on the box, his garage lifts growing
-  their walls, anyone's keys moving onto a ring at login.
+- Released 2026-10-14 in pack 1.86.0 (above).
 
 ## 1.16.0 — released 2026-10-12 in pack 1.85.0 (seats kept, take the controls, a crew across a logout; a reported move re-run at its own heading; D-0038, D-0039)
 

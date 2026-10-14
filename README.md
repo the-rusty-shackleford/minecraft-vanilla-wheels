@@ -21,7 +21,7 @@ somewhere safe, never in the air where their seat was (see [Driving](#driving)).
 re-runs a driver's reported move at the heading the client made it at (D-0039): a turning Huey's hull
 was tested a tick behind and the move refused, "moved wrongly". Network 8.
 
-**1.17.0** (built, unreleased; D-0040, D-0041): the Mechanic Lift **docks** a vehicle left standing on
+**1.17.0** (pack 1.86.0; D-0040, D-0041): the Mechanic Lift **docks** a vehicle left standing on
 its deck -- the deck rises, the vehicle slides to its spot, backed up to the lift's new back wall,
 centred and facing the front, and is held there until its driver's throttle lets it go -- so a garage
 of lifts is a row of cars parked alike (see [Docking](#docking-a-vehicle-1170)). The lift has a back

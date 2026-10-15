@@ -29,10 +29,10 @@ wall between its back posts; a lift from before grows one when it loads. And eve
 **keyring** that cannot be lost: pairing a vehicle puts the key on it, keys from before move onto it
 at login, and using the ring opens a screen that says where each vehicle is, what a recall costs, and
 recalls one on a Confirm (see [Keys](#damage-repairs-and-recovery-keys-180)). Network 9: the ring's
-screen has a message of its own. **1.17.1** (released): a docked vehicle is drawn flat on the deck;
-1.17.0 drew it a fifth of a block up and pitched, the terrain fit having found the back wall a block
-past its tail (Rusty: "floating a wee bit"). **1.17.2** (built, unreleased): the keyring may ride in a
-bag you carry; 1.17.1 flagged it as fitting in no container item, which Backpacks+ read as "storage"
+screen has a message of its own. **1.17.1**: a docked vehicle is drawn flat on the deck; 1.17.0 drew it
+a fifth of a block up and pitched, the terrain fit having found the back wall a block past its tail
+(Rusty: "floating a wee bit"). **1.17.2** (pack 1.87.0, with Backpacks+ 0.8.0): the keyring may ride in
+a bag you carry; 1.17.1 flagged it as fitting in no container item, which Backpacks+ read as "storage"
 and refused (Backpacks+ 0.8.0 narrows that rule; Rusty: a bag takes what the inventory takes).
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a

@@ -7,7 +7,14 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.17.2 — built, unreleased (the keyring rides in a bag)
+## 1.17.2 — released 2026-10-15 in pack 1.87.0 with Backpacks+ 0.8.0 (the keyring rides in a bag)
+
+Released on Rusty's "coordinate with each other so you can release both changes in one release", tag
+`v1.17.2` at `efafe16`; the release gate green on that commit (192 JUnit, 142 GameTests with Backpacks+ 0.8.0
+as the bag, 67 booth checks); sha1 `bc4770d2` on GitHub and on the server (the server repo's
+`knowledge/releases/pack-1.87.0.md`). Jdrum12 and WAXER_01 online: the two-minute warning, the restart at
+its end, Done 2.828 s, 20.000 TPS. 1.17.1 (`fcc5d6b`, sha1 `fe40a6cc`) was released on GitHub the same day
+but never put in a pack on its own: 1.17.2 went straight from 1.17.0.
 
 The other session's Backpacks+ fix (0.8.0): the bag refused the keyring because `KeyringItem` flagged it
 as fitting in no container item, and Backpacks+ read that flag as "this is storage"; Rusty wants a bag

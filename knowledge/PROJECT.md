@@ -7,7 +7,13 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.18.0 — built and gated 2026-10-14, UNRELEASED until Rusty's go (the eight-long lift; D-0042)
+## 1.18.0 — released 2026-10-15 in pack 1.88.0 (the eight-long lift; D-0042)
+
+Released on Rusty's "go", tag `v1.18.0` at `dd8e5a6`; the release gate (`clean build --no-build-cache`, the booth
+in software on `:7`) green on that commit: 194 JUnit, 143 GameTests, 67 booth checks; sha1 `35b8d9ff` on GitHub
+and on the server (the server repo's `knowledge/releases/pack-1.88.0.md`). WAXER_01 online: the two-minute
+warning, the restart at its end, Done 2.801 s, 20.000 TPS, the Yggdrasil key fetched. Not yet seen on the box:
+the Pickup parked whole on a long lift.
 
 Rusty, 2026-10-14: "The farmers pickup doesnt really fit on the mechanical lift, I think we should make it a
 little bigger so it fits such vehicles (and then please fix the spacing that will undoubtedly get messed up

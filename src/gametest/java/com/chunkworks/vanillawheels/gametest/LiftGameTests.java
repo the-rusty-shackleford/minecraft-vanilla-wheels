@@ -526,6 +526,10 @@ public final class LiftGameTests {
             helper.assertTrue(car.docked(), "and held");
             helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.DOCKED, "docked");
             helper.assertValueEqual(lift.dockedVehicle(), car, "the lift's vehicle");
+            // Flat on the deck: the wall behind its tail must not lift or tilt the drawn body (Rusty saw a docked car float).
+            var held = car.suspension(1.0f);
+            helper.assertTrue(held.lift() == 0.0 && held.pitch() == 0.0 && held.roll() == 0.0,
+                    "drawn flat on the deck: lift " + held.lift() + " pitch " + held.pitch() + " roll " + held.roll());
             helper.succeed();
         });
     }

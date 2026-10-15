@@ -1453,8 +1453,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             takeTheWheel();
         }
         wasAtTheWheel = atTheWheel;
+        boolean held = false;
         if (atTheWheel) {
-            if (!heldDocked(p)) {
+            held = heldDocked(p);
+            if (!held) {
                 stepAtTheWheel(p);
             }
         } else if (!towedHere) {
@@ -1467,6 +1469,11 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 poseTowed(p, tower);
             }
             // else: the tower ticks later this pass and moves and poses this body then
+        } else if (held) {
+            // Docked, this stands flat on a flat deck by construction (D-0040). The terrain fit would look a
+            // block past the tail, find the lift's back wall there, and draw the body lifted and pitched.
+            pose(Suspension.LEVEL);
+            sharePose();
         } else if (atTheWheel) {
             poseAtTheWheel(p);
         } else {

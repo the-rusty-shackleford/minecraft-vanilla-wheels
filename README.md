@@ -29,7 +29,9 @@ wall between its back posts; a lift from before grows one when it loads. And eve
 **keyring** that cannot be lost: pairing a vehicle puts the key on it, keys from before move onto it
 at login, and using the ring opens a screen that says where each vehicle is, what a recall costs, and
 recalls one on a Confirm (see [Keys](#damage-repairs-and-recovery-keys-180)). Network 9: the ring's
-screen has a message of its own.
+screen has a message of its own. **1.17.1** (built, unreleased): a docked vehicle is drawn flat on the
+deck; 1.17.0 drew it a fifth of a block up and pitched, the terrain fit having found the back wall a
+block past its tail (Rusty: "floating a wee bit").
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,

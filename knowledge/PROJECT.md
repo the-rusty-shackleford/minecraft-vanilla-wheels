@@ -7,6 +7,16 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.17.1 — built, unreleased (a docked vehicle drawn flat on the deck)
+
+Rusty, 2026-10-14, the first car parked on the box: "It works great, but the car is not touching the
+lift. It is floating a wee bit." The drawn pose is a plane fitted through the ground under and a block
+around the body (`Terrain.step`, `fit` over `bodyLength / 2 + LOOK`); backed up to the back wall the fit
+found the wall's top behind the tail and drew the body 0.19 up and pitched 0.21 rad (the gametest's box
+car; the assertion added first bit on 1.17.0). Held on a lift the body is now posed `Suspension.LEVEL` and
+shared (`Vehicle.tick`): a docked vehicle stands on a flat deck by construction. `LiftGameTests` asserts
+the flat pose after docking.
+
 ## 1.17.0 — released 2026-10-14 in pack 1.86.0 (docking on the Mechanic Lift, and its back wall; the keyring; D-0040, D-0041)
 
 Released on Rusty's go ("go"), tag `v1.17.0` at `9eef31e`; the release gate (`clean build --no-build-cache`,

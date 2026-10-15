@@ -7,7 +7,12 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.18.1 — built and gated 2026-10-15, UNRELEASED until Rusty's go (the spot centred; D-0043)
+## 1.18.1 — released 2026-10-15 in pack 1.89.0 (the spot centred; D-0043)
+
+Released on Rusty's "eh just give a 2 min warning and dpeloy", tag `v1.18.1` at `73f9b5f`; the release gate green
+on that commit: 194 JUnit, 143 GameTests, 67 booth checks; sha1 `5bd4ce51` on GitHub and on the server (the
+server repo's `knowledge/releases/pack-1.89.0.md`). WAXER_01 online: the two-minute warning, the restart at its
+end, Done 2.830 s, 20.000 TPS, the Yggdrasil key fetched.
 
 Rusty, 2026-10-15, on the re-laid garage: "the trailblazer does not center properly based on the new size of
 the lift (it is too far back)". 1.18.0 kept D-0040's "back up to the wall", which on the long deck put a

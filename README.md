@@ -29,9 +29,11 @@ wall between its back posts; a lift from before grows one when it loads. And eve
 **keyring** that cannot be lost: pairing a vehicle puts the key on it, keys from before move onto it
 at login, and using the ring opens a screen that says where each vehicle is, what a recall costs, and
 recalls one on a Confirm (see [Keys](#damage-repairs-and-recovery-keys-180)). Network 9: the ring's
-screen has a message of its own. **1.17.1** (built, unreleased): a docked vehicle is drawn flat on the
-deck; 1.17.0 drew it a fifth of a block up and pitched, the terrain fit having found the back wall a
-block past its tail (Rusty: "floating a wee bit").
+screen has a message of its own. **1.17.1** (released): a docked vehicle is drawn flat on the deck;
+1.17.0 drew it a fifth of a block up and pitched, the terrain fit having found the back wall a block
+past its tail (Rusty: "floating a wee bit"). **1.17.2** (built, unreleased): the keyring may ride in a
+bag you carry; 1.17.1 flagged it as fitting in no container item, which Backpacks+ read as "storage"
+and refused (Backpacks+ 0.8.0 narrows that rule; Rusty: a bag takes what the inventory takes).
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
@@ -385,10 +387,11 @@ the key to issues a new key, and the old one leaves the ring and stops working. 
 loose from before 1.17.0 -- in an inventory, a bag, or waiting to come home -- joins the ring at
 the owner's next login, or when used.
 
-**The ring is never lost.** It lives in your inventory proper: bags, bundles and shulker boxes
-refuse it. The drop key does nothing to it (`ServerPlayerMixin` and `LocalPlayerMixin`, and
-`ItemTossEvent` for a throw out of a screen); put in a chest (or an ender chest, a frame, a pot) or
-in a stranger's inventory, it comes straight back to you; at a death it is
+**The ring is never lost.** It lives on you: your inventory, or a bag you carry (1.17.2; before,
+the bag refused it). The drop key does nothing to it (`ServerPlayerMixin` and `LocalPlayerMixin`,
+and `ItemTossEvent` for a throw out of a screen); put in a chest (or an ender chest, a frame, a
+pot), in a stranger's inventory, or inside a bag, box or bundle that is then dropped, it comes
+straight back to you; at a death it is
 lifted off you before anything drops and is back in your inventory at your respawn, with or
 without keepInventory; if you were away it comes at your login, and if you had no room, within a
 second of making some. Only a `/clear` or the creative inventory's bin can take it; for that, use

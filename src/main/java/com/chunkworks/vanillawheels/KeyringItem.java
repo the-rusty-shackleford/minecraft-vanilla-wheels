@@ -33,8 +33,11 @@ import net.minecraft.world.level.Level;
 
 /**
  * The keyring (D-0041, {@link Keyring}): every key a player holds, on one ring that is never
- * lost -- it cannot be dropped, refuses every container, and comes back after a death. Use opens
- * it: each vehicle with where it is and what a recall would cost, and a Recall button.
+ * lost -- it cannot be dropped, comes back from any container that is not on its owner, and
+ * comes back after a death. A bag the owner carries may hold it (1.17.2: Carried sees a bag's
+ * cells, a dropped bag gives it up, and the menu guard looks inside); it fits in no bundle or
+ * shulker box only as far as the game's own rule sends it home from there. Use opens it: each
+ * vehicle with where it is and what a recall would cost, and a Recall button.
  */
 public final class KeyringItem extends Item {
     /** How many vehicles the tooltip names before it counts the rest. */
@@ -56,12 +59,6 @@ public final class KeyringItem extends Item {
     public static void open(ServerPlayer player) {
         Keyring.gather(player);
         player.openMenu(new SimpleMenuProvider((id, inventory, p) -> new KeyringMenu(id, inventory), Component.translatable("item.vanillawheels.keyring")));
-    }
-
-    /** effects: a ring goes in no bundle or shulker box */
-    @Override
-    public boolean canFitInsideContainerItems() {
-        return false;
     }
 
     @Override

@@ -223,7 +223,7 @@ public final class KeyringGameTests {
     // --- never lost -----------------------------------------------------------
 
     @GameTest(template = "arena", timeoutTicks = 80)
-    public void theRingCannotBeDroppedAndComesBackFromAChestAStrangerAFrameAndABag(GameTestHelper helper) {
+    public void theRingCannotBeDroppedAndComesBackFromAChestAStrangerAFrameAndADroppedBag(GameTestHelper helper) {
         floor(helper);
         Vehicle a = car(helper, 4.5, 4.5);
         ServerPlayer p = player(helper, "owner");
@@ -275,16 +275,25 @@ public final class KeyringGameTests {
             helper.assertTrue(frame.getItem().isEmpty(), "a frame is refused it");
             helper.assertTrue(KeyFobs.onPerson(p, t), "and it stays on its owner");
 
-            // A bag refuses the ring (it fits inside no container item), so with the inventory full but for a bag
-            // a ring coming home has nowhere to go: it waits, and comes within a second of room being made.
+            // In a bag: the inventory full but for the bag, a ring coming home lands in it and is on its owner;
+            // the bag dropped, the ring is taken out of it and, with no room on its owner, waits, and comes
+            // within a second of room being made.
             ItemStack theRing = ring(p).copy();
             p.getInventory().removeItem(ring(p));
             for (int i = 0; i < 36; i++) p.getInventory().setItem(i, new ItemStack(net.minecraft.world.item.Items.DIRT, 64));
             p.getInventory().setItem(20, new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.parse("backpacksplus:basic_backpack"))));
             KeyFobs.sendHome(p.server, theRing);
-            helper.assertTrue(!KeyFobs.onPerson(p, t), "the bag did not take it");
-            helper.assertValueEqual(ringsAndKeysOnTheGround(helper), 0, "and it lies nowhere");
-            helper.assertTrue(KeyFobs.get(p.server).waitingFor(t), "no room on its owner: it waits");
+            helper.assertTrue(KeyFobs.onPerson(p, t), "in the bag, on its owner");
+            helper.assertTrue(Carried.find(p, ringOf(p), true) != null, "and it is the bag that holds it");
+            ItemStack bag = p.getInventory().getItem(20).copy();
+            p.getInventory().setItem(20, new ItemStack(net.minecraft.world.item.Items.DIRT, 64));
+            p.drop(bag, true);
+            helper.assertValueEqual(ringsAndKeysOnTheGround(helper), 0, "the bag dropped: the ring did not go with it");
+            helper.assertTrue(!KeyFobs.onPerson(p, t), "and is off its owner, who has no room");
+            helper.assertTrue(KeyFobs.get(p.server).waitingFor(t), "so it waits");
+            ItemEntity lying = helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(8), e -> e.getItem().is(bag.getItem())).stream().findFirst().orElseThrow();
+            var cells = lying.getItem().getOrDefault(DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY);
+            helper.assertTrue(cells.stream().noneMatch(Keyring::isRing), "the bag on the ground is without it");
             p.getInventory().setItem(3, ItemStack.EMPTY);
         });
         helper.runAtTickTime(50, () -> {

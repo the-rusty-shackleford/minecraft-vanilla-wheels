@@ -118,8 +118,8 @@ it the next time you log in.
 
 ![The keyring's screen](img/keyring.webp)
 
-- **The ring is never lost.** You can't drop it, it refuses chests, bags, bundles, frames and
-  other people's inventories, and it comes back to you when you respawn. Only `/clear` or the creative
+- **The ring is never lost.** You can't drop it, it refuses chests, frames and other people's
+  inventories, a bag that's dropped gives it up, and it comes back to you when you respawn. Only `/clear` or the creative
   bin can destroy it; after that, a blank key used in the air re-issues your keys one by one.
 - **Use the ring** to see your vehicles: each row says where the vehicle is, about how far, and
   what bringing it back costs as a share of its tank. Press **Recall** and the row shows the exact

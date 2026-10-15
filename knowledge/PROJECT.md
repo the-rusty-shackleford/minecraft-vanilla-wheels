@@ -7,7 +7,15 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.17.1 — built, unreleased (a docked vehicle drawn flat on the deck)
+## 1.17.2 — built, unreleased (the keyring rides in a bag)
+
+The other session's Backpacks+ fix (0.8.0): the bag refused the keyring because `KeyringItem` flagged it
+as fitting in no container item, and Backpacks+ read that flag as "this is storage"; Rusty wants a bag
+to take what the inventory takes. The override is gone; the never-lost rules already cover a ring in a
+bag (Carried sees bag cells, a dropped bag gives it up, the menu guard looks inside), and the gametest's
+bag tail now asserts that. To ship with Backpacks+ 0.8.0 as pack 1.87.0.
+
+## 1.17.1 — released 2026-10-14 (tag `v1.17.1` = `fcc5d6b`; a docked vehicle drawn flat on the deck)
 
 Rusty, 2026-10-14, the first car parked on the box: "It works great, but the car is not touching the
 lift. It is floating a wee bit." The drawn pose is a plane fitted through the ground under and a block

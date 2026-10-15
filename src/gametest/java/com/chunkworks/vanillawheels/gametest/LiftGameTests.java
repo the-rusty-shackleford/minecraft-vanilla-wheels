@@ -555,9 +555,14 @@ public final class LiftGameTests {
             helper.assertTrue(car.docked(), "taken");
             helper.assertTrue(car.position().distanceTo(spot) < 0.01, "on its spot: " + car.position() + " vs " + spot);
             helper.assertValueEqual(car.getYRot(), Footprint.Heading.EAST.yaw(), "spun half a turn to face the front");
-            // Backed up to the wall: the tail GAP off the wall's face, which is BAR_MIN into the deck's last cell to the west.
-            double wall = helper.absolutePos(EAST_CONTROLLER).getX() + 1 - lift.footprint().wallFace();
-            helper.assertValueEqual(Math.round((car.getX() - bodyLength(helper, BOX_CAR) / 2 - wall) * 1000) / 1000.0, Docking.GAP, "its tail a gap off the wall");
+            // Centred (D-0043): the nose as far from the front edge (the controller's east face) as the tail from the
+            // wall's face, which is BAR_MIN into the deck's last cell to the west.
+            double front = helper.absolutePos(EAST_CONTROLLER).getX() + 1;
+            double wall = front - lift.footprint().wallFace();
+            double half = bodyLength(helper, BOX_CAR) / 2;
+            double noseMargin = front - (car.getX() + half), tailMargin = (car.getX() - half) - wall;
+            helper.assertValueEqual(Math.round(noseMargin * 1000) / 1000.0, Math.round(tailMargin * 1000) / 1000.0, "the same margin at the nose and the tail");
+            helper.assertTrue(tailMargin >= Docking.GAP, "at least the gap off the wall: " + tailMargin);
             helper.succeed();
         });
     }
@@ -654,10 +659,11 @@ public final class LiftGameTests {
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
         LiftBlockEntity lift = lift(helper, CONTROLLER);
-        // The car facing the front with the trailer hitched close behind it, both on the deck and both in the back
-        // stretch where the two spots lie (z 6.56..10.06): each stands where the other's spot is, so neither is clear.
-        Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 6.0), 180.0f);
-        Vehicle trailer = stand(helper, BOX_TRAILER, new Vec3(7.5, DECK, 9.3), 180.0f);
+        // The car facing the front with the trailer hitched close behind it, both on the deck and both across the
+        // middle where the two spots lie (the car's z 5.16..8.16, the trailer's 4.91..8.41): each stands where the
+        // other's spot is, so neither is clear.
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 5.0), 180.0f);
+        Vehicle trailer = stand(helper, BOX_TRAILER, new Vec3(7.5, DECK, 8.3), 180.0f);
         car.hitch(trailer);
         helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TOWING, "unhitch first");
         helper.runAtTickTime(Docking.REST + 5, () -> {
@@ -716,7 +722,7 @@ public final class LiftGameTests {
     }
 
     @GameTest(template = "arena", timeoutTicks = 120)
-    public void aShortLiftDocksAgainstItsOwnWallTwoRowsNearerThanALongOne(GameTestHelper helper) {
+    public void aShortLiftCentresByItsOwnWallABlockNearerThanALongOne(GameTestHelper helper) {
         layFloor(helper);
         // A six-long lift whole, as the box's garage lifts are: laid by commands, every part flagged short.
         Footprint old = Footprint.SHORT;
@@ -731,8 +737,8 @@ public final class LiftGameTests {
         Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 5.0), 180.0f);
         Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
         double depth = spot.z - helper.absolutePos(CONTROLLER).getZ();
-        helper.assertValueEqual(Math.round(depth * 1e4) / 1e4, Math.round(Docking.depth(old, bodyLength(helper, BOX_CAR)) * 1e4) / 1e4, "the spot by the short deck's wall");
-        helper.assertValueEqual(Math.round((Docking.depth(Footprint.LONG, bodyLength(helper, BOX_CAR)) - depth) * 1e4) / 1e4, 2.0, "two rows nearer than on a long one");
+        helper.assertValueEqual(Math.round(depth * 1e4) / 1e4, Math.round(Docking.depth(old, bodyLength(helper, BOX_CAR)) * 1e4) / 1e4, "the spot in the short deck's middle");
+        helper.assertValueEqual(Math.round((Docking.depth(Footprint.LONG, bodyLength(helper, BOX_CAR)) - depth) * 1e4) / 1e4, 1.0, "a block nearer than on a long one: half the two rows");
         helper.assertTrue(bodyLength(helper, BOX_LONG) > Docking.longest(old), "the long box fits neither");
         helper.runAtTickTime(Docking.REST + 2 + LiftMotion.JOB + 2, () -> {
             helper.assertTrue(car.docked(), "taken");

@@ -175,17 +175,18 @@ Steel comes from [Metals and Materials](/wiki/metals-and-materials).
 ### Parking on a lift
 
 A lift **parks** whatever you leave on it. Drive onto the deck, get out, and half a second
-later the rams run: the deck comes up, the vehicle slides to the middle and backs up to the
-wall, turning to face the front if it wasn't, and the deck sets it down. It stays put, square
-and centred, until someone in the driver's seat presses the throttle, which lets it go. A
+later the rams run: the deck comes up, the vehicle slides to the middle of the deck, as far
+from the front edge as from the wall, turning to face the front if it wasn't, and the deck
+sets it down. It stays put, square and centred, until someone in the driver's seat presses
+the throttle, which lets it go. A
 garage of lifts is a row of vehicles parked alike, and a parked vehicle is in the right place
 for Paint and Repair.
 
 ![A car parked on a lift, backed up to its wall](img/lift-docked.webp)
 
 - Anything that fits parks: cars, pickups and trailers. The Farmer's Pickup sits whole on an
-  eight-long deck; on an older six-long lift its nose hangs a little over the front edge.
-  Helicopters are too long and are left alone.
+  eight-long deck; on an older six-long lift it backs up to the wall with its nose a little
+  over the front edge. Helicopters are too long and are left alone.
 - A truck with a trailer hitched isn't taken; unhitch the trailer first, and move it off if it
   stands where the truck would go. The menu's status line says what the lift is waiting for.
 - One vehicle to a lift. A second one left on the deck stays where it is.

@@ -40,7 +40,11 @@ parks whole on the deck (Rusty: it "doesnt really fit", "make it a little bigger
 shape it was laid with: its blocks carry a `long` flag, every lift placed from now on has it, and a
 lift from before reads as the six-long shape it was and goes on working as it did; break it and place
 it again for the long one. Network 10, since the lift's blocks have a new state (see
-[The Mechanic Lift](#the-mechanic-lift)).
+[The Mechanic Lift](#the-mechanic-lift)). **1.18.1** (D-0043): a parked vehicle sits **centred**
+between the deck's front edge and the wall, the same margin at both ends; 1.18.0 still backed every
+vehicle up to the wall, the rule from when the Pickup was longer than the deck, which on the long deck
+left a Trailblazer two blocks behind the middle (Rusty: "too far back"). A body too long to leave a
+quarter block at both ends still backs up to the wall with its nose over the front edge.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
@@ -693,9 +697,13 @@ of a standing lift removes that lift whole.
 A vehicle **left standing on a lift's deck is taken by it** (D-0040, `domain/Docking`): with
 nobody at the wheel, neither towing nor towed, still on the ground for half a second, and
 its centre over the deck, the lift runs its job and through the hold the vehicle glides to
-its **spot** -- centred across the deck, backed up to the wall with its tail a quarter block
-off the wall's face, nose to the front -- turning the short way to face the front (a vehicle
-that came in backwards is spun half a turn). From then on it is **docked**: held on its
+its **spot** -- centred across the deck and, since 1.18.1 (D-0043), centred along it too:
+the middle of the stretch from the front edge to the wall's face, so the nose is as far from
+the edge as the tail is from the wall (`Docking.centres`: any body that leaves a quarter block
+at both ends; the whole fleet on a long lift). A body too long for that backs up to the wall,
+its tail a quarter block off the wall's face and its nose over the front edge (the Pickup on a
+six-long lift). It turns the short way to face the front (a vehicle that came in backwards is
+spun half a turn). From then on it is **docked**: held on its
 spot, its steering dead, until a throttle lets it go -- the driver's (W or S; their client
 lets go at once and the server follows when their drive state arrives) or a script's. A
 released vehicle that stops on the deck again is simply taken again. Build stands a new
@@ -714,7 +722,9 @@ truck, say); and a **driver** at the wheel, who need only step out. A protocol b
 one may refuse docking for its vehicles through the `docks()` hook (below).
 
 A docked vehicle stays docked across a save (`Docked`, its lift's controller position) and
-is set on its spot again as it loads. It is let go when its lift is gone, or when it is found
+is set on its spot again as it loads: a vehicle parked under 1.18.0 moves to the centred spot
+by itself, snapped there if it is within a block, else let go and taken again, which runs the
+rams once. It is let go when its lift is gone, or when it is found
 more than a block from its spot: a key's recall, a command, anything that moved it away.
 Hitching a docked trailer to a truck lets it go too. A vehicle that was already standing on a
 lift when 1.17.0 arrives is taken the first time it is seen standing still: every car in a

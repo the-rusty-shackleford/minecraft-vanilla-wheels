@@ -29,10 +29,12 @@ import org.junit.jupiter.api.Test;
  * hair wider; as long as the longest, a hair longer; the fleet (the
  * Trailblazer, the Pickup, the Trailer, the subs dock on both; the Huey
  * and the Chinook on neither); what the long deck takes that the short
- * one does not. Depth: a body's tail lands GAP off the wall on each shape;
- * the longest body's nose lands OVERHANG past the front; the Pickup's nose
- * is past the short deck's front edge and on the long deck; no length
- * refused. Progress: nowhere
+ * one does not. Depth (D-0043): a body that leaves GAP at both ends sits
+ * centred between the front edge and the wall's face, the same margin each
+ * end, on each shape; one that does not backs up to the wall, its tail GAP
+ * off the face; the two rules agree at the boundary; the longest body's
+ * nose lands OVERHANG past the front; the Pickup centres on the long deck
+ * and backs up on the short, its nose over the edge; no length refused. Progress: nowhere
  * through the rise, rising through the hold and monotone, there through
  * the fall, out of range refused. Turn: none, a quarter each way, a half
  * either way goes positive, more than a turn around, wrapping past 360.
@@ -67,21 +69,33 @@ final class DockingTest {
     }
 
     @Test
-    void aDockedBodyBacksUpToTheWallOnEachDeck() {
-        double length = 4.64;
+    void aDockedBodySitsCentredWithTheSameMarginAtBothEndsOrBacksUpToTheWall() {
         for (Footprint f : java.util.List.of(Footprint.SHORT, Footprint.LONG)) {
-            double depth = Docking.depth(f, length);
-            assertEquals(f.wallFace() - Docking.GAP, depth + length / 2.0, 1e-12, "its tail GAP off the wall's face");
+            double face = f.wallFace();
+            for (double length : new double[] {3.0, 4.64}) {
+                assertTrue(Docking.centres(f, length), length + " centres on " + f.length());
+                double depth = Docking.depth(f, length);
+                double front = depth - length / 2.0, back = face - (depth + length / 2.0);
+                assertEquals(front, back, 1e-12, "the same margin at the nose and the tail");
+                assertTrue(back >= Docking.GAP, "and at least the gap");
+                assertEquals(face / 2.0, depth, 1e-12, "the middle of the stretch from the front edge to the wall's face");
+            }
+            double edge = face - 2.0 * Docking.GAP;
+            assertTrue(Docking.centres(f, edge), "a body that leaves exactly the gap at both ends centres");
+            assertFalse(Docking.centres(f, edge + 1e-9), "a hair longer backs up");
+            assertEquals(Docking.depth(f, edge), face - Docking.GAP - edge / 2.0, 1e-12, "and the two rules agree there");
             double longest = Docking.longest(f);
-            double nose = Docking.depth(f, longest) - longest / 2.0;
-            assertEquals(-Docking.OVERHANG, nose, 1e-12, "the longest body's nose hangs OVERHANG past the front edge");
+            assertEquals(face - Docking.GAP, Docking.depth(f, longest) + longest / 2.0, 1e-12, "backed up: the tail GAP off the wall's face");
+            assertEquals(-Docking.OVERHANG, Docking.depth(f, longest) - longest / 2.0, 1e-12, "the longest body's nose hangs OVERHANG past the front edge");
             assertThrows(IllegalArgumentException.class, () -> Docking.depth(f, 0.0));
             assertThrows(IllegalArgumentException.class, () -> Docking.depth(f, -1.0));
         }
-        assertEquals(2.7425, Docking.depth(Footprint.SHORT, length), 1e-12, "a Trailblazer sits a quarter block behind the short deck's centre");
-        assertEquals(4.7425, Docking.depth(Footprint.LONG, length), 1e-12, "and two blocks deeper on the long one: the wall is where it is measured from");
-        assertTrue(Docking.depth(Footprint.SHORT, 6.44) - 3.22 < 0, "a Pickup's nose is past the short deck's front edge");
-        assertEquals(0.6225, Docking.depth(Footprint.LONG, 6.44) - 3.22, 1e-12, "and more than half a block inside the long deck's (D-0042)");
+        assertEquals(2.65625, Docking.depth(Footprint.SHORT, 4.64), 1e-12, "a Trailblazer: the short deck's middle, a third of a block off the wall");
+        assertEquals(3.65625, Docking.depth(Footprint.LONG, 4.64), 1e-12, "and a block deeper on the long one, 1.34 off each end");
+        assertFalse(Docking.centres(Footprint.SHORT, 6.44), "the Pickup backs up on the short deck");
+        assertTrue(Docking.depth(Footprint.SHORT, 6.44) - 3.22 < 0, "its nose past the front edge");
+        assertTrue(Docking.centres(Footprint.LONG, 6.44), "and centres on the long one");
+        assertEquals(0.43625, Docking.depth(Footprint.LONG, 6.44) - 3.22, 1e-12, "0.44 inside the front edge, and the same off the wall (D-0042, D-0043)");
     }
 
     @Test

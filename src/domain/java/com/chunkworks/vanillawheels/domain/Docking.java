@@ -51,15 +51,26 @@ public final class Docking {
     }
 
     /**
+     * effects: returns whether a body {@code length} long sits centred on a lift shaped {@code f}:
+     * between the front edge and the wall's face with the same margin at both ends, that margin
+     * at least GAP (D-0043)
+     */
+    public static boolean centres(Footprint f, double length) {
+        return length <= f.wallFace() - 2.0 * GAP;
+    }
+
+    /**
      * requires: length > 0
      * effects: returns the depth from the deck's front edge of a docked body's centre on a lift
-     * shaped {@code f}, for a body {@code length} long: its tail GAP off the wall's face
+     * shaped {@code f}, for a body {@code length} long: the middle of the stretch from the front
+     * edge to the wall's face when the body {@link #centres}, else as deep as the wall allows, its
+     * tail GAP off the wall's face and its nose over the front edge (D-0043)
      */
     public static double depth(Footprint f, double length) {
         if (!(length > 0)) {
             throw new IllegalArgumentException("a body has length: " + length);
         }
-        return f.wallFace() - GAP - length / 2.0;
+        return centres(f, length) ? f.wallFace() / 2.0 : f.wallFace() - GAP - length / 2.0;
     }
 
     /**

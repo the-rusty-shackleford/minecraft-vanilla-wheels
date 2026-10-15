@@ -7,6 +7,16 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.18.1 — built and gated 2026-10-15, UNRELEASED until Rusty's go (the spot centred; D-0043)
+
+Rusty, 2026-10-15, on the re-laid garage: "the trailblazer does not center properly based on the new size of
+the lift (it is too far back)". 1.18.0 kept D-0040's "back up to the wall", which on the long deck put a
+Trailblazer two blocks behind the middle. `Docking.depth` is now the middle of the stretch from the front edge
+to the wall's face for any body that leaves `GAP` at both ends (`Docking.centres`), else backed up as before;
+the rules agree at the boundary. A vehicle docked under 1.18.0 moves to the new spot as it loads (snapped
+within `HOLD`, else let go and taken again). Network 10 unchanged. Gate: 194 JUnit, 143 GameTests (the east
+lift's spin test asserts equal margins; the towing pair re-stood across the middle), the booth.
+
 ## 1.18.0 — released 2026-10-15 in pack 1.88.0 (the eight-long lift; D-0042)
 
 Released on Rusty's "go", tag `v1.18.0` at `dd8e5a6`; the release gate (`clean build --no-build-cache`, the booth

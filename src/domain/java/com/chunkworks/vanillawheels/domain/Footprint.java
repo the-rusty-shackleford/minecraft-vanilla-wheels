@@ -22,34 +22,29 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * The Mechanic Lift's shape: a deck five cells wide and six long, one
- * cell high, with a one-cell post on each corner of the deck and a
- * one-cell wall between the two back posts (D-0040), so the lift has an
- * obvious back. The controller is the deck's front-centre cell; every
- * other cell is a part with an index, and the index alone finds the
- * controller again.
+ * The Mechanic Lift's shape: a deck five cells wide and {@code length} long, one cell high, with
+ * a one-cell post on each corner of the deck and a one-cell wall between the two back posts
+ * (D-0040), so the lift has an obvious back. The controller is the deck's front-centre cell;
+ * every other cell is a part with an index, and the index alone finds the controller again.
  *
- * <p>Cells are in the lift's own frame, offsets from the controller:
- * {@code right} across the deck (negative to the left), {@code back}
- * along it away from the front, {@code up} from the deck. A {@link Heading}
- * turns them into world offsets; the front is where the controller looks,
- * the deck lies behind it.
+ * <p>Two lengths exist (D-0042): {@link #SHORT}, six long, every lift laid before 1.18.0; and
+ * {@link #LONG}, eight long, every lift laid since, which takes the Farmer's Pickup whole. A
+ * lift keeps the shape it was laid with: its blocks say which. The cells of the six-long shape
+ * are in the order they always were, so a saved lift keeps every index it has.
  *
- * <p>RI: cells() has WIDTH * LENGTH + 4 * POST + (WIDTH - 2) entries,
- *     distinct, the controller first, the wall last (its cells were added
- *     in 1.17.0, after the deck and the posts, so a lift saved before keeps
- *     every index it has); indexOf and cell are inverse on 1..PARTS.
- * AF: the list of cells, in index order, is the lift.
+ * <p>Cells are in the lift's own frame, offsets from the controller: {@code right} across the
+ * deck (negative to the left), {@code back} along it away from the front, {@code up} from the
+ * deck. A {@link Heading} turns them into world offsets; the front is where the controller
+ * looks, the deck lies behind it.
+ *
+ * <p>RI: cells() has WIDTH * length + 4 * POST + (WIDTH - 2) entries, distinct, the controller
+ *     first, then the deck row by row, the posts, the wall last; indexOf and cell are inverse on
+ *     1..parts(). AF: the list of cells, in index order, is the lift.
  */
 public final class Footprint {
-    private Footprint() {}
-
     public static final int WIDTH = 5;
-    public static final int LENGTH = 6;
     /** Blocks in each corner post, above the deck. */
     public static final int POST = 1;
-    /** Cells besides the controller: the deck, the posts, the back wall. */
-    public static final int PARTS = WIDTH * LENGTH - 1 + 4 * POST + (WIDTH - 2);
     /**
      * Where a post or the wall stands within its cell, across the slim way, as a share of the
      * cell: the posts are columns six sixteenths square in the middle, the wall a bar as thick
@@ -57,8 +52,46 @@ public final class Footprint {
      */
     public static final double BAR_MIN = 5.0 / 16.0;
     public static final double BAR_MAX = 11.0 / 16.0;
-    /** The depth of the wall's front face from the deck's front edge, blocks: what a docked body backs up to. */
-    public static final double WALL_FACE = LENGTH - 1 + BAR_MIN;
+
+    /** The lift as laid before 1.18.0: a deck six long. */
+    public static final Footprint SHORT = new Footprint(6);
+    /** The lift as laid since 1.18.0: a deck eight long, which takes the Farmer's Pickup whole (D-0042). */
+    public static final Footprint LONG = new Footprint(8);
+    /** The most parts a lift has, for a part's index property. */
+    public static final int MAX_PARTS = LONG.parts();
+
+    private final int length;
+    private final List<Cell> cells;
+
+    private Footprint(int length) {
+        this.length = length;
+        this.cells = build(length);
+    }
+
+    /** effects: returns the shape a lift laid {@code isLong} has */
+    public static Footprint of(boolean isLong) {
+        return isLong ? LONG : SHORT;
+    }
+
+    /** effects: returns the deck's length, cells */
+    public int length() {
+        return length;
+    }
+
+    /** effects: returns whether this is the long shape */
+    public boolean isLong() {
+        return this == LONG;
+    }
+
+    /** effects: returns how many cells besides the controller: the deck, the posts, the back wall */
+    public int parts() {
+        return cells.size() - 1;
+    }
+
+    /** effects: returns the depth of the wall's front face from the deck's front edge, blocks: what a docked body backs up to */
+    public double wallFace() {
+        return length - 1 + BAR_MIN;
+    }
 
     /** One cell of the lift, offsets from the controller in the lift's frame. */
     public record Cell(int right, int up, int back) {
@@ -137,13 +170,11 @@ public final class Footprint {
         }
     }
 
-    private static final List<Cell> CELLS = build();
-
-    private static List<Cell> build() {
+    private static List<Cell> build(int length) {
         List<Cell> cells = new ArrayList<>();
         cells.add(new Cell(0, 0, 0));
         int half = WIDTH / 2;
-        for (int back = 0; back < LENGTH; back++) {
+        for (int back = 0; back < length; back++) {
             for (int right = -half; right <= half; right++) {
                 if (back != 0 || right != 0) {
                     cells.add(new Cell(right, 0, back));
@@ -151,22 +182,22 @@ public final class Footprint {
             }
         }
         for (int right : new int[] {-half, half}) {
-            for (int back : new int[] {0, LENGTH - 1}) {
+            for (int back : new int[] {0, length - 1}) {
                 for (int up = 1; up <= POST; up++) {
                     cells.add(new Cell(right, up, back));
                 }
             }
         }
-        // The wall last: the indices before it are what lifts saved before 1.17.0 carry.
+        // The wall last: in the six-long shape the indices before it are what lifts saved before 1.17.0 carry.
         for (int right = -half + 1; right <= half - 1; right++) {
-            cells.add(new Cell(right, 1, LENGTH - 1));
+            cells.add(new Cell(right, 1, length - 1));
         }
         return List.copyOf(cells);
     }
 
-    /** effects: returns every cell, the controller at index 0, the parts at 1..PARTS */
-    public static List<Cell> cells() {
-        return CELLS;
+    /** effects: returns every cell, the controller at index 0, the parts at 1..parts() */
+    public List<Cell> cells() {
+        return cells;
     }
 
     /**
@@ -175,14 +206,14 @@ public final class Footprint {
      * a front post's column; a back post's column run on to the cell's edge toward the wall;
      * the wall right across its cell -- so the back row's bars meet end to end
      */
-    public static List<double[]> bars(Cell c) {
+    public List<double[]> bars(Cell c) {
         if (c.isDeck()) {
             return List.of();
         }
         if (c.isWall()) {
             return List.of(new double[] {0.0, 1.0, BAR_MIN, BAR_MAX});
         }
-        if (c.back() == LENGTH - 1) {
+        if (c.back() == length - 1) {
             return c.right() < 0
                     ? List.of(new double[] {BAR_MIN, 1.0, BAR_MIN, BAR_MAX})
                     : List.of(new double[] {0.0, BAR_MAX, BAR_MIN, BAR_MAX});
@@ -191,29 +222,29 @@ public final class Footprint {
     }
 
     /**
-     * requires: 1 <= index <= PARTS
+     * requires: 1 <= index <= parts()
      * effects: returns the part with {@code index}
      */
-    public static Cell cell(int index) {
-        if (index < 1 || index > PARTS) {
-            throw new IllegalArgumentException("a part index is 1.." + PARTS + ": " + index);
+    public Cell cell(int index) {
+        if (index < 1 || index > parts()) {
+            throw new IllegalArgumentException("a part index is 1.." + parts() + ": " + index);
         }
-        return CELLS.get(index);
+        return cells.get(index);
     }
 
     /**
      * effects: returns the index of {@code cell}: 0 for the controller,
-     * 1..PARTS for a part; -1 if it is no cell of the lift
+     * 1..parts() for a part; -1 if it is no cell of the lift
      */
-    public static int indexOf(Cell cell) {
-        return CELLS.indexOf(cell);
+    public int indexOf(Cell cell) {
+        return cells.indexOf(cell);
     }
 
     /**
      * effects: returns the world offset (x, y, z) from a part at
      * {@code index} back to its controller, for a lift facing {@code h}
      */
-    public static int[] toController(int index, Heading h) {
+    public int[] toController(int index, Heading h) {
         int[] o = h.offset(cell(index));
         return new int[] {-o[0], -o[1], -o[2]};
     }
@@ -224,13 +255,13 @@ public final class Footprint {
      * {@code supported} (the caller tests the block under it) -- or null
      * when every cell passes
      */
-    public static Cell firstBlocked(Predicate<Cell> free, Predicate<Cell> supported) {
-        for (Cell c : CELLS) {
+    public Cell firstBlocked(Predicate<Cell> free, Predicate<Cell> supported) {
+        for (Cell c : cells) {
             if (!free.test(c)) {
                 return c;
             }
         }
-        for (Cell c : CELLS) {
+        for (Cell c : cells) {
             if (c.isDeck() && !supported.test(c)) {
                 return c;
             }
@@ -243,10 +274,10 @@ public final class Footprint {
      * controller, inclusive minimum and maximum (x, y, z), for a lift
      * facing {@code h}
      */
-    public static int[][] bounds(Heading h) {
+    public int[][] bounds(Heading h) {
         int[] min = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE};
         int[] max = {Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
-        for (Cell c : CELLS) {
+        for (Cell c : cells) {
             int[] o = h.offset(c);
             for (int i = 0; i < 3; i++) {
                 min[i] = Math.min(min[i], o[i]);
@@ -260,9 +291,9 @@ public final class Footprint {
      * effects: returns the point on the deck's centre line {@code depth}
      * blocks back from its front edge, on top of the deck, as an offset
      * from the controller's corner (x, y, z), for a lift facing {@code h};
-     * the deck's own centre is at depth LENGTH / 2
+     * the deck's own centre is at depth length() / 2
      */
-    public static double[] onDeck(Heading h, double depth) {
+    public double[] onDeck(Heading h, double depth) {
         double back = depth - 0.5;
         return new double[] {
                 0.5 - back * h.dx,
@@ -276,7 +307,7 @@ public final class Footprint {
      * controller's corner: min (x, y, z) and max, the deck's top face up
      * to the posts' top, for a lift facing {@code h}
      */
-    public static double[][] deckBox(Heading h) {
+    public double[][] deckBox(Heading h) {
         int[][] b = bounds(h);
         return new double[][] {
                 {b[0][0], 1.0, b[0][2]},

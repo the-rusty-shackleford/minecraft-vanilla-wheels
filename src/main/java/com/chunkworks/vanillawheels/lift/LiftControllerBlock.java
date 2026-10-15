@@ -45,6 +45,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.AABB;
@@ -56,14 +57,21 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
  * other cells as {@link LiftPartBlock}s facing the same way; removing it,
  * by any means, removes them all; breaking it drops the lift item once.
  * Invisible, since the block entity renderer draws the whole lift.
+ *
+ * <p>A lift's shape is in its blocks' state ({@link #LONG}, D-0042): a lift
+ * placed since 1.18.0 is the eight-long {@link Footprint#LONG}; one saved
+ * before has no such property, reads as {@code false}, and stays the
+ * six-long {@link Footprint#SHORT} it was laid as.
  */
 public final class LiftControllerBlock extends BaseEntityBlock {
     public static final MapCodec<LiftControllerBlock> CODEC = simpleCodec(LiftControllerBlock::new);
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    /** Whether the lift is the eight-long shape; false, the default every lift from before 1.18.0 reads, is the six-long one. */
+    public static final BooleanProperty LONG = BooleanProperty.create("long");
 
     public LiftControllerBlock(BlockBehaviour.Properties props) {
         super(props);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LONG, false));
     }
 
     @Override
@@ -73,7 +81,12 @@ public final class LiftControllerBlock extends BaseEntityBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, LONG);
+    }
+
+    /** effects: returns the shape of the lift whose controller or part is in {@code state} */
+    public static Footprint footprint(BlockState state) {
+        return Footprint.of(state.getValue(LONG));
     }
 
     @Override
@@ -98,8 +111,8 @@ public final class LiftControllerBlock extends BaseEntityBlock {
     }
 
     /**
-     * effects: returns the state for a lift facing the player, or null --
-     * so nothing is placed -- when a cell of the footprint is not free or
+     * effects: returns the state for a long lift facing the player, or null
+     * -- so nothing is placed -- when a cell of the footprint is not free or
      * a deck cell has nothing solid under it. Entities in the way count
      * as not free, as they do for any block.
      */
@@ -107,17 +120,18 @@ public final class LiftControllerBlock extends BaseEntityBlock {
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
         Direction facing = ctx.getHorizontalDirection().getOpposite();
-        return blocked(ctx.getLevel(), ctx.getClickedPos(), facing) == null ? defaultBlockState().setValue(FACING, facing) : null;
+        return blocked(ctx.getLevel(), ctx.getClickedPos(), facing, Footprint.LONG) == null
+                ? defaultBlockState().setValue(FACING, facing).setValue(LONG, true) : null;
     }
 
     /**
-     * effects: returns the first cell that keeps a lift with its controller
-     * at {@code controller} facing {@code facing} from standing in
+     * effects: returns the first cell that keeps a lift shaped {@code f} with its
+     * controller at {@code controller} facing {@code facing} from standing in
      * {@code level}, or null when it may
      */
     @Nullable
-    public static Cell blocked(Level level, BlockPos controller, Direction facing) {
-        return Footprint.firstBlocked(
+    public static Cell blocked(Level level, BlockPos controller, Direction facing, Footprint f) {
+        return f.firstBlocked(
                 c -> {
                     BlockPos p = at(controller, facing, c);
                     return level.getBlockState(p).canBeReplaced() && level.getEntities(null, new AABB(p)).isEmpty();
@@ -128,15 +142,17 @@ public final class LiftControllerBlock extends BaseEntityBlock {
                 });
     }
 
-    /** effects: lays every part of the footprint around the controller just placed */
+    /** effects: lays every part of the footprint around the controller just placed, each carrying the lift's facing and shape */
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         Direction facing = state.getValue(FACING);
-        List<Cell> cells = Footprint.cells();
-        for (int i = 1; i <= Footprint.PARTS; i++) {
+        Footprint f = footprint(state);
+        List<Cell> cells = f.cells();
+        for (int i = 1; i <= f.parts(); i++) {
             BlockState part = ModContent.LIFT_PART.get().defaultBlockState()
                     .setValue(LiftPartBlock.FACING, facing)
-                    .setValue(LiftPartBlock.INDEX, i);
+                    .setValue(LiftPartBlock.INDEX, i)
+                    .setValue(LONG, f.isLong());
             level.setBlock(at(pos, facing, cells.get(i)), part, Block.UPDATE_ALL);
         }
     }
@@ -146,8 +162,9 @@ public final class LiftControllerBlock extends BaseEntityBlock {
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
         if (!state.is(newState.getBlock())) {
             Direction facing = state.getValue(FACING);
-            for (int i = 1; i <= Footprint.PARTS; i++) {
-                BlockPos p = at(pos, facing, Footprint.cell(i));
+            Footprint f = footprint(state);
+            for (int i = 1; i <= f.parts(); i++) {
+                BlockPos p = at(pos, facing, f.cell(i));
                 if (level.getBlockState(p).is(ModContent.LIFT_PART.get())) {
                     level.removeBlock(p, false);
                 }

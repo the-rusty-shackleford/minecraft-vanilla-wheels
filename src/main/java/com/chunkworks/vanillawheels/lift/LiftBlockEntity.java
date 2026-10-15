@@ -79,6 +79,11 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
         return LiftControllerBlock.heading(facing());
     }
 
+    /** effects: returns this lift's shape: six long from before 1.18.0, eight long since (D-0042) */
+    public Footprint footprint() {
+        return LiftControllerBlock.footprint(getBlockState());
+    }
+
     /** effects: returns whether a job is running */
     public boolean busy() {
         return jobTicks > 0;
@@ -120,7 +125,7 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
 
     /** effects: returns the box above the deck, in the world */
     public AABB deckBox() {
-        double[][] b = Footprint.deckBox(heading());
+        double[][] b = footprint().deckBox(heading());
         return new AABB(worldPosition.getX() + b[0][0], worldPosition.getY() + b[0][1], worldPosition.getZ() + b[0][2],
                 worldPosition.getX() + b[1][0], worldPosition.getY() + b[1][1], worldPosition.getZ() + b[1][2]);
     }
@@ -131,8 +136,9 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
      */
     private void growWall() {
         Direction facing = facing();
-        for (int i = 1; i <= Footprint.PARTS; i++) {
-            Cell c = Footprint.cell(i);
+        Footprint f = footprint();
+        for (int i = 1; i <= f.parts(); i++) {
+            Cell c = f.cell(i);
             if (!c.isWall()) {
                 continue;
             }
@@ -140,7 +146,7 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
             BlockState there = level.getBlockState(at);
             if (!there.is(ModContent.LIFT_PART.get()) && there.canBeReplaced()) {
                 level.setBlock(at, ModContent.LIFT_PART.get().defaultBlockState()
-                        .setValue(LiftPartBlock.FACING, facing).setValue(LiftPartBlock.INDEX, i), Block.UPDATE_ALL);
+                        .setValue(LiftPartBlock.FACING, facing).setValue(LiftPartBlock.INDEX, i).setValue(LiftPartBlock.LONG, f.isLong()), Block.UPDATE_ALL);
             }
         }
     }
@@ -151,7 +157,8 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
      * where Build stands a new one
      */
     public Vec3 spot(double length) {
-        double[] s = Footprint.onDeck(heading(), Docking.depth(length));
+        Footprint f = footprint();
+        double[] s = f.onDeck(heading(), Docking.depth(f, length));
         return new Vec3(worldPosition.getX() + s[0], worldPosition.getY() + s[1], worldPosition.getZ() + s[2]);
     }
 
@@ -182,7 +189,7 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
         VehicleProfile p = v.profile();
         Vehicle holder = dockedVehicle();
         return LiftStatus.dock(true, holder == v, busy(), v.trailer() != null || v.tower() != null,
-                p != null && v.docks() && Docking.fits(p.body().width(), p.body().length()), holder != null,
+                p != null && v.docks() && Docking.fits(footprint(), p.body().width(), p.body().length()), holder != null,
                 p == null || clearFor(p, v), v.getControllingPassenger() != null);
     }
 
@@ -208,7 +215,7 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
      */
     public boolean take(Vehicle v) {
         VehicleProfile p = v.profile();
-        if (busy() || p == null || !v.docks() || !Docking.fits(p.body().width(), p.body().length())) {
+        if (busy() || p == null || !v.docks() || !Docking.fits(footprint(), p.body().width(), p.body().length())) {
             return false;
         }
         Vehicle holder = dockedVehicle();

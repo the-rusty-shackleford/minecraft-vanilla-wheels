@@ -42,8 +42,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class Payloads {
     private Payloads() {}
 
-    /** Bumped when a payload's shape changes; a mismatch refuses the connection early. */
-    private static final String VERSION = "9";
+    /**
+     * Bumped when a payload's shape changes, or when a block's states do (a client with the other
+     * side's state table reads every block state after it wrong); a mismatch refuses the
+     * connection early. 10: the Mechanic Lift's blocks gained their shape flag (D-0042).
+     */
+    private static final String VERSION = "10";
 
     /** The driver's state of the vehicle it drives. */
     public record DriveState(int vehicle, float speed, float steer, int throttle, boolean drifting, float burn) implements CustomPacketPayload {

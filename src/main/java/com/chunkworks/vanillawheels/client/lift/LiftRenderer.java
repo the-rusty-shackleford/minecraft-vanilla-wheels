@@ -41,8 +41,9 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 /**
- * Draws a whole Mechanic Lift from its controller: a cube per deck cell, a
- * slim column per post cell and the back wall's bar between the back posts
+ * Draws a whole Mechanic Lift from its controller, in its own shape
+ * ({@link LiftBlockEntity#footprint}): a cube per deck cell, a slim column
+ * per post cell and the back wall's bar between the back posts
  * ({@link Footprint#bars}) on a steel-plate texture, a hazard band along
  * the deck's outer edge, the lot raised by the block entity's {@code raise}
  * while a job runs. The blocks themselves are invisible; this is all anyone
@@ -66,6 +67,7 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
         BlockPos pos = lift.getBlockPos();
         int light = LevelRenderer.getLightColor(lift.getLevel(), pos.above());
         Heading h = lift.heading();
+        Footprint f = lift.footprint();
         double raise = lift.raise(partialTick);
         pose.pushPose();
         pose.translate(0.0, raise, 0.0);
@@ -73,19 +75,19 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
         // buffer when another type is asked for, so the two textures are
         // two passes, not two interleaved buffers.
         VertexConsumer deck = buffers.getBuffer(RenderType.entityCutoutNoCull(DECK_TEXTURE));
-        for (Cell c : Footprint.cells()) {
+        for (Cell c : f.cells()) {
             if (c.isDeck()) {
                 int[] o = h.offset(c);
                 top(pose, deck, o[0], o[1], o[2], 0.0f, 1.0f, 0.0f, 1.0f, light);
             }
         }
         VertexConsumer plate = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
-        for (Cell c : Footprint.cells()) {
+        for (Cell c : f.cells()) {
             int[] o = h.offset(c);
             if (c.isDeck()) {
                 sides(pose, plate, o[0], o[1], o[2], 0.0f, 1.0f, 0.0f, 1.0f, light);
             } else {
-                for (double[] bar : Footprint.bars(c)) {
+                for (double[] bar : f.bars(c)) {
                     double[] a = h.local(bar[0], bar[2]);
                     double[] b = h.local(bar[1], bar[3]);
                     float x0 = (float) Math.min(a[0], b[0]), x1 = (float) Math.max(a[0], b[0]);
@@ -98,14 +100,14 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
         // The hazard band: along every deck edge with no deck cell beyond it, a hair above the plate.
         VertexConsumer stripe = buffers.getBuffer(RenderType.entityCutoutNoCull(STRIPE_TEXTURE));
         Set<Long> deckCells = new HashSet<>();
-        for (Cell c : Footprint.cells()) {
+        for (Cell c : f.cells()) {
             if (c.isDeck()) {
                 int[] o = h.offset(c);
                 deckCells.add(key(o[0], o[2]));
             }
         }
         float y = 1.0f + 0.002f;
-        for (Cell c : Footprint.cells()) {
+        for (Cell c : f.cells()) {
             if (!c.isDeck()) {
                 continue;
             }
@@ -169,7 +171,7 @@ public final class LiftRenderer implements BlockEntityRenderer<LiftBlockEntity> 
 
     @Override
     public AABB getRenderBoundingBox(LiftBlockEntity lift) {
-        int[][] b = Footprint.bounds(lift.heading());
+        int[][] b = lift.footprint().bounds(lift.heading());
         BlockPos p = lift.getBlockPos();
         return new AABB(p.getX() + b[0][0], p.getY() + b[0][1], p.getZ() + b[0][2],
                 p.getX() + b[1][0] + 1.0, p.getY() + b[1][1] + 1.0 + 0.5, p.getZ() + b[1][2] + 1.0);

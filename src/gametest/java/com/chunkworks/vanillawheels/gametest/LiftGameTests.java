@@ -83,12 +83,14 @@ public final class LiftGameTests {
     private static final int FLOOR = 2;
     private static final ResourceLocation BOX_CAR = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_car");
     private static final ResourceLocation BOX_TRAILER = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_trailer");
-    /** The box car's body stretched to eight blocks: longer than any lift takes. */
+    /** The box car's body stretched to ten blocks: longer than any lift takes. */
     private static final ResourceLocation BOX_LONG = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_long");
-    /** The controller's cell for a lift facing north: the deck runs south from it, centred in the arena. */
+    /** The controller's cell for a lift facing north: its eight-long deck runs south from it, x 5..9, z 3..10. */
     private static final BlockPos CONTROLLER = new BlockPos(7, FLOOR, 3);
-    /** A second lift's controller, facing east: its deck runs west from it along the arena's south side. */
+    /** A second lift's controller, facing east: its deck runs west from it along the arena's south side, x 6..13, z 9..13. */
     private static final BlockPos EAST_CONTROLLER = new BlockPos(13, FLOOR, 11);
+    /** The lift the item places since 1.18.0 (D-0042). */
+    private static final Footprint PLACED = Footprint.LONG;
     /** The deck's top, where a vehicle's feet stand. */
     private static final double DECK = FLOOR + 1;
     private static final Input STICK_RIGHT = new Input(0, 1, false, true, true);
@@ -199,26 +201,32 @@ public final class LiftGameTests {
     public void placingLaysTheWholeFootprintFacingEachWayAndSetblockAirTakesItAll(GameTestHelper helper) {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
+        // Off every deck this test lays (they reach x 3..11 and z 3..11): a body in a cell keeps a lift from standing.
+        Vec3 corner = helper.absoluteVec(new Vec3(1.5, FLOOR, 12.5));
+        sp.teleportTo(corner.x, corner.y, corner.z);
         BlockPos centre = new BlockPos(7, FLOOR, 7);
         for (Direction facing : Direction.Plane.HORIZONTAL) {
-            // The controller is three cells in front of the arena's centre so the deck ends at the centre's far side.
+            // The controller is three cells in front of the arena's centre, so the eight-long deck runs four past it.
             BlockPos controller = centre.relative(facing, 3);
             InteractionResult r = place(helper, sp, controller, facing);
             helper.assertTrue(r.consumesAction(), "placed facing " + facing + ": " + r);
             BlockState c = helper.getBlockState(controller);
             helper.assertTrue(c.is(ModContent.LIFT_CONTROLLER.get()), "the controller facing " + facing);
             helper.assertValueEqual(c.getValue(LiftControllerBlock.FACING), facing, "its facing");
-            for (int i = 1; i <= Footprint.PARTS; i++) {
-                BlockPos p = LiftControllerBlock.at(controller, facing, Footprint.cell(i));
+            helper.assertTrue(c.getValue(LiftControllerBlock.LONG), "the item places the long lift");
+            helper.assertValueEqual(lift(helper, controller).footprint(), PLACED, "eight long");
+            for (int i = 1; i <= PLACED.parts(); i++) {
+                BlockPos p = LiftControllerBlock.at(controller, facing, PLACED.cell(i));
                 BlockState s = helper.getBlockState(p);
                 helper.assertTrue(s.is(ModContent.LIFT_PART.get()), "part " + i + " facing " + facing + " at " + p + ": " + s);
                 helper.assertValueEqual(s.getValue(LiftPartBlock.INDEX), i, "its index");
+                helper.assertTrue(s.getValue(LiftPartBlock.LONG), "its shape");
                 helper.assertValueEqual(LiftPartBlock.controller(s, helper.absolutePos(p)), helper.absolutePos(controller), "it finds its controller");
             }
-            helper.assertValueEqual(liftBlocks(helper), Footprint.PARTS + 1, "the whole lift and nothing else");
+            helper.assertValueEqual(liftBlocks(helper), PLACED.parts() + 1, "the whole lift and nothing else");
             helper.assertTrue(sp.getMainHandItem().isEmpty(), "the item was used");
             // setblock air on a far part: everything goes, nothing drops.
-            helper.setBlock(LiftControllerBlock.at(controller, facing, Footprint.cell(Footprint.PARTS)), Blocks.AIR);
+            helper.setBlock(LiftControllerBlock.at(controller, facing, PLACED.cell(PLACED.parts())), Blocks.AIR);
             helper.assertValueEqual(liftBlocks(helper), 0, "gone after a setblock facing " + facing);
             helper.assertValueEqual(liftItemsDropped(helper), 0, "no drop from a setblock");
         }
@@ -229,15 +237,15 @@ public final class LiftGameTests {
     public void placementRefusesABlockedCellAnUnsupportedDeckCellAndAnEntityInTheWay(GameTestHelper helper) {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
-        // A block in the back-right corner post's cell.
-        BlockPos post = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 5));
+        // A block in the back-right corner post's cell: the eighth row's, two rows past where a short lift's would be.
+        BlockPos post = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 7));
         helper.setBlock(post, Blocks.STONE);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH) == InteractionResult.FAIL, "refused with a block in a post cell");
         helper.assertValueEqual(liftBlocks(helper), 0, "nothing placed");
         helper.assertTrue(sp.getMainHandItem().is(ModContent.LIFT_ITEM.get()), "the item stays");
         helper.setBlock(post, Blocks.AIR);
-        // A hole under a deck cell.
-        BlockPos hole = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(-1, 0, 4)).below();
+        // A hole under a deck cell of the seventh row, which only the long lift has.
+        BlockPos hole = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(-1, 0, 6)).below();
         helper.setBlock(hole, Blocks.AIR);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH) == InteractionResult.FAIL, "refused over a hole");
         helper.assertValueEqual(liftBlocks(helper), 0, "nothing placed over the hole");
@@ -253,7 +261,7 @@ public final class LiftGameTests {
         // Grass in a cell is replaceable and no obstacle.
         helper.setBlock(LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(1, 0, 2)), Blocks.SHORT_GRASS);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed over grass");
-        helper.assertValueEqual(liftBlocks(helper), Footprint.PARTS + 1, "the whole lift");
+        helper.assertValueEqual(liftBlocks(helper), PLACED.parts() + 1, "the whole lift");
         helper.succeed();
     }
 
@@ -271,7 +279,7 @@ public final class LiftGameTests {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
-        BlockPos farPost = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(-2, 1, 5));
+        BlockPos farPost = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(-2, 1, 7));
         helper.assertTrue(sp.gameMode.destroyBlock(helper.absolutePos(farPost)), "broke a post");
         helper.assertValueEqual(liftBlocks(helper), 0, "the lift is gone");
         helper.assertValueEqual(liftItemsDropped(helper), 1, "one lift dropped");
@@ -359,7 +367,7 @@ public final class LiftGameTests {
         layFloor(helper);
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
-        LiftMenu menu = open(helper, sp, LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 5)));
+        LiftMenu menu = open(helper, sp, LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(2, 1, 7)));
         helper.assertTrue(menu.stillValid(sp), "valid for the player who opened it");
         helper.assertValueEqual(menu.buildStatus(), LiftStatus.Build.NO_RECIPE, "empty: nothing to build");
         helper.assertValueEqual(menu.paintStatus(), LiftStatus.Paint.NO_VEHICLE, "empty: nothing to paint");
@@ -494,7 +502,7 @@ public final class LiftGameTests {
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
         LiftBlockEntity lift = lift(helper, CONTROLLER);
-        // Off centre, askew, nobody aboard: the deck runs z 3..9, x 5..10.
+        // Off centre, askew, nobody aboard: the deck runs z 3..10, x 5..9.
         Vehicle car = stand(helper, BOX_CAR, new Vec3(6.3, DECK, 4.6), 135.0f);
         Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
         Vec3 start = car.position();
@@ -540,7 +548,7 @@ public final class LiftGameTests {
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, EAST_CONTROLLER, Direction.EAST).consumesAction(), "placed facing east");
         LiftBlockEntity lift = lift(helper, EAST_CONTROLLER);
-        // The deck runs west from the controller: x 8..14, z 9..14. The front looks east (yaw -90); backed in looks west.
+        // The deck runs west from the controller: x 6..13, z 9..13. The front looks east (yaw -90); backed in looks west.
         Vehicle car = stand(helper, BOX_CAR, new Vec3(10.4, DECK, 11.9), 90.0f);
         Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
         helper.runAtTickTime(Docking.REST + 2 + LiftMotion.JOB + 2, () -> {
@@ -548,7 +556,7 @@ public final class LiftGameTests {
             helper.assertTrue(car.position().distanceTo(spot) < 0.01, "on its spot: " + car.position() + " vs " + spot);
             helper.assertValueEqual(car.getYRot(), Footprint.Heading.EAST.yaw(), "spun half a turn to face the front");
             // Backed up to the wall: the tail GAP off the wall's face, which is BAR_MIN into the deck's last cell to the west.
-            double wall = helper.absolutePos(EAST_CONTROLLER).getX() + 1 - Footprint.WALL_FACE;
+            double wall = helper.absolutePos(EAST_CONTROLLER).getX() + 1 - lift.footprint().wallFace();
             helper.assertValueEqual(Math.round((car.getX() - bodyLength(helper, BOX_CAR) / 2 - wall) * 1000) / 1000.0, Docking.GAP, "its tail a gap off the wall");
             helper.succeed();
         });
@@ -629,7 +637,7 @@ public final class LiftGameTests {
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
         LiftBlockEntity lift = lift(helper, CONTROLLER);
-        helper.assertTrue(bodyLength(helper, BOX_LONG) > Docking.LONGEST, "the long box is longer than the lift takes");
+        helper.assertTrue(bodyLength(helper, BOX_LONG) > Docking.longest(lift.footprint()), "the long box is longer than the lift takes");
         Vehicle bus = stand(helper, BOX_LONG, new Vec3(7.5, DECK, 6.0), 180.0f);
         Vec3 start = bus.position();
         helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TOO_BIG, "too big");
@@ -646,9 +654,10 @@ public final class LiftGameTests {
         ServerPlayer sp = player(helper, GameType.SURVIVAL);
         helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
         LiftBlockEntity lift = lift(helper, CONTROLLER);
-        // The car near the front of the deck facing the front, the trailer hitched behind it, both on the deck.
-        Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 4.0), 180.0f);
-        Vehicle trailer = stand(helper, BOX_TRAILER, new Vec3(7.5, DECK, 4.0 + 26 / 16.0 + 34 / 16.0 + 0.3), 180.0f);
+        // The car facing the front with the trailer hitched close behind it, both on the deck and both in the back
+        // stretch where the two spots lie (z 6.56..10.06): each stands where the other's spot is, so neither is clear.
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 6.0), 180.0f);
+        Vehicle trailer = stand(helper, BOX_TRAILER, new Vec3(7.5, DECK, 9.3), 180.0f);
         car.hitch(trailer);
         helper.assertValueEqual(lift.dockStatus(), LiftStatus.Dock.TOWING, "unhitch first");
         helper.runAtTickTime(Docking.REST + 5, () -> {
@@ -706,28 +715,63 @@ public final class LiftGameTests {
         });
     }
 
-    @GameTest(template = "arena", timeoutTicks = 60)
-    public void aLiftFromBeforeTheWallGrowsOneOnLoadWhereItsCellsAreFree(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 120)
+    public void aShortLiftDocksAgainstItsOwnWallTwoRowsNearerThanALongOne(GameTestHelper helper) {
         layFloor(helper);
-        // Laid by commands as 1.16.0 placed it: the controller and parts 1..33, no wall. Stone stands in the wall's middle cell.
+        // A six-long lift whole, as the box's garage lifts are: laid by commands, every part flagged short.
+        Footprint old = Footprint.SHORT;
+        for (int i = old.parts(); i >= 1; i--) {
+            helper.setBlock(LiftControllerBlock.at(CONTROLLER, Direction.NORTH, old.cell(i)),
+                    ModContent.LIFT_PART.get().defaultBlockState().setValue(LiftPartBlock.FACING, Direction.NORTH).setValue(LiftPartBlock.INDEX, i).setValue(LiftPartBlock.LONG, false));
+        }
+        helper.setBlock(CONTROLLER, ModContent.LIFT_CONTROLLER.get().defaultBlockState().setValue(LiftControllerBlock.FACING, Direction.NORTH).setValue(LiftControllerBlock.LONG, false));
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        helper.assertValueEqual(lift.footprint(), old, "six long");
+        helper.assertValueEqual(lift.deckBox().maxZ - helper.absolutePos(CONTROLLER).getZ(), 6.0, "its deck box ends at the sixth row");
+        Vehicle car = stand(helper, BOX_CAR, new Vec3(7.5, DECK, 5.0), 180.0f);
+        Vec3 spot = lift.spot(bodyLength(helper, BOX_CAR));
+        double depth = spot.z - helper.absolutePos(CONTROLLER).getZ();
+        helper.assertValueEqual(Math.round(depth * 1e4) / 1e4, Math.round(Docking.depth(old, bodyLength(helper, BOX_CAR)) * 1e4) / 1e4, "the spot by the short deck's wall");
+        helper.assertValueEqual(Math.round((Docking.depth(Footprint.LONG, bodyLength(helper, BOX_CAR)) - depth) * 1e4) / 1e4, 2.0, "two rows nearer than on a long one");
+        helper.assertTrue(bodyLength(helper, BOX_LONG) > Docking.longest(old), "the long box fits neither");
+        helper.runAtTickTime(Docking.REST + 2 + LiftMotion.JOB + 2, () -> {
+            helper.assertTrue(car.docked(), "taken");
+            helper.assertTrue(car.position().distanceTo(spot) < 0.01, "on the short deck's spot: " + car.position() + " vs " + spot);
+            helper.assertValueEqual(car.getYRot(), Footprint.Heading.NORTH.yaw(), "facing the front");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void aLiftFromBeforeTheWallGrowsOneOnLoadWhereItsCellsAreFreeAndStaysSixLong(GameTestHelper helper) {
+        layFloor(helper);
+        // Laid by commands as 1.16.0 placed it: the controller and parts 1..33 in the short shape's order, no wall and no
+        // shape flag, as every lift saved before 1.18.0 reads. Stone stands in the wall's middle cell.
+        Footprint old = Footprint.SHORT;
         BlockPos stone = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(0, 1, 5));
         helper.setBlock(stone, Blocks.STONE);
         for (int i = 33; i >= 1; i--) {
-            helper.setBlock(LiftControllerBlock.at(CONTROLLER, Direction.NORTH, Footprint.cell(i)),
+            helper.setBlock(LiftControllerBlock.at(CONTROLLER, Direction.NORTH, old.cell(i)),
                     ModContent.LIFT_PART.get().defaultBlockState().setValue(LiftPartBlock.FACING, Direction.NORTH).setValue(LiftPartBlock.INDEX, i));
         }
         helper.setBlock(CONTROLLER, ModContent.LIFT_CONTROLLER.get().defaultBlockState().setValue(LiftControllerBlock.FACING, Direction.NORTH));
         helper.assertValueEqual(liftBlocks(helper), 34, "the old lift, whole");
+        helper.assertValueEqual(lift(helper, CONTROLLER).footprint(), old, "it keeps the shape it was laid as (D-0042)");
         helper.runAtTickTime(2, () -> {
             for (int right : new int[] {-1, 1}) {
                 BlockPos at = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(right, 1, 5));
                 BlockState s = helper.getBlockState(at);
                 helper.assertTrue(s.is(ModContent.LIFT_PART.get()), "a wall cell grew at " + right + ": " + s);
-                helper.assertValueEqual(s.getValue(LiftPartBlock.INDEX), Footprint.indexOf(new Cell(right, 1, 5)), "with its index");
+                helper.assertValueEqual(s.getValue(LiftPartBlock.INDEX), old.indexOf(new Cell(right, 1, 5)), "with its index");
                 helper.assertValueEqual(s.getValue(LiftPartBlock.FACING), Direction.NORTH, "facing the lift's way");
+                helper.assertTrue(!s.getValue(LiftPartBlock.LONG), "in the short shape");
             }
             helper.assertTrue(helper.getBlockState(stone).is(Blocks.STONE), "the stone is left to itself");
             helper.assertValueEqual(liftBlocks(helper), 36, "two cells grew");
+            for (int back = 6; back <= 7; back++) {
+                BlockPos row = LiftControllerBlock.at(CONTROLLER, Direction.NORTH, new Cell(0, 0, back));
+                helper.assertTrue(helper.getBlockState(row).isAir(), "no deck grew past the sixth row: " + helper.getBlockState(row));
+            }
             helper.setBlock(CONTROLLER, Blocks.AIR);
         });
         helper.runAtTickTime(4, () -> {

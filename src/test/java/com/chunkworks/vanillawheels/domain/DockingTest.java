@@ -25,11 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Partitions. Fit: narrow and short; as wide as the deck, a hair wider;
- * as long as LONGEST, a hair longer; the fleet (the Trailblazer, the
- * Pickup, the Trailer, the subs dock; the Huey and the Chinook do not).
- * Depth: a body's tail lands GAP off the wall; the longest body's nose
- * lands OVERHANG past the front; no length refused. Progress: nowhere
+ * Partitions. Fit, on each shape: narrow and short; as wide as the deck, a
+ * hair wider; as long as the longest, a hair longer; the fleet (the
+ * Trailblazer, the Pickup, the Trailer, the subs dock on both; the Huey
+ * and the Chinook on neither); what the long deck takes that the short
+ * one does not. Depth: a body's tail lands GAP off the wall on each shape;
+ * the longest body's nose lands OVERHANG past the front; the Pickup's nose
+ * is past the short deck's front edge and on the long deck; no length
+ * refused. Progress: nowhere
  * through the rise, rising through the hold and monotone, there through
  * the fall, out of range refused. Turn: none, a quarter each way, a half
  * either way goes positive, more than a turn around, wrapping past 360.
@@ -40,34 +43,45 @@ import org.junit.jupiter.api.Test;
 final class DockingTest {
 
     @Test
-    void whatFitsTheDeck() {
-        assertTrue(Docking.fits(1.5, 3.0), "a small car");
-        assertTrue(Docking.fits(Footprint.WIDTH, 3.0), "as wide as the deck");
-        assertFalse(Docking.fits(Footprint.WIDTH + 0.01, 3.0), "a hair wider");
-        assertTrue(Docking.fits(2.0, Docking.LONGEST), "as long as the longest");
-        assertFalse(Docking.fits(2.0, Docking.LONGEST + 0.01), "a hair longer");
-        assertEquals(5.0 + 5.0 / 16.0 - 0.25 + 1.5, Docking.LONGEST, 1e-12);
-        // The fleet, by the bodies in their profiles.
-        assertTrue(Docking.fits(1.84, 4.64), "Trailblazer");
-        assertTrue(Docking.fits(2.54, 6.44), "Farmer's Pickup, just");
-        assertTrue(Docking.fits(2.35, 5.18), "Trailer");
-        assertTrue(Docking.fits(2.7, 5.3), "Explorer");
-        assertTrue(Docking.fits(1.4, 3.3), "Scout");
-        assertFalse(Docking.fits(2.6, 12.6), "Huey");
-        assertFalse(Docking.fits(3.8, 15.9), "Chinook");
+    void whatFitsEachDeck() {
+        assertEquals(5.0 + 5.0 / 16.0 - 0.25 + 1.5, Docking.longest(Footprint.SHORT), 1e-12);
+        assertEquals(7.0 + 5.0 / 16.0 - 0.25 + 1.5, Docking.longest(Footprint.LONG), 1e-12);
+        for (Footprint f : java.util.List.of(Footprint.SHORT, Footprint.LONG)) {
+            double longest = Docking.longest(f);
+            assertTrue(Docking.fits(f, 1.5, 3.0), "a small car");
+            assertTrue(Docking.fits(f, Footprint.WIDTH, 3.0), "as wide as the deck");
+            assertFalse(Docking.fits(f, Footprint.WIDTH + 0.01, 3.0), "a hair wider");
+            assertTrue(Docking.fits(f, 2.0, longest), "as long as the longest");
+            assertFalse(Docking.fits(f, 2.0, longest + 0.01), "a hair longer");
+            // The fleet, by the bodies in their profiles.
+            assertTrue(Docking.fits(f, 1.84, 4.64), "Trailblazer");
+            assertTrue(Docking.fits(f, 2.54, 6.44), "Farmer's Pickup");
+            assertTrue(Docking.fits(f, 2.35, 5.18), "Trailer");
+            assertTrue(Docking.fits(f, 2.7, 5.3), "Explorer");
+            assertTrue(Docking.fits(f, 1.4, 3.3), "Scout");
+            assertFalse(Docking.fits(f, 2.6, 12.6), "Huey");
+            assertFalse(Docking.fits(f, 3.8, 15.9), "Chinook");
+        }
+        assertFalse(Docking.fits(Footprint.SHORT, 1.5, 8.0), "an eight-block body is past the short deck");
+        assertTrue(Docking.fits(Footprint.LONG, 1.5, 8.0), "and docks on the long one, its nose over the edge");
     }
 
     @Test
-    void aDockedBodyBacksUpToTheWall() {
+    void aDockedBodyBacksUpToTheWallOnEachDeck() {
         double length = 4.64;
-        double depth = Docking.depth(length);
-        assertEquals(Footprint.WALL_FACE - Docking.GAP, depth + length / 2.0, 1e-12, "its tail GAP off the wall's face");
-        assertEquals(2.7425, depth, 1e-12, "a Trailblazer sits a quarter block behind the deck's centre");
-        double nose = Docking.depth(Docking.LONGEST) - Docking.LONGEST / 2.0;
-        assertEquals(-Docking.OVERHANG, nose, 1e-12, "the longest body's nose hangs OVERHANG past the front edge");
-        assertTrue(Docking.depth(6.44) - 3.22 < 0, "a Pickup's nose is past the front edge");
-        assertThrows(IllegalArgumentException.class, () -> Docking.depth(0.0));
-        assertThrows(IllegalArgumentException.class, () -> Docking.depth(-1.0));
+        for (Footprint f : java.util.List.of(Footprint.SHORT, Footprint.LONG)) {
+            double depth = Docking.depth(f, length);
+            assertEquals(f.wallFace() - Docking.GAP, depth + length / 2.0, 1e-12, "its tail GAP off the wall's face");
+            double longest = Docking.longest(f);
+            double nose = Docking.depth(f, longest) - longest / 2.0;
+            assertEquals(-Docking.OVERHANG, nose, 1e-12, "the longest body's nose hangs OVERHANG past the front edge");
+            assertThrows(IllegalArgumentException.class, () -> Docking.depth(f, 0.0));
+            assertThrows(IllegalArgumentException.class, () -> Docking.depth(f, -1.0));
+        }
+        assertEquals(2.7425, Docking.depth(Footprint.SHORT, length), 1e-12, "a Trailblazer sits a quarter block behind the short deck's centre");
+        assertEquals(4.7425, Docking.depth(Footprint.LONG, length), 1e-12, "and two blocks deeper on the long one: the wall is where it is measured from");
+        assertTrue(Docking.depth(Footprint.SHORT, 6.44) - 3.22 < 0, "a Pickup's nose is past the short deck's front edge");
+        assertEquals(0.6225, Docking.depth(Footprint.LONG, 6.44) - 3.22, 1e-12, "and more than half a block inside the long deck's (D-0042)");
     }
 
     @Test

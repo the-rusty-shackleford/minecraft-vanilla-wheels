@@ -153,9 +153,12 @@ Steel comes from [Metals and Materials](/wiki/metals-and-materials).
 
 ![A car built on a raised lift](img/lift.webp)
 
-- **Placing:** the lift item lays the whole lift at once, a five-by-six deck with a post on
-  each corner and a short wall across the back, facing you. It needs every cell clear and
-  solid ground under the deck. The wall is the back; you walk up to the front.
+- **Placing:** the lift item lays the whole lift at once, a deck five wide and eight long with
+  a post on each corner and a short wall across the back, facing you. It needs every cell clear
+  and solid ground under the deck. The wall is the back; you walk up to the front.
+- A lift placed before the deck grew (Vanilla Wheels 1.18.0) is still six long and works as it
+  did. For a long one in its place, break it (the whole lift comes back as one item) and place
+  it again.
 - **Using it:** right-click any block of it. There's a slot each for the chassis, the wheels,
   the engine and a dye.
   - **Build** puts the vehicle on the deck, parked against the wall facing the front, and uses
@@ -180,8 +183,9 @@ for Paint and Repair.
 
 ![A car parked on a lift, backed up to its wall](img/lift-docked.webp)
 
-- Anything that fits parks: cars, pickups and trailers, the Farmer's Pickup with its nose a
-  little over the front edge. Helicopters are too long and are left alone.
+- Anything that fits parks: cars, pickups and trailers. The Farmer's Pickup sits whole on an
+  eight-long deck; on an older six-long lift its nose hangs a little over the front edge.
+  Helicopters are too long and are left alone.
 - A truck with a trailer hitched isn't taken; unhitch the trailer first, and move it off if it
   stands where the truck would go. The menu's status line says what the lift is waiting for.
 - One vehicle to a lift. A second one left on the deck stays where it is.

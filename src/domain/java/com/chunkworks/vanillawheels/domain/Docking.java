@@ -33,30 +33,33 @@ public final class Docking {
 
     /** Between a docked body's tail and the wall's face, blocks. */
     public static final double GAP = 0.25;
-    /** How far a body may hang past the deck's front edge and still dock, blocks: a Pickup's bonnet, not a Huey. */
+    /** How far a body may hang past the deck's front edge and still dock, blocks: a Pickup's bonnet on a six-long deck, not a Huey. */
     public static final double OVERHANG = 1.5;
-    /** The longest body that docks, blocks: from GAP off the wall to OVERHANG past the front. */
-    public static final double LONGEST = Footprint.WALL_FACE - GAP + OVERHANG;
+
+    /** effects: returns the longest body that docks on a lift shaped {@code f}, blocks: from GAP off the wall to OVERHANG past the front */
+    public static double longest(Footprint f) {
+        return f.wallFace() - GAP + OVERHANG;
+    }
     /** Ticks a body must stand still on the deck before the lift takes it. */
     public static final int REST = 10;
     /** How far a docked body may be found from its spot and still be docked, blocks: further, something moved it away. */
     public static final double HOLD = 1.0;
 
-    /** effects: returns whether a body {@code width} across and {@code length} long docks: within the deck's width, no longer than LONGEST */
-    public static boolean fits(double width, double length) {
-        return width <= Footprint.WIDTH && length <= LONGEST;
+    /** effects: returns whether a body {@code width} across and {@code length} long docks on a lift shaped {@code f}: within the deck's width, no longer than {@link #longest} */
+    public static boolean fits(Footprint f, double width, double length) {
+        return width <= Footprint.WIDTH && length <= longest(f);
     }
 
     /**
      * requires: length > 0
-     * effects: returns the depth from the deck's front edge of a docked body's centre, for a
-     * body {@code length} long: its tail GAP off the wall's face
+     * effects: returns the depth from the deck's front edge of a docked body's centre on a lift
+     * shaped {@code f}, for a body {@code length} long: its tail GAP off the wall's face
      */
-    public static double depth(double length) {
+    public static double depth(Footprint f, double length) {
         if (!(length > 0)) {
             throw new IllegalArgumentException("a body has length: " + length);
         }
-        return Footprint.WALL_FACE - GAP - length / 2.0;
+        return f.wallFace() - GAP - length / 2.0;
     }
 
     /**

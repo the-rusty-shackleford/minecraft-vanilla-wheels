@@ -7,6 +7,32 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.18.0 — built and gated 2026-10-14, UNRELEASED until Rusty's go (the eight-long lift; D-0042)
+
+Rusty, 2026-10-14: "The farmers pickup doesnt really fit on the mechanical lift, I think we should make it a
+little bigger so it fits such vehicles (and then please fix the spacing that will undoubtedly get messed up
+in my garage as a result of this)".
+- **Eight long**: `Footprint` is a value, `SHORT` (six) or `LONG` (eight); the controller and every part carry
+  a `long` block state (`LiftControllerBlock.LONG`), the item places `LONG`, a block saved before reads
+  `false` and stays the six-long lift it was, cells in the order they always were. `Docking.fits/depth/longest`
+  take the footprint; `LiftBlockEntity.footprint()`; `LiftPartBlock.INDEX` runs to 46 (`Footprint.MAX_PARTS`),
+  a part past its shape's last cell is a plain cube of no lift. A short lift is never regrown long (D-0042:
+  the new rows could hold anything); break and place again. The Pickup's nose ends 0.62 inside a long deck's
+  front edge. **Network 10**: a new block state shifts the state table for every block after the parts.
+- Gate: 194 JUnit (`FootprintTest` rewritten for the two shapes, `DockingTest` per shape), 143 GameTests (one
+  new: a six-long lift laid whole docks against its own wall two rows nearer; the placement test's player
+  moved off the longer decks' reach; the old-lift test also pins the short shape kept; the box-long body is
+  ten blocks now, longer than a long lift takes; the towing pair stands in the back stretch of the longer
+  deck where both spots lie), the booth's checks with the long lift in its photos.
+- **The garage** (the server repo's `knowledge/operations/garage.md`): Rusty's six lifts are re-laid long by
+  `tools/lab-server/garage/relay.py` (the old six taken up by their controllers, the north-east girder pillar
+  from z 1236 to 1237 off the new front post, the two docked vehicles moved into the lane and back; the spot is
+  measured from the wall, so they stand where they stood), proven on the lab from a copy of the box's region
+  (`relay-dry.sh`) and run on the box with `apply.sh` once the box runs 1.18.0. Decks z 1229..1236 and
+  1250..1257, two blocks of floor to the lane's lines each side.
+- Dependents: every bundled range admits 1.18.0 (Trailblazer/Trailer/Pickup/Submersibles `[1.14,2.0)`,
+  Rotorcraft `[1.16,2.0)`); nothing else needs a rebuild. Wiki photos of the lift re-shot from the gate's booth.
+
 ## 1.17.2 — released 2026-10-15 in pack 1.87.0 with Backpacks+ 0.8.0 (the keyring rides in a bag)
 
 Released on Rusty's "coordinate with each other so you can release both changes in one release", tag

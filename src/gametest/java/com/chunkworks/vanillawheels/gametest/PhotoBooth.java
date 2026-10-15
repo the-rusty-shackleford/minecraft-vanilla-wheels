@@ -427,7 +427,7 @@ public final class PhotoBooth {
             liftPos = ctx.getClickedPos();
             InteractionResult r = ModContent.LIFT_ITEM.get().place(ctx);
             if (!r.consumesAction()) {
-                com.chunkworks.vanillawheels.domain.Footprint.Cell cell = com.chunkworks.vanillawheels.lift.LiftControllerBlock.blocked(level, liftPos, Direction.NORTH);
+                com.chunkworks.vanillawheels.domain.Footprint.Cell cell = com.chunkworks.vanillawheels.lift.LiftControllerBlock.blocked(level, liftPos, Direction.NORTH, com.chunkworks.vanillawheels.domain.Footprint.LONG);
                 BlockPos at = cell == null ? null : com.chunkworks.vanillawheels.lift.LiftControllerBlock.at(liftPos, Direction.NORTH, cell);
                 LOG.error("booth: FAIL the lift is placed -- {}; blocked cell {} at {}: {} entities {}", r, cell, at,
                     at == null ? null : level.getBlockState(at), at == null ? null : level.getEntities(null, new AABB(at)));

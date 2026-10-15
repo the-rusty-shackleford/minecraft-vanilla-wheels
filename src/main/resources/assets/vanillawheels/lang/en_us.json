@@ -35,7 +35,7 @@
   "block.vanillawheels.mechanic_lift_part": "Mechanic Lift",
   "vanillawheels.lift.build": "Build",
   "vanillawheels.lift.paint": "Paint",
-  "vanillawheels.lift.no_room": "The lift needs a clear, level five by six with a block of headroom",
+  "vanillawheels.lift.no_room": "The lift needs a clear, level five by eight with a block of headroom",
   "vanillawheels.lift.status.busy": "The rams are working...",
   "vanillawheels.lift.status.build_ready": "Ready to build",
   "vanillawheels.lift.status.paint_ready": "Ready to paint the vehicle",

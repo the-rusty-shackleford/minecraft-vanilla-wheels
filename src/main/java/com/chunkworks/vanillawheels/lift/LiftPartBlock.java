@@ -19,7 +19,9 @@ package com.chunkworks.vanillawheels.lift;
 
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.domain.Footprint;
+import com.chunkworks.vanillawheels.domain.Footprint.Cell;
 import com.mojang.serialization.MapCodec;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionResult;
@@ -34,6 +36,7 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -43,18 +46,21 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * Every cell of a Mechanic Lift but the controller: a deck cell is a full
  * cube to stand a vehicle on, a post cell a slim column, a wall cell a bar
  * across the back ({@link Footprint#bars}). The state carries the lift's
- * facing and the cell's index, which is enough to find the controller with
- * no level lookup, so every hook here forwards there.
+ * facing, its shape ({@link LiftControllerBlock#LONG}) and the cell's
+ * index, which is enough to find the controller with no level lookup, so
+ * every hook here forwards there. A part whose index is past its shape's
+ * last cell (only a command lays one) belongs to no lift: a plain cube.
  */
 public final class LiftPartBlock extends HorizontalDirectionalBlock {
     public static final MapCodec<LiftPartBlock> CODEC = simpleCodec(LiftPartBlock::new);
-    public static final IntegerProperty INDEX = IntegerProperty.create("index", 1, Footprint.PARTS);
+    public static final IntegerProperty INDEX = IntegerProperty.create("index", 1, Footprint.MAX_PARTS);
+    public static final BooleanProperty LONG = LiftControllerBlock.LONG;
     /** The bars' shapes by state, made as asked for: a post's column, a back post's run to the wall, the wall. */
     private static final java.util.Map<BlockState, VoxelShape> BARS = new java.util.concurrent.ConcurrentHashMap<>();
 
     public LiftPartBlock(Properties props) {
         super(props);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(INDEX, 1));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(INDEX, 1).setValue(LONG, false));
     }
 
     @Override
@@ -64,7 +70,15 @@ public final class LiftPartBlock extends HorizontalDirectionalBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, INDEX);
+        builder.add(FACING, INDEX, LONG);
+    }
+
+    /** effects: returns the cell {@code state} names in its lift's shape, or null for an index past the shape's last cell */
+    @Nullable
+    private static Cell cell(BlockState state) {
+        Footprint f = LiftControllerBlock.footprint(state);
+        int index = state.getValue(INDEX);
+        return index <= f.parts() ? f.cell(index) : null;
     }
 
     @Override
@@ -72,22 +86,26 @@ public final class LiftPartBlock extends HorizontalDirectionalBlock {
         return RenderShape.INVISIBLE;
     }
 
-    /** effects: returns the controller's position for the part in {@code state} at {@code pos} */
+    /** effects: returns the controller's position for the part in {@code state} at {@code pos}; {@code pos} itself for a part of no lift */
     public static BlockPos controller(BlockState state, BlockPos pos) {
-        int[] o = Footprint.toController(state.getValue(INDEX), LiftControllerBlock.heading(state.getValue(FACING)));
+        if (cell(state) == null) {
+            return pos;
+        }
+        int[] o = LiftControllerBlock.footprint(state).toController(state.getValue(INDEX), LiftControllerBlock.heading(state.getValue(FACING)));
         return pos.offset(o[0], o[1], o[2]);
     }
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return Footprint.cell(state.getValue(INDEX)).isDeck() ? net.minecraft.world.phys.shapes.Shapes.block() : BARS.computeIfAbsent(state, LiftPartBlock::bars);
+        Cell c = cell(state);
+        return c == null || c.isDeck() ? net.minecraft.world.phys.shapes.Shapes.block() : BARS.computeIfAbsent(state, LiftPartBlock::bars);
     }
 
     /** effects: returns the shape of the bars in the cell {@code state} names, turned to the lift's facing */
     private static VoxelShape bars(BlockState state) {
         Footprint.Heading h = LiftControllerBlock.heading(state.getValue(FACING));
         VoxelShape shape = net.minecraft.world.phys.shapes.Shapes.empty();
-        for (double[] bar : Footprint.bars(Footprint.cell(state.getValue(INDEX)))) {
+        for (double[] bar : LiftControllerBlock.footprint(state).bars(cell(state))) {
             double[] a = h.local(bar[0], bar[2]);
             double[] b = h.local(bar[1], bar[3]);
             shape = net.minecraft.world.phys.shapes.Shapes.or(shape, net.minecraft.world.phys.shapes.Shapes.box(

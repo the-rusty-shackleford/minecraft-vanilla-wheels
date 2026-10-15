@@ -35,6 +35,13 @@ a fifth of a block up and pitched, the terrain fit having found the back wall a 
 a bag you carry; 1.17.1 flagged it as fitting in no container item, which Backpacks+ read as "storage"
 and refused (Backpacks+ 0.8.0 narrows that rule; Rusty: a bag takes what the inventory takes).
 
+**1.18.0** (unreleased; D-0042): the Mechanic Lift is **eight blocks long**, so the Farmer's Pickup
+parks whole on the deck (Rusty: it "doesnt really fit", "make it a little bigger"). A lift keeps the
+shape it was laid with: its blocks carry a `long` flag, every lift placed from now on has it, and a
+lift from before reads as the six-long shape it was and goes on working as it did; break it and place
+it again for the long one. Network 10, since the lift's blocks have a new state (see
+[The Mechanic Lift](#the-mechanic-lift)).
+
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
 burns fuel, shows its gauges on a physical dash, lights the road, honks, plays records,
@@ -645,10 +652,10 @@ Materials'. Install that required mod separately on both client and server;
 Mod Hub includes the shared version in our pack.
 
 The **Mechanic Lift** is one item that places a whole lift: a deck five blocks wide and
-six long with a one-block post on each corner and a one-block wall between the two back
-posts (1.17.0), thirty-seven blocks laid at once facing you, refused with a message unless
-every cell is clear and every deck cell has solid ground under it. The wall is the lift's
-back; the controller block is the deck's front-centre cell. Break any block of it and the
+eight long (1.18.0; six before) with a one-block post on each corner and a one-block wall
+between the two back posts (1.17.0), forty-seven blocks laid at once facing you, refused with
+a message unless every cell is clear and every deck cell has solid ground under it. The wall
+is the lift's back; the controller block is the deck's front-centre cell. Break any block of it and the
 whole lift goes, dropping one lift item (none in creative); replace a block with a command
 and the rest goes without a drop; a vehicle standing on it is left where it is. Right-click
 any block of it for the menu: a slot each for the chassis, the wheels, the engine and a
@@ -661,12 +668,25 @@ ever finds an entity on the deck. Either job raises the deck half a block for tw
 with the rams' sound, and the vehicle on it rises with the deck, riders and all. Closing
 the menu hands the parts back.
 
+**Two shapes** (D-0042, `domain/Footprint`): `LONG`, eight cells long, which every lift placed
+since 1.18.0 is, and `SHORT`, six long, which every lift laid before is and stays. The shape is
+in the blocks: the controller and every part carry a `long` state, and a block saved without it
+(every lift from before 1.18.0) reads `false`. A lift is never regrown into the long shape --
+its two new rows could hold anything -- so for a long one where a short one stands, break it
+and place it again. The short shape's cells are in the order they always were: a saved
+lift keeps every index it has. A part block's index runs to 46 now (the long shape's last
+cell); a part given an index past its own shape's last cell by a command is a plain cube that
+belongs to no lift.
+
 A lift placed before 1.17.0 has no wall: it grows one the first time its controller ticks
 after loading, in whichever of the three cells is free (air or anything replaceable). A
 cell holding a block of yours is left to it, and the lift is drawn with the whole wall
 regardless; break that block and the wall fills in on the next load. Lifts laid by command
 (`setblock`) with parts 1..33 only are grown the same way: the wall's cells are indices 34
-to 36, appended so that no saved lift's indices moved.
+to 36 in the short shape (44 to 46 in the long), appended so that no saved lift's indices moved.
+Laying a lift by command, set the parts before the controller: the controller grows any wall
+cell it finds free within a tick of standing, and a `setblock` that clears a cell holding a part
+of a standing lift removes that lift whole.
 
 ### Docking a vehicle (1.17.0)
 
@@ -684,9 +704,11 @@ deck.
 
 What the lift refuses, and says so in the menu's status line while that vehicle is on the
 deck: a vehicle **towing or towed** ("Unhitch the trailer"); one **too big** for the deck
-(wider than five blocks or longer than `Docking.LONGEST`, the stretch from the wall's gap to
-a block and a half past the front edge -- the Farmer's Pickup just docks, its nose over the
-front edge; the Huey and the Chinook never); the deck **taken** by another docked vehicle;
+(wider than five blocks or longer than `Docking.longest` for that lift's shape, the stretch
+from the wall's gap to a block and a half past the front edge: 8.56 blocks on a long lift,
+6.56 on a short one -- the Farmer's Pickup sits whole on a long deck, its nose more than
+half a block inside the edge, and just docks on a short one with its nose over it; the Huey
+and the Chinook never); the deck **taken** by another docked vehicle;
 the spot **blocked** by another vehicle standing in it (a trailer just unhitched behind the
 truck, say); and a **driver** at the wheel, who need only step out. A protocol built on this
 one may refuse docking for its vehicles through the `docks()` hook (below).
@@ -762,7 +784,9 @@ its tail a gap off the wall; a driver aboard keeps it waiting; held, the stick d
 throttle lets it go; a second car on a taken deck, a box too long, a truck with its trailer hitched
 and one whose spot the unhitched trailer stands in are all left alone, the truck taken once the
 trailer is gone; a trailer alone docks by its own length; breaking the lift frees the car and a save
-keeps it docked; a lift laid without the wall grows one where its cells are free; the car
+keeps it docked; a lift laid without the wall grows one where its cells are free and stays six
+long, and a six-long lift laid whole docks the car against its own wall, two rows nearer than a long
+one would; the car
 catches the trailer's tongue, tows it straight and through a turn with the tongue on the
 hitch, lets go on a click, rolls back clear and stays behind as the car drives off (against a
 wall too) and hitches again when the car backs onto it; a lead loads a cow and two calves through open doors and no

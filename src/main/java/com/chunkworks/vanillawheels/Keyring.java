@@ -18,12 +18,15 @@
 package com.chunkworks.vanillawheels;
 
 import com.chunkworks.carried.api.Carried;
+import com.mojang.serialization.Codec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import javax.annotation.Nullable;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -42,6 +45,34 @@ import net.minecraft.world.item.ItemStack;
 public final class Keyring {
     private Keyring() {}
 
+    /**
+     * The keys on a ring (D-0044), as the {@code KEYRING_KEYS} component's value. Two are equal when
+     * their keys match stack for stack, items, counts and components, as vanilla compares a box's
+     * or a bundle's contents: an {@code ItemStack} has no value equality of its own, so a bare list
+     * of them made two copies of one ring differ the moment one crossed the network or a save, and
+     * every comparison of item and components (a warehouse's index taking one back) missed it.
+     * Saved and sent as the plain list it was before 1.18.2.
+     */
+    public record Keys(List<ItemStack> keys) {
+        public static final Keys NONE = new Keys(List.of());
+        public static final Codec<Keys> CODEC = ItemStack.CODEC.listOf().xmap(Keys::new, Keys::keys);
+        public static final StreamCodec<RegistryFriendlyByteBuf, Keys> STREAM_CODEC = ItemStack.LIST_STREAM_CODEC.map(Keys::new, Keys::keys);
+
+        public Keys {
+            keys = List.copyOf(keys);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return this == o || o instanceof Keys other && ItemStack.listMatches(keys, other.keys);
+        }
+
+        @Override
+        public int hashCode() {
+            return ItemStack.hashStackList(keys);
+        }
+    }
+
     /** effects: whether {@code stack} is a keyring */
     public static boolean isRing(ItemStack stack) {
         return stack.is(ModContent.KEYRING.get());
@@ -49,7 +80,7 @@ public final class Keyring {
 
     /** effects: the keys on {@code ring}, in the order they were put on; none for anything but a ring */
     public static List<ItemStack> keys(ItemStack ring) {
-        return isRing(ring) ? ring.getOrDefault(ModContent.KEYRING_KEYS.get(), List.of()) : List.of();
+        return isRing(ring) ? ring.getOrDefault(ModContent.KEYRING_KEYS.get(), Keys.NONE).keys() : List.of();
     }
 
     /** effects: the key on {@code ring} with {@code token}, or null */
@@ -106,7 +137,7 @@ public final class Keyring {
         }
         ItemStack ring = new ItemStack(ModContent.KEYRING.get());
         ring.set(ModContent.KEY_OWNER.get(), player.getUUID());
-        ring.set(ModContent.KEYRING_KEYS.get(), List.of(one));
+        ring.set(ModContent.KEYRING_KEYS.get(), new Keys(List.of(one)));
         Carried.give(player, ring);
         return ring.isEmpty();
     }
@@ -152,7 +183,7 @@ public final class Keyring {
                 return ring;
             }
             ItemStack result = ring.copy();
-            result.set(ModContent.KEYRING_KEYS.get(), List.copyOf(keys));
+            result.set(ModContent.KEYRING_KEYS.get(), new Keys(keys));
             return result;
         });
     }
@@ -189,7 +220,7 @@ public final class Keyring {
             keys.add(key);
         }
         ItemStack result = ring.copy();
-        result.set(ModContent.KEYRING_KEYS.get(), List.copyOf(keys));
+        result.set(ModContent.KEYRING_KEYS.get(), new Keys(keys));
         return result;
     }
 

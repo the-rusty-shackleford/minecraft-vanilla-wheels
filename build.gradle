@@ -145,6 +145,7 @@ configurations {
     gametestRuntimeOnly.extendsFrom runtimeOnly
 }
 
+def backpacksJar = file('../minecraft-backpacks-plus/build/libs/backpacksplus-0.9.0.jar')
 dependencies {
     // Luminance lights the headlamps. Compiled against, and nested
     // Jar-in-Jar so the pack needs no separate jar; it is a client-only mod
@@ -164,8 +165,10 @@ dependencies {
             prefer "1.0.0"
         }
     }
-    // Backpacks+ on the gametest server only, so a give is proven against a real bag.
-    gametestRuntimeOnly files('../minecraft-backpacks-plus/build/libs/backpacksplus-0.8.0.jar')
+    // Backpacks+ on the gametest server only, so a give is proven against a real bag: the version the
+    // pack ships, built in its own repo first. `files` drops a missing jar without a word (2026-10-21: the
+    // bag tests ran bagless once that repo built its next version), so the run checks it is there.
+    gametestRuntimeOnly files(backpacksJar)
     // Metals and Materials supplies the steel the part recipes take
     // (#c:ingots/steel and #c:storage_blocks/steel). Install it separately.
     implementation("com.chunkworks.metalsandmaterials:metalsandmaterials") {
@@ -216,6 +219,7 @@ publishing {
 // and the task fails without it. `check` runs the gate unless asked not to
 // (`-PskipGameTests`) for fast iteration on the pure tests.
 tasks.named('runGameTestServer') { task ->
+    task.doFirst { if (!backpacksJar.exists()) throw new GradleException("Backpacks+ is missing at ${backpacksJar}: build minecraft-backpacks-plus first") }
     // Resolved now, not in the action: the configuration cache forbids the
     // action from touching the project.
     def logFile = layout.projectDirectory.file('run/logs/latest.log').asFile

@@ -413,4 +413,36 @@ public final class KeyringGameTests {
             done(helper, p);
         });
     }
+
+    // --- the same ring after the wire and a save (D-0044) ---------------------
+
+    /**
+     * A ring sent to a client and back, or saved and loaded, is the same item with the same
+     * components: what a warehouse's index, or anything else that compares item and components,
+     * needs to find it again. 1.18.1's list of stacks compared by identity and failed both.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public void aRingIsTheSameRingAfterTheWireAndASave(GameTestHelper helper) {
+        floor(helper);
+        Vehicle a = car(helper, 4.5, 4.5);
+        Vehicle b = car(helper, 8.5, 4.5);
+        ServerPlayer p = player(helper, "comparer");
+        pair(p, a);
+        pair(p, b);
+        ItemStack ring = ring(p);
+        helper.assertValueEqual(Keyring.keys(ring).size(), 2, "two keys on the ring");
+        var registries = helper.getLevel().registryAccess();
+        var buf = new net.minecraft.network.RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(), registries);
+        ItemStack.STREAM_CODEC.encode(buf, ring);
+        ItemStack sent = ItemStack.STREAM_CODEC.decode(buf);
+        helper.assertTrue(ItemStack.isSameItemSameComponents(ring, sent), "the ring after the wire is the same ring");
+        ItemStack saved = ItemStack.parse(registries, ring.save(registries)).orElseThrow();
+        helper.assertTrue(ItemStack.isSameItemSameComponents(ring, saved), "the ring after a save is the same ring");
+        helper.assertValueEqual(ring.getComponents().hashCode(), sent.getComponents().hashCode(), "and hashes alike, for a map of kinds");
+        ItemStack other = ring.copy();
+        Keyring.Keys keys = other.get(ModContent.KEYRING_KEYS.get());
+        other.set(ModContent.KEYRING_KEYS.get(), new Keyring.Keys(List.of(keys.keys().getFirst())));
+        helper.assertTrue(!ItemStack.isSameItemSameComponents(ring, other), "a ring with a key fewer is not the same ring");
+        done(helper, p);
+    }
 }

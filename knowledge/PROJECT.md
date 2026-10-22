@@ -7,6 +7,20 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.18.2 — built 2026-10-21, not released (a ring equals itself; D-0044)
+
+Rusty's keyring went into a Warehouse Manager and its index could not hand it back: the ring's keys were a
+bare list of stacks, which compare by identity, so the ring clicked on the client never matched the ring in
+the chest. `keyring_keys` is now `Keyring.Keys`, equal by value, saved and sent as the same list (network 10
+unchanged). One new GameTest, failed on 1.18.1 first; 144 GameTests green. Ships with Warehouse Manager
+0.9.1 (its D-0017: a ring never goes in). Also: the Mechanic Lift's screen widens about its own middle
+when the repair column shows, from where its layout put it, rather than re-centring every frame, so
+Backpacks+ 0.9.0's panel beside it keeps the screen where it moved it. Found in the gate: the gametest
+server named `backpacksplus-0.8.0.jar`, gone once that repo built 0.9.0, and `files` dropped it silently,
+so two bag tests ran bagless and failed; it names 0.9.0 and the run stops if the jar is missing. Release
+gate (`clean build --no-build-cache`, booth in software on `:7`) green: 194 JUnit, 144 GameTests, 67 booth
+checks; jar sha1 `5960a623`. Released on Rusty's go, 2026-10-21.
+
 ## 1.18.1 — released 2026-10-15 in pack 1.89.0 (the spot centred; D-0043)
 
 Released on Rusty's "eh just give a 2 min warning and dpeloy", tag `v1.18.1` at `73f9b5f`; the release gate green

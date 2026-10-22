@@ -128,9 +128,9 @@ public final class ModContent {
     public static final DeferredItem<KeyFobItem> KEY_FOB = ITEMS.registerItem("key_fob", KeyFobItem::new, new Item.Properties().stacksTo(1));
     /** Every key a player holds, on one ring that cannot be lost (D-0041). Never crafted: it appears with the first key. */
     public static final DeferredItem<KeyringItem> KEYRING = ITEMS.registerItem("keyring", KeyringItem::new, new Item.Properties().stacksTo(1));
-    /** The keys on a ring, each as the key fob it is, in the order they were put on. */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.List<ItemStack>>> KEYRING_KEYS = COMPONENTS.register("keyring_keys",
-            () -> DataComponentType.<java.util.List<ItemStack>>builder().persistent(ItemStack.CODEC.listOf()).networkSynchronized(ItemStack.LIST_STREAM_CODEC).build());
+    /** The keys on a ring, each as the key fob it is, in the order they were put on; compared by value (D-0044). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Keyring.Keys>> KEYRING_KEYS = COMPONENTS.register("keyring_keys",
+            () -> DataComponentType.<Keyring.Keys>builder().persistent(Keyring.Keys.CODEC).networkSynchronized(Keyring.Keys.STREAM_CODEC).build());
     /** A tank's worth of fuel: hold use at a vehicle to pour. Full when crafted. */
     public static final DeferredItem<GasCanItem> GAS_CAN = ITEMS.registerItem("gas_can",
             props -> new GasCanItem(props.component(FUEL.get(), GasCanItem.CAPACITY)), new Item.Properties().stacksTo(1));

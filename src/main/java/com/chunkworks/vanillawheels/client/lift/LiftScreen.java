@@ -73,8 +73,13 @@ public final class LiftScreen extends AbstractContainerScreen<LiftMenu> {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        imageWidth = menu.repairVisible() ? 294 : 176;
-        leftPos = (width - imageWidth) / 2;
+        // The repair column widens the screen about its middle: half the change each side, from where
+        // the layout put it, so a screen moved by another mod (Backpacks+' panel beside it) stays moved.
+        int wide = menu.repairVisible() ? 294 : 176;
+        if (wide != imageWidth) {
+            leftPos -= (wide - imageWidth) / 2;
+            imageWidth = wide;
+        }
         build.setX(leftPos + 26); paint.setX(leftPos + 98); repair.setX(leftPos + 190);
         repair.visible = menu.repairVisible();
         repair.active = menu.repairReady();

@@ -86,3 +86,7 @@ tags: [index]
 - [D-0043](D-0043.md): A parked vehicle sits centred between the deck's front edge and the wall's face, the same margin at both ends (any body that leaves a quarter block at each end; the whole fleet on a long lift); a body too long for that backs up to the wall with its nose over the front edge, as every vehicle did under D-0040. Rusty, on the re-laid garage: the Trailblazer "is too far back".
 
 - [D-0044](D-0044.md): The keys on a ring compare by value (`Keyring.Keys`, vanilla's `listMatches` and `hashStackList`), so a ring is the same item with the same components after the network and a save; saved and sent as the plain list it was. A Warehouse Manager's index could not hand Rusty's ring back.
+
+- [D-0045](D-0045.md): Aboard, a click on your own vehicle is the hand's: food, potions and maps are used as on foot (a free seat beside the rider took it as boarding); and the engine and tyre loops start once the profile is known, so a vehicle plays the engine its profile names, at that sound's range (every vehicle had played the car's petrol engine at sixteen blocks). Rusty's friends: nothing could be used in a Huey, and no rotor was heard in third person.
+
+- [D-0046](D-0046.md): The lift builds, keeps and lets go of a body bigger than its deck: its own posts are no obstacle to Build, the vehicle docked here is the deck's wherever its centre is, and a protocol's `leavingTheLift` (an aircraft's climb) lets go besides the throttle, the server following a player's client off the spot. The lift had refused to build a Chinook since 1.17.0.

@@ -7,6 +7,29 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.18.3 — built 2026-10-22, not released (the helicopter friends' asks; D-0045, D-0046)
+
+From Rusty's friends, flying on the box: nothing held could be used in a Huey, and no rotor was heard
+in third person.
+- **Using what you hold aboard** (D-0045): a rider's click on their own vehicle is passed to the hand.
+  A free seat beside them took it for boarding: food, potions, the atlas, anything. Every vehicle with a
+  seat free did this, cars too.
+- **Each vehicle's own engine loop** (D-0045): the loop was made as the vehicle joined a client, before
+  its profile arrived, so every vehicle played the car's petrol engine at sixteen blocks; the Huey's
+  and the Chinook's rotors and the submarines' motors were never heard. It starts once the profile is
+  known now. Found by reading OpenAL's own source state in the Huey's booth, and heard: recorded through
+  OpenAL Soft's wave writer, third person went from 14% of first person's loudness to as loud.
+- **The lift and a body bigger than its deck** (D-0046), found moving the Chinook's tests onto this
+  release: the lift had refused to build a Chinook since 1.17.0 (its own front posts counted against
+  the 3.8-wide body), lost the one it built (its centre is past the front edge), and held a helicopter
+  whose pilot pressed Space. Its own blocks no longer count against Build, the docked vehicle is the
+  deck's wherever its centre is, a protocol's `leavingTheLift` lets go on a climb, and the server
+  follows a player's client off the spot.
+- Three new GameTests, each failed on 1.18.2's code first; network 10 unchanged. Release gate
+  (`clean build --no-build-cache`, booth in software on `:7`) green: 194 JUnit, 147 GameTests, 67 booth
+  checks; jar sha1 `ab670e0f`. Ships with Rotorcraft 1.3.0, the Huey 1.3.0 and the Chinook 1.2.0. Not
+  seen: a pilot's real Space off a lift (no booth flies off one).
+
 ## 1.18.2 — built 2026-10-21, not released (a ring equals itself; D-0044)
 
 Rusty's keyring went into a Warehouse Manager and its index could not hand it back: the ring's keys were a

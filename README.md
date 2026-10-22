@@ -186,7 +186,11 @@ aboard, the game takes the vehicle with you only if you are its one player aboar
 with the rest of its crew, and you keep its seat in your save: logging back in, you are seated in it
 again wherever it is now (if it is loaded and has a seat), else stood on the ground under where you
 left (at the surface, under water), never on lava, fire, magma or a cactus, within eight blocks, or,
-with nowhere to stand, given a minute of slow falling and water breathing. Movement keys
+with nowhere to stand, given a minute of slow falling and water breathing. Aboard, a right-click
+on the vehicle is the hand's (1.18.3, D-0045): food, a potion, a map or anything else held is used
+as on foot. From a seat the crosshair lands on the hull, and before, a free seat beside the rider
+took the click as boarding, so nothing could be used aboard a Huey. A chest the click lands in, a
+key fob and the crouching gestures are still the vehicle's. Movement keys
 drive and steer; **jump** held while turning above a third of top speed drifts the kart
 way: the nose swings out to a slip angle on the side you turned, steering leans the
 slide tighter or wider, the car keeps sliding the way it was going and comes round only
@@ -556,6 +560,11 @@ A protocol can build vehicles of its own on this one (D-0030), as Rotorcraft bui
 - **Wheels that are not drawn.** `"wheels": {"drawn": false, ...}`: the positions are where skids
   or feet touch the ground, drawn with the body. No wheel mesh is drawn there, and the lift builds
   the vehicle from its chassis (and engine) without wheels.
+- **The loops start when the profile is known.** A vehicle joins a client before its synced data
+  arrives; the engine and tyre loops start then only if its profile is already known, else as it
+  arrives (`Controls.onVehicleJoined`, called from both; `Controls.engineOf` returns the loop). From
+  1.12.0 to 1.18.2 every vehicle played the car's petrol loop at its sixteen blocks, whatever its
+  profile named (D-0045): no helicopter's rotor or submarine's motor was ever heard.
 - **Sounds a data mod ships.** A profile's `sounds.engine` may name a sound that only the vehicle
   mod's own `sounds.json` defines; it is played all the same. `sounds.pitch` and `sounds.volume`
   (each `[idle, full]`, absent a car's `[0.75, 1.6]` and `[0.28, 0.72]`) set where the loop runs
@@ -705,10 +714,18 @@ its tail a quarter block off the wall's face and its nose over the front edge (t
 six-long lift). It turns the short way to face the front (a vehicle that came in backwards is
 spun half a turn). From then on it is **docked**: held on its
 spot, its steering dead, until a throttle lets it go -- the driver's (W or S; their client
-lets go at once and the server follows when their drive state arrives) or a script's. A
+lets go at once and the server follows when their drive state arrives) or a script's -- or, for
+a protocol's vehicle that rises off the deck, its climb (`leavingTheLift`, D-0046: a helicopter is
+built docked, and a pilot's Space held it there). While a player works it, the server lets it go
+once their client has carried it more than a block off its spot. A
 released vehicle that stops on the deck again is simply taken again. Build stands a new
 vehicle on its spot docked. Paint and Repair work on the docked vehicle as on any on the
-deck.
+deck, wherever its centre is: a body over twice the deck's length, the Chinook's, stands backed to
+the wall with its centre past the front edge, and before 1.18.3 the lift lost it (D-0046). Build
+counts this lift's own blocks as no obstacle: a body wider than the deck between its posts, the
+Chinook's at 3.8, stands through the front posts, as a vehicle spun on the deck passes through
+them (D-0040); from 1.17.0 to 1.18.2 the lift refused to build a Chinook at all. Another lift's
+blocks and anything else in the spot still refuse it.
 
 What the lift refuses, and says so in the menu's status line while that vehicle is on the
 deck: a vehicle **towing or towed** ("Unhitch the trailer"); one **too big** for the deck

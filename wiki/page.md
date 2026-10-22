@@ -17,6 +17,7 @@ behind, and, for a hidden garage, **hidden doors**, **vehicle sensors** and **fl
   aboard it stays with them, and when you log back in you're put back in your seat wherever the
   vehicle is now. If it's gone, you're set down on the ground below where you left, or at the
   surface if you were under water.
+- **Use what's in your hand** while you ride: eat, drink a potion, open a map, as on foot.
 - **Drive:** the movement keys. A standing car turns on the spot with the stick held.
 - **Horn:** **Left Control**, while you ride (it's still sprint everywhere else).
 - **Headlights:** **H** cycles off, on and auto (auto switches them on when it gets dark). The
@@ -162,7 +163,8 @@ Steel comes from [Metals and Materials](/wiki/metals-and-materials).
 - **Using it:** right-click any block of it. There's a slot each for the chassis, the wheels,
   the engine and a dye.
   - **Build** puts the vehicle on the deck, parked against the wall facing the front, and uses
-    exactly its parts.
+    exactly its parts. A helicopter too big for the deck sticks out over the front, and lifts off
+    it with Space.
   - **Paint** colours the vehicle standing on the deck with the dye, using one.
   - **Repair** appears while a damaged vehicle is on the deck: add the material it shows and
     press Repair. A full repair costs 20 steel for a Trailblazer, 18 iron for a Farmer's Pickup

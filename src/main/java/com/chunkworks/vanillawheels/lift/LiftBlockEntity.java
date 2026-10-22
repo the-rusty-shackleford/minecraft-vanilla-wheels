@@ -41,6 +41,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -162,14 +163,19 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
         return new Vec3(worldPosition.getX() + s[0], worldPosition.getY() + s[1], worldPosition.getZ() + s[2]);
     }
 
-    /** effects: returns the vehicle standing on the deck, if one does: its feet inside the deck box; the docked one before any other */
+    /**
+     * effects: returns the vehicle on the deck, if one is: the one docked here, wherever its centre
+     * is, before any other with its feet inside the deck box. A body over twice the deck's length,
+     * the Chinook's, built here stands backed to the wall with its centre past the front edge, and
+     * was lost to its own lift: not to be painted or mended (D-0046).
+     */
     @Nullable
     public Vehicle vehicleOnDeck() {
         if (level == null) {
             return null;
         }
         AABB deck = deckBox();
-        List<Vehicle> on = level.getEntitiesOfClass(Vehicle.class, deck, v -> deck.contains(v.position()));
+        List<Vehicle> on = level.getEntitiesOfClass(Vehicle.class, deck, v -> worldPosition.equals(v.dockedAt()) || deck.contains(v.position()));
         return on.stream().filter(v -> worldPosition.equals(v.dockedAt())).findFirst().orElse(on.isEmpty() ? null : on.get(0));
     }
 
@@ -227,13 +233,39 @@ public final class LiftBlockEntity extends BlockEntity implements MenuProvider {
         return true;
     }
 
-    /** effects: returns whether a {@code p} stood at its spot on the deck would meet a block or an entity */
+    /**
+     * effects: returns whether a {@code p} stood at its spot on the deck would meet an entity, or a
+     * block other than this lift's own (D-0046): a body wider than the deck between its posts, the
+     * Chinook's, stands through the front posts as a vehicle spun on the deck passes through them
+     * (D-0040), where counting them refused to build it at all; another lift's posts beside it, a
+     * wall or anything else still count
+     */
     public boolean occupied(VehicleProfile p) {
         if (level == null) {
             return true;
         }
         AABB box = spotBox(p);
-        return !level.noCollision(box) || !level.getEntities(null, box).isEmpty();
+        if (!level.getEntities(null, box).isEmpty()) {
+            return true;
+        }
+        java.util.Set<BlockPos> own = new java.util.HashSet<>();
+        own.add(worldPosition);
+        Footprint f = footprint();
+        for (int i = 1; i <= f.parts(); i++) {
+            own.add(LiftControllerBlock.at(worldPosition, facing(), f.cell(i)));
+        }
+        for (BlockPos at : BlockPos.betweenClosed(Mth.floor(box.minX), Mth.floor(box.minY), Mth.floor(box.minZ),
+                Mth.floor(box.maxX), Mth.floor(box.maxY), Mth.floor(box.maxZ))) {
+            if (own.contains(at)) {
+                continue;
+            }
+            for (AABB solid : level.getBlockState(at).getCollisionShape(level, at).toAabbs()) {
+                if (solid.move(at).intersects(box)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

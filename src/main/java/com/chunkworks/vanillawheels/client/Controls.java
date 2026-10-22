@@ -31,6 +31,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The driver's side of driving: turns the local player's keys into an
@@ -178,9 +179,26 @@ public final class Controls {
         }
     }
 
-    /** effects: starts the engine and tyre loops for a vehicle that just appeared on this client; the radio is {@link Radio}'s */
+    /**
+     * effects: starts the engine and tyre loops for a vehicle on this client, once, when its profile
+     * is known: the vehicle joins the client before its synced data arrives, and an engine loop made
+     * then was the car's petrol engine for every vehicle naming its own, a helicopter's rotor and a
+     * submarine's motor among them, at the car's sixteen blocks (D-0045). Called as it joins and as
+     * its profile arrives; the radio is {@link Radio}'s.
+     */
     public static void onVehicleJoined(Vehicle vehicle) {
-        Minecraft.getInstance().getSoundManager().play(new EngineSound(vehicle));
+        if (vehicle.profile() == null || vehicle.engineLoop() != null) {
+            return;
+        }
+        EngineSound engine = new EngineSound(vehicle);
+        vehicle.setEngineLoop(engine);
+        Minecraft.getInstance().getSoundManager().play(engine);
         Minecraft.getInstance().getSoundManager().play(new SkidSound(vehicle));
+    }
+
+    /** effects: returns the engine loop started for {@code vehicle} on this client, or null before its profile is known */
+    @Nullable
+    public static EngineSound engineOf(Vehicle vehicle) {
+        return vehicle.engineLoop() instanceof EngineSound e ? e : null;
     }
 }

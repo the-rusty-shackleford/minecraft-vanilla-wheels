@@ -374,6 +374,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             profile = null;
             if (profile() != null) {
                 refreshDimensions();
+                // A client learns the profile after the vehicle joins it: the loops it names start now (D-0045).
+                if (level().isClientSide()) {
+                    Controls.onVehicleJoined(this);
+                }
             }
         }
     }
@@ -1460,6 +1464,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                 stepAtTheWheel(p);
             }
         } else if (!towedHere) {
+            if (!level().isClientSide()) {
+                followOffTheLift();
+            }
             setDeltaMovement(Vec3.ZERO);
             wheelTravel += entityData.get(DATA_SPEED);
             drive = synced();
@@ -1816,6 +1823,16 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * get-out key asks {@link #getOut}. False for every car.
      */
     public boolean verticalControls() {
+        return false;
+    }
+
+    /**
+     * effects: returns whether whoever works it asks to leave the lift it is docked on by something
+     * other than the throttle, on the side at the wheel: a protocol whose vehicles rise off the deck
+     * says so for its climb (D-0046: a helicopter is born docked on the lift that built it, and a
+     * pilot's Space held it there). False for every car.
+     */
+    protected boolean leavingTheLift() {
         return false;
     }
 
@@ -2469,6 +2486,30 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         entityData.set(DATA_DOCKED, true);
     }
 
+    /**
+     * effects: on the server, while a player works it, lets it go once their client has taken it
+     * further than {@link com.chunkworks.vanillawheels.domain.Docking#HOLD} off its spot, or the lift
+     * is gone. The client lets go at once on the throttle or a climb ({@link #heldDocked}) and the
+     * server heard only of a throttle: a helicopter climbing off on Space stayed docked here (D-0046).
+     */
+    private void followOffTheLift() {
+        if (dockedAt == null) {
+            return;
+        }
+        if (Double.isNaN(dockX)) {
+            com.chunkworks.vanillawheels.lift.LiftBlockEntity lift = liftAt(dockedAt);
+            if (lift == null) {
+                undock();
+                return;
+            }
+            learnSpot(lift);
+        }
+        double dx = getX() - dockX, dy = getY() - dockY, dz = getZ() - dockZ;
+        if (dx * dx + dy * dy + dz * dz > com.chunkworks.vanillawheels.domain.Docking.HOLD * com.chunkworks.vanillawheels.domain.Docking.HOLD) {
+            undock();
+        }
+    }
+
     /** effects: takes the spot and heading this is held at from {@code lift} */
     private void learnSpot(com.chunkworks.vanillawheels.lift.LiftBlockEntity lift) {
         VehicleProfile p = profile();
@@ -2499,7 +2540,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             return false;
         }
         int throttle = level().isClientSide() ? Controls.input(this).throttle() : scripted != null ? scripted.throttle() : 0;
-        if (throttle != 0) {
+        if (throttle != 0 || leavingTheLift()) {
             undock();
             return false;
         }
@@ -2784,7 +2825,9 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (player instanceof ServerPlayer server) RecoveryData.get(server.server).bind(server, this, player.getItemInHand(hand));
             return InteractionResult.sidedSuccess(level().isClientSide());
         }
-        if (player.isSecondaryUseActive()) {
+        // Aboard, the click is the hand's (D-0045): from a seat the crosshair lands on the hull, and
+        // a free seat beside the rider took it for boarding, so nothing in hand could be used.
+        if (player.isSecondaryUseActive() || hasPassenger(player)) {
             return InteractionResult.PASS;
         }
         ItemStack held = player.getItemInHand(hand);
@@ -3411,6 +3454,21 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (event.getSource().is(net.minecraft.world.damagesource.DamageTypes.IN_WALL) && event.getEntity().getVehicle() instanceof Vehicle) {
             event.setCanceled(true);
         }
+    }
+
+    /** This client's engine loop for the vehicle, once {@link Controls} starts it; held as an Object so a server never names a client class. */
+    @Nullable
+    private Object engineLoop;
+
+    /** effects: returns this client's engine loop for the vehicle, null on a server and until its profile is known */
+    @Nullable
+    public Object engineLoop() {
+        return engineLoop;
+    }
+
+    /** modifies: this; effects: records the engine loop this client started for the vehicle */
+    public void setEngineLoop(Object loop) {
+        engineLoop = loop;
     }
 
     public static void onEntityJoin(EntityJoinLevelEvent event) {

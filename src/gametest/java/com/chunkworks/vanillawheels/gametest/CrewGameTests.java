@@ -31,7 +31,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -305,5 +308,22 @@ public final class CrewGameTests {
                     logOut(helper, p);
                 })
                 .thenSucceed();
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public void aRidersClickOnTheirOwnVehicleIsTheirHandsWithASeatFree(GameTestHelper helper) {
+        // From a seat the crosshair lands on the vehicle's own hull. A free seat beside the rider took
+        // the click as boarding, so nobody could eat, drink or open a map aboard a Huey (D-0045).
+        layFloor(helper, Blocks.STONE);
+        SkidVehicle skids = skids(helper, FLOOR);
+        ServerPlayer pilot = newPlayer(helper, "hand-pilot", new Vec3(7.5, FLOOR, 7.5));
+        board(helper, skids, pilot);
+        helper.assertTrue(skids.hasSeatFor(newPlayer(helper, "hand-other", new Vec3(3.5, FLOOR, 3.5))), "a seat is free");
+        pilot.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.BREAD));
+        helper.assertTrue(!skids.interact(pilot, InteractionHand.MAIN_HAND).consumesAction(), "the click is passed to the bread in hand");
+        helper.assertTrue(pilot.getVehicle() == skids && skids.getControllingPassenger() == pilot, "still at the controls");
+        pilot.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        helper.assertTrue(!skids.interact(pilot, InteractionHand.MAIN_HAND).consumesAction(), "an empty hand's click is passed on too");
+        helper.succeed();
     }
 }

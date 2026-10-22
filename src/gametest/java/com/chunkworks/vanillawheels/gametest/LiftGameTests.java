@@ -20,6 +20,7 @@ package com.chunkworks.vanillawheels.gametest;
 import com.chunkworks.vanillawheels.ModContent;
 import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.api.VanillaWheels;
+import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.domain.Docking;
 import com.chunkworks.vanillawheels.domain.Footprint;
 import com.chunkworks.vanillawheels.domain.Footprint.Cell;
@@ -85,6 +86,8 @@ public final class LiftGameTests {
     private static final ResourceLocation BOX_TRAILER = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_trailer");
     /** The box car's body stretched to ten blocks: longer than any lift takes. */
     private static final ResourceLocation BOX_LONG = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_long");
+    /** The long box 3.8 wide, as the Chinook: wider than the deck between its posts. */
+    private static final ResourceLocation BOX_WIDE = ResourceLocation.fromNamespaceAndPath("vanillawheels_gametest", "box_wide");
     /** The controller's cell for a lift facing north: its eight-long deck runs south from it, x 5..9, z 3..10. */
     private static final BlockPos CONTROLLER = new BlockPos(7, FLOOR, 3);
     /** A second lift's controller, facing east: its deck runs west from it along the arena's south side, x 6..13, z 9..13. */
@@ -634,6 +637,57 @@ public final class LiftGameTests {
             helper.assertTrue(!lift.busy(), "no job ran");
             helper.succeed();
         });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public void aDockedVehicleItsPlayersClientTakesOffTheSpotIsLetGoOnTheServer(GameTestHelper helper) {
+        // A pilot's client lets go of the lift on the climb alone and flies off; the server, which a
+        // player's vehicle only mirrors, heard of no throttle and kept it docked (D-0046).
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.CREATIVE);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftMenu menu = open(helper, sp, CONTROLLER);
+        load(menu, 1, 4, 1, 0);
+        helper.assertTrue(menu.clickMenuButton(sp, LiftMenu.BUILD_BUTTON), "built");
+        sp.closeContainer();
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        Vehicle car = lift.dockedVehicle();
+        helper.assertTrue(car != null, "born docked");
+        helper.runAtTickTime(LiftMotion.JOB + 2, () -> {
+            helper.assertTrue(sp.startRiding(car, true) && car.getControllingPassenger() == sp, "the player takes the wheel");
+            helper.assertTrue(car.docked(), "still docked with the player aboard");
+            // What the player's client reports as it rises off the deck: a move, and no throttle.
+            car.absMoveTo(car.getX(), car.getY() + 3.0, car.getZ(), car.getYRot(), car.getXRot());
+        });
+        helper.runAtTickTime(LiftMotion.JOB + 5, () -> {
+            helper.assertTrue(!car.docked(), "let go once off its spot");
+            helper.assertTrue(lift.dockedVehicle() == null, "the lift holds nothing");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public void aBodyWiderThanTheDeckIsBuiltThroughTheLiftsOwnPostsButNotThroughAnythingElse(GameTestHelper helper) {
+        // The Chinook could not be built from 1.17.0 on: its spot runs through the front posts (D-0046).
+        layFloor(helper);
+        ServerPlayer sp = player(helper, GameType.CREATIVE);
+        helper.assertTrue(place(helper, sp, CONTROLLER, Direction.NORTH).consumesAction(), "placed");
+        LiftBlockEntity lift = lift(helper, CONTROLLER);
+        LiftMenu menu = open(helper, sp, CONTROLLER);
+        menu.getSlot(LiftMenu.CHASSIS).set(ModContent.chassisStack(BOX_WIDE));
+        menu.broadcastChanges();
+        VehicleProfile wide = lift.profile(BOX_WIDE);
+        helper.assertTrue(wide != null && wide.body().width() > 3.7, "the wide box is wider than the deck between its posts");
+        helper.assertValueEqual(menu.buildStatus(), LiftStatus.Build.READY, "the lift's own posts do not refuse it");
+        BlockPos ahead = new BlockPos(7, FLOOR + 1, 1);
+        helper.setBlock(ahead, Blocks.STONE);
+        menu.broadcastChanges();
+        helper.assertValueEqual(menu.buildStatus(), LiftStatus.Build.OCCUPIED, "a block in its spot off the lift still does");
+        helper.setBlock(ahead, Blocks.AIR);
+        menu.broadcastChanges();
+        helper.assertTrue(menu.clickMenuButton(sp, LiftMenu.BUILD_BUTTON), "built");
+        helper.assertValueEqual(helper.getLevel().getEntitiesOfClass(Vehicle.class, lift.deckBox()).size(), 1, "one wide box on the deck");
+        helper.succeed();
     }
 
     @GameTest(template = "arena", timeoutTicks = 100)

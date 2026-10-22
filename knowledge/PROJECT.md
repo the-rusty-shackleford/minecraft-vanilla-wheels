@@ -7,7 +7,7 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.18.3 — built 2026-10-22, not released (the helicopter friends' asks; D-0045, D-0046)
+## 1.18.3 — released 2026-10-22 in pack 1.92.0 (the helicopter friends' asks; D-0045, D-0046)
 
 From Rusty's friends, flying on the box: nothing held could be used in a Huey, and no rotor was heard
 in third person.
@@ -29,6 +29,8 @@ in third person.
   (`clean build --no-build-cache`, booth in software on `:7`) green: 194 JUnit, 147 GameTests, 67 booth
   checks; jar sha1 `ab670e0f`. Ships with Rotorcraft 1.3.0, the Huey 1.3.0 and the Chinook 1.2.0. Not
   seen: a pilot's real Space off a lift (no booth flies off one).
+
+Released on Rusty's "Looks good, release", tag `v1.18.3` at `ae47f1e`, the release gate green on that code; sha1 `ab670e0f` on GitHub and on the server (the server repo's `knowledge/releases/pack-1.92.0.md`). Bobandy_ online: the two-minute warning, the restart at its end, 20.000 TPS.
 
 ## 1.18.2 — built 2026-10-21, not released (a ring equals itself; D-0044)
 

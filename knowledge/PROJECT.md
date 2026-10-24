@@ -7,7 +7,7 @@ tags: [overview]
 
 # Vanilla Wheels
 
-## 1.19.0 — built 2026-10-23, not released (two wheels and a horse's jump; D-0047)
+## 1.19.0 — released 2026-10-24 in pack 1.93.0 (two wheels and a horse's jump; D-0047)
 
 Rusty, 2026-10-23: two motorcycles for the roster, "they jump exactly as a ridden horse does, same
 controls": the Scrambler and the Iron Horse, data-only repos on this release.
@@ -26,6 +26,10 @@ controls": the Scrambler and the Iron Horse, data-only repos on this release.
   footprint, the drawing assertion on the old pose), and the bikes' booths on real Space presses.
   Rotorcraft (37), Submersibles (23), Trailblazer (11), Trailer (5) and Farmer's Pickup (7) GameTests
   pass on it. Network 10 unchanged. Not seen: a jump on the box.
+
+Released on Rusty's "go", tag `v1.19.0` at `ae0c35e`, the release gate green on that code (212 JUnit, 154
+GameTests, 68 booth checks); sha1 `524e08f1` on GitHub and on the server (the server repo's
+`knowledge/releases/pack-1.93.0.md`). Nobody online: one restart, 20.000 TPS.
 
 ## 1.18.3 — released 2026-10-22 in pack 1.92.0 (the helicopter friends' asks; D-0045, D-0046)
 

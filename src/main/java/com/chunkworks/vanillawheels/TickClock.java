@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
  * the entity pass and is overwritten by the server's time packet every
  * twenty ticks, so as a pass id it repeated or skipped -- a trailer that
  * froze a tick and jumped two, once a second. A counter bumped before each
- * pass is exact. nfx's {@code TowClock}, from his patch.
+ * pass is exact. The original {@code TowClock}, ported.
  */
 public final class TickClock {
     private TickClock() {}

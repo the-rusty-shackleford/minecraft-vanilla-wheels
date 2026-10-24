@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -60,7 +60,7 @@ final class Headlamps {
         double fz = Math.cos(heading);
         // An unpowered vehicle (a trailer) has no headlamps to aim: its lamps are markers, a point
         // at each lens of luminance twice the range -- Luminance falls one level a block, so a
-        // marker of range 3 is at 6 on its lens, 3 at three blocks, gone at six. nfx's rewrite.
+        // marker of range 3 is at 6 on its lens, 3 at three blocks, gone at six: the original rewrite.
         boolean markers = !p.isPowered();
         int level = Math.max(1, Math.min(Source.MAX_LUMINANCE, 2 * lights.range()));
         for (Vec at : lights.at()) {

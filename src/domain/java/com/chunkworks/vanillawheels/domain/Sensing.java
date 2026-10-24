@@ -1,13 +1,13 @@
-/* Copyright (C) 2026 Rusty Shackleford and nfx. SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 Chunkworks. SPDX-License-Identifier: AGPL-3.0-or-later */
 package com.chunkworks.vanillawheels.domain;
 
 /**
  * The Vehicle Sensor's rules (D-0035): its range, and how long it stays on.
  *
  * <p>A sensor looks around itself every {@link #SCAN_PERIOD} ticks for a vehicle within its range: any
- * part of a vehicle within that many blocks of the sensor, in every direction (Rusty: "range based and
+ * part of a vehicle within that many blocks of the sensor, in every direction ("range based and
  * not 'tripwire' based"). A car at full speed is seen within a tenth of a second of coming into range,
- * so a door can be open before it arrives (Rusty: "if I am driving towards the door at full speed, I
+ * so a door can be open before it arrives ("if I am driving towards the door at full speed, I
  * dont have to slow down"). Its range is a rung of a ladder, {@code 2, 4, 8, 12, 16, 20, 24, 32}
  * blocks, stepped by hand; a command may set any range from {@link #MIN_RANGE} to {@link #MAX_RANGE}.
  * Seeing a vehicle, the sensor is on for {@link #HOLD} more scans, counting down one each scan that

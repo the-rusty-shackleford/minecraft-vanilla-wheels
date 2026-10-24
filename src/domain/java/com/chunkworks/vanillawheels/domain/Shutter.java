@@ -1,4 +1,4 @@
-/* Copyright (C) 2026 Rusty Shackleford and nfx. SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 Chunkworks. SPDX-License-Identifier: AGPL-3.0-or-later */
 package com.chunkworks.vanillawheels.domain;
 
 import java.util.*;
@@ -18,7 +18,7 @@ public final class Shutter {
     /** How a curtain opens, and how fast. ROLLING rolls up into a half-block header, which stays
      * (the garage door), an eighth-block a tick; SINKING slides down whole into its sill and leaves
      * the full opening (the hidden door), half a block a tick, so a four-high door is open in 0.4 s
-     * (Rusty: "if I am driving towards the door at full speed, I dont have to slow down"). */
+     * ("if I am driving towards the door at full speed, I dont have to slow down"). */
     public enum Kind {
         ROLLING(1), SINKING(4);
         /** Eighth-blocks moved a tick. */

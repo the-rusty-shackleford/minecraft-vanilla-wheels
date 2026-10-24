@@ -31,19 +31,19 @@ at login, and using the ring opens a screen that says where each vehicle is, wha
 recalls one on a Confirm (see [Keys](#damage-repairs-and-recovery-keys-180)). Network 9: the ring's
 screen has a message of its own. **1.17.1**: a docked vehicle is drawn flat on the deck; 1.17.0 drew it
 a fifth of a block up and pitched, the terrain fit having found the back wall a block past its tail
-(Rusty: "floating a wee bit"). **1.17.2** (pack 1.87.0, with Backpacks+ 0.8.0): the keyring may ride in
+("floating a wee bit"). **1.17.2** (pack 1.87.0, with Backpacks+ 0.8.0): the keyring may ride in
 a bag you carry; 1.17.1 flagged it as fitting in no container item, which Backpacks+ read as "storage"
-and refused (Backpacks+ 0.8.0 narrows that rule; Rusty: a bag takes what the inventory takes).
+and refused (Backpacks+ 0.8.0 narrows that rule; a bag takes what the inventory takes).
 
 **1.18.0** (unreleased; D-0042): the Mechanic Lift is **eight blocks long**, so the Farmer's Pickup
-parks whole on the deck (Rusty: it "doesnt really fit", "make it a little bigger"). A lift keeps the
+parks whole on the deck (it "doesnt really fit", "make it a little bigger"). A lift keeps the
 shape it was laid with: its blocks carry a `long` flag, every lift placed from now on has it, and a
 lift from before reads as the six-long shape it was and goes on working as it did; break it and place
 it again for the long one. Network 10, since the lift's blocks have a new state (see
 [The Mechanic Lift](#the-mechanic-lift)). **1.18.1** (D-0043): a parked vehicle sits **centred**
 between the deck's front edge and the wall, the same margin at both ends; 1.18.0 still backed every
 vehicle up to the wall, the rule from when the Pickup was longer than the deck, which on the long deck
-left a Trailblazer two blocks behind the middle (Rusty: "too far back"). A body too long to leave a
+left a Trailblazer two blocks behind the middle ("too far back"). A body too long to leave a
 quarter block at both ends still backs up to the wall with its nose over the front edge.
 
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
@@ -73,7 +73,7 @@ Version 1.7.1 added this tab. Since 1.7.2, Metals and Materials is installed sep
 
 The held garage panel now has a larger, front-facing item pose so its slats are
 visible in first person and in the inventory. Released alongside a fresh world on seed 1000820165;
-[visual verification](devtools/verification/garage-held-item.md) was skipped at Rusty's request while their personal Prism client is running.
+[visual verification](devtools/verification/garage-held-item.md) was skipped on request while a personal Prism client was running.
 
 ## Falls in 1.9.4
 
@@ -132,7 +132,7 @@ Available in **1.9.0**. See the
 
 ## Hidden doors, vehicle sensors and floor hatches (1.15)
 
-Built for Rusty's underground garage: a tunnel whose rock face opens for a car and nobody else, and a
+Built for an underground garage: a tunnel whose rock face opens for a car and nobody else, and a
 floor that closes over an elevator's hole. All three are drawn by Vanilla Wheels' own renderers and
 never swap blocks while they move, so nothing flickers under shaders.
 
@@ -215,7 +215,7 @@ Dismount"), not Shift.
 
 A vehicle climbs any ledge up to its profile's `climb` (one block for a pickup; a
 two-block ledge is a wall, use a ramp) without a jump: the collision box steps up the way
-the game steps a player up a slab. What is drawn is posed on the ground nfx's way
+the game steps a player up a slab. What is drawn is posed on the ground the original way
 (`domain/Terrain`): every wheel is probed as a disc, which starts riding up a step one
 radius early along a quarter circle; one plane is fitted through the terrain along both
 wheel tracks over the whole footprint, a block past each end, with the walk along a track
@@ -858,7 +858,7 @@ Vehicle contacts exchange bounded momentum, tagged fragile blocks break with per
 
 ## Licence
 
-AGPL-3.0-or-later. Copyright 2026 Rusty Shackleford and nfx.
+AGPL-3.0-or-later. Copyright 2026 Chunkworks.
 
 ## Collision and moving lights in 1.7.0
 

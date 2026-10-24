@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -958,7 +958,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             if (seat < 0 || seat >= p.seats().size()) {
                 return super.getPassengerAttachmentPoint(entity, dimensions, partialTick);
             }
-            // Anchored on the eye, nfx's way: the game hangs a rider's eye a fixed height straight up
+            // Anchored on the eye, the original way: the game hangs a rider's eye a fixed height straight up
             // from the attachment, so on a tilted body an upright rider's head left the cabin. The
             // eye point is what turns with the body, and the attachment hangs back down from it.
             VehicleProfile.Seat seat0 = p.seats().get(seat);
@@ -1125,7 +1125,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /**
      * effects: lets go of the tower by hand: unhitched, this trailer rolls back about ROLL_BACK
      * along its heading, and that tower does not catch it again until the two have parted -- so
-     * driving off leaves it behind (Rusty, 2026-09-28; D-0022)
+     * driving off leaves it behind (2026-09-28; D-0022)
      */
     void letGo() {
         Vehicle tower = tower();
@@ -1168,7 +1168,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * this pass and will catch up then -- after the level's snapshot of its
      * old position, so the old and new bracket one tick of motion. A body
      * moved from its tower's tick before its own is drawn in steps otherwise:
-     * the snapshot overwrites "old" with the moved position (nfx's finding).
+     * the snapshot overwrites "old" with the moved position (the original finding).
      */
     void followFrom(Vehicle tower, long pass) {
         if (!simulatesTow(tower) || lastFollowedPass == pass) {
@@ -1577,7 +1577,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /**
-     * effects: poses the body on the ground under it, nfx's way ({@link Terrain}): the wheels
+     * effects: poses the body on the ground under it, the original way ({@link Terrain}): the wheels
      * probed as discs from where the last pose drew them, one plane fitted through the terrain
      * over the whole footprint, pitch and roll on critically damped springs toward it, the height
      * on the plane within the sink and float bounds, the descending end kept clear -- so a
@@ -2718,7 +2718,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
 
     /**
      * effects: returns whether fuel gates the engine: the config requires it and the driver is not
-     * in creative. In creative nothing consumable is required (Rusty's rule for every mod, as the
+     * in creative. In creative nothing consumable is required (the rule for every mod, as the
      * game's own creative spends no arrows): the engine runs on an empty tank and burns nothing.
      * The game's predicate, so a spectator or a creative-like mode counts as the game says.
      */
@@ -2877,7 +2877,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * with a box, anywhere on the door where it stands now, shut or swung -- the box's corners
      * turned about the hinge by the swing, bounded, and met by the click's line within
      * {@link #CHEST_REACH} of the hit, since the hit lands on the hull and a swung door stands
-     * off it (Rusty: "anywhere on the door, not just the hinges")
+     * off it ("anywhere on the door, not just the hinges")
      */
     private boolean nearADoor(VehicleProfile p, Vec3 hit, Vec3 eye) {
         Vec3 ray = hit.add(position()).subtract(eye);

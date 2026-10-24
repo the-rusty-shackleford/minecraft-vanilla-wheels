@@ -1,10 +1,10 @@
-/* Copyright (C) 2026 Rusty Shackleford and nfx. SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 Chunkworks. SPDX-License-Identifier: AGPL-3.0-or-later */
 package com.chunkworks.vanillawheels.domain;
 
 /**
  * The Floor Hatch's rules (D-0037): a housing in a floor slides a plate over the opening in front of
  * it, and draws it back under the floor, so the opening is a real hole (air) while open and a solid
- * floor while shut. Rusty: "a floor of some kind that closes when the elevator passes underneath, and
+ * floor while shut. The ask: "a floor of some kind that closes when the elevator passes underneath, and
  * opens right before the elevator comes back up", and "a guard so nobody in the house accidentally
  * falls down a chasm that suddenly appeared".
  *

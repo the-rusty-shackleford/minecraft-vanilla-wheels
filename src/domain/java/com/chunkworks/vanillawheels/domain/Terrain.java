@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ package com.chunkworks.vanillawheels.domain;
 /**
  * How a body is posed on the ground it stands on: the terrain sensed as a
  * vehicle's wheels would sense it, one plane fitted through it, and the
- * body eased onto that plane. nfx's design, ported from his patch
+ * body eased onto that plane: the original design, ported from the original patch
  * ({@code GroundPose} and {@code TrailerPose}) into the pure layer: the
  * world is reached only through {@link Columns}, so the whole thing runs
  * under a test with a synthetic terrain.
@@ -81,7 +81,7 @@ public final class Terrain {
          * effects: returns how far under the body's y a terrain sample may look: as far as the fit's
          * window is long, so on a steep descent the samples behind a long body read the real ground
          * rather than bottoming out at BELOW -- a floor that shifted with every step-up and rippled
-         * the fitted height (nfx's open item)
+         * the fitted height (the original open item)
          */
         public double sampleBelow() {
             return Math.max(BELOW, bodyLength / 2.0 + LOOK + 1.0);

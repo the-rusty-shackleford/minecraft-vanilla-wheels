@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -139,9 +139,9 @@ public final class PhotoBooth {
         // movement (including window-manager cursor warps) out of its camera.
         if (mc.player != null && mc.screen == null) mc.mouseHandler.releaseMouse();
         if (!muted) {
-            // Silent from the first tick, before the title music: Rusty listens to music while these run.
+            // Silent from the first tick, before the title music: someone may be listening to music while these run.
             mc.options.getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.MASTER).set(0.0);
-            // Iconified beside Rusty's own client, the window never has focus: the world must not pause for it.
+            // Iconified beside a player's own client, the window never has focus: the world must not pause for it.
             mc.options.pauseOnLostFocus = false;
             muted = true;
         }
@@ -305,7 +305,7 @@ public final class PhotoBooth {
         // Third person from the seat, looking a little up so the camera's rays sweep the meadow
         // behind the car, as a hillside's does on a descent: the camera keeps its full distance,
         // as the game's own would, since grass has no visual shape. Its outline once clipped it
-        // at every tuft (Rusty: "the screen keeps stuttering as if the camera keeps glitching
+        // at every tuft ("the screen keeps stuttering as if the camera keeps glitching
         // perspectives").
         s.add(new Step(t += 2, () -> {
             mc.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);

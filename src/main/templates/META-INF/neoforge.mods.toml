@@ -7,7 +7,7 @@ issueTrackerURL="https://github.com/the-rusty-shackleford/minecraft-vanilla-whee
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-authors="Rusty Shackleford, nfx"
+authors="Chunkworks"
 description='''
 A vehicle protocol. A vehicle is a datapack entry and a mesh: this mod owns
 the driving, the seats, the fuel, the storage, the headlights, the horn, the

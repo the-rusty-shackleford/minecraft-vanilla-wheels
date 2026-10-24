@@ -1,4 +1,4 @@
-# Copyright (C) 2026 Rusty Shackleford and nfx. SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Chunkworks. SPDX-License-Identifier: AGPL-3.0-or-later
 """Press or let go of one key on the booth's display through XTEST, as a person would.
 
 Why: NeoForge reads Shift, Control and Alt from GLFW's own key state, which only a real key

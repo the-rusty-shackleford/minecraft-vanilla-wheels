@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -66,7 +66,7 @@ public record Drive(double speed, double heading, double motion, double steer, d
 
     /** Below this fraction of top speed nothing turns and no drift starts. */
     public static final double CREEP = 0.02;
-    /** A standing car with the stick held pivots as if rolling at this, blocks per tick: about two degrees a tick. nfx's turn-in-place. */
+    /** A standing car with the stick held pivots as if rolling at this, blocks per tick: about two degrees a tick: the original turn-in-place. */
     public static final double TURN_IN_PLACE = 0.15;
     /** The fraction of top speed under which a drift cannot begin. */
     public static final double DRIFT_FLOOR = 0.35;

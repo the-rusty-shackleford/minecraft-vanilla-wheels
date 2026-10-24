@@ -1,6 +1,6 @@
 """Original empty-slot glyphs; immutable pixels, drawn at Minecraft's native density.
 
-Copyright 2026 Rusty Shackleford and nfx. AGPL-3.0-or-later.
+Copyright 2026 Chunkworks. AGPL-3.0-or-later.
 """
 
 type Pixel = tuple[int, int, int, int]

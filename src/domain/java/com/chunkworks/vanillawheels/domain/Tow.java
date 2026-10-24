@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -74,7 +74,7 @@ public final class Tow {
      * effects: returns whether a loose tongue {@code distance} from a moving tower's ball is caught:
      * within {@code reach}, unless it was let go by hand from this very tower and the two have not
      * yet parted ({@code released}). Without the release, the first tick of driving off caught the
-     * tongue still lying on the ball again (Rusty, 2026-09-28; D-0022).
+     * tongue still lying on the ball again (2026-09-28; D-0022).
      */
     public static boolean catches(double distance, boolean released, double reach) {
         return !released && distance < reach;

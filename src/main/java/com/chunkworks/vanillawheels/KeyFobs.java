@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -60,7 +60,7 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Keys that are never lost (Rusty, 2026-09-29; D-0026), and the keyring they live on (D-0041).
+ * Keys that are never lost (2026-09-29; D-0026), and the keyring they live on (D-0041).
  * A key paired as its vehicle's current key is <em>live</em>; so is a ring carrying one. A live
  * stack lives only on its owner: their inventory, or a bag Carried says they carry. Tossed,
  * spilled at a death, dropped inside a bag or a box, put in a chest, handed to a frame or a pot,

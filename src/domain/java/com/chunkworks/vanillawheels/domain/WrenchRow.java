@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ package com.chunkworks.vanillawheels.domain;
 
 /**
  * A vehicle's condition drawn the way the game draws health and hunger
- * (Rusty: "a bar of wrench icons that behave similarly to the health and
+ * ("a bar of wrench icons that behave similarly to the health and
  * hunger bars"). Ten wrenches, each a tenth of the condition, in halves,
  * any condition above nothing showing at least a half. After a hurt the row
  * blinks for a second with what was lost still shown pale, and for half a

@@ -1,6 +1,6 @@
 /*
  * Vanilla Wheels - a vehicle protocol.
- * Copyright (C) 2026 Rusty Shackleford and nfx
+ * Copyright (C) 2026 Chunkworks
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The terrain pose over synthetic ground, the scenarios of nfx's offline
+ * The terrain pose over synthetic ground, the scenarios of the original offline
  * replay ({@code slopesim.py}): a body driving straight along +z at a steady
  * speed, its physics y resting on the highest block under its box, its
  * drawn pose stepped every tick. What is asserted is what the eye sees in

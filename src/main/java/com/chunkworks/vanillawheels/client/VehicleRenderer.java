@@ -21,6 +21,7 @@ import com.chunkworks.vanillawheels.Vehicle;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.domain.Paint;
 import com.chunkworks.vanillawheels.domain.BodyPose;
+import com.chunkworks.vanillawheels.domain.Linkage;
 import com.chunkworks.vanillawheels.domain.Rotation;
 import com.chunkworks.vanillawheels.domain.Suspension;
 import com.chunkworks.vanillawheels.domain.Vec;
@@ -206,6 +207,27 @@ public class VehicleRenderer extends EntityRenderer<Vehicle> {
                         lit ? MeshDrawer.Shading.LAMP : MeshDrawer.Shading.LIT);
             }
             poseStack.popPose();
+        }
+
+        if (!a.moving.isEmpty()) {
+            // The body's own moving parts (D-0047): each turned through the parts that carry it, then by itself.
+            Linkage.State state = new Linkage.State(vehicle.wheelTravel(partialTick), vehicle.steer(), Mth.clamp(vehicle.ridden(partialTick), 0.0f, 1.0f));
+            for (int i = 0; i < a.moving.size(); i++) {
+                Appearance.Moved part = a.moving.get(i);
+                poseStack.pushPose();
+                for (Rotation r : a.linkage.chain(i, state)) {
+                    rotateAround(poseStack, r);
+                }
+                MeshDrawer.draw(part.mesh(), poseStack.last(), solid, MeshDrawer.WHITE, packedLight, overlay, MeshDrawer.Shading.LIT);
+                if (part.painted().quadCount() > 0) {
+                    MeshDrawer.draw(part.painted(), poseStack.last(), solid, paintOf(vehicle, p), packedLight, overlay, MeshDrawer.Shading.LIT);
+                }
+                if (part.lamps().quadCount() > 0) {
+                    MeshDrawer.draw(part.lamps(), poseStack.last(), solid, MeshDrawer.WHITE, lit ? LightTexture.FULL_BRIGHT : packedLight, overlay,
+                            lit ? MeshDrawer.Shading.LAMP : MeshDrawer.Shading.LIT);
+                }
+                poseStack.popPose();
+            }
         }
 
         double spin = WheelSpin.radians(vehicle.wheelTravel(partialTick), a.wheelRadius);

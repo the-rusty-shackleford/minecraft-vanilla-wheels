@@ -7,6 +7,26 @@ tags: [overview]
 
 # Vanilla Wheels
 
+## 1.19.0 — built 2026-10-23, not released (two wheels and a horse's jump; D-0047)
+
+Rusty, 2026-10-23: two motorcycles for the roster, "they jump exactly as a ridden horse does, same
+controls": the Scrambler and the Iron Horse, data-only repos on this release.
+- **The jump is the horse's** (`jump`): `Vehicle` is the game's `PlayerRideableJumping`, so its driver
+  gets the horse's jump bar and controls; the numbers are the game's (`domain/Jump`), an average horse's
+  0.7 rising 3.12 blocks at a full bar. A jump asked for in the air waits for the ground. On a vehicle
+  that jumps the jump key never drifts.
+- **Two wheels lean** (`lean`, `domain/Lean`): upright, into turns as balance needs, onto a stand parked.
+- **Moving parts of the body's own mesh** (`moving`, `domain/Linkage`): wheels that roll, a fork that
+  steers with its wheel in it, a stand that folds while ridden; on the lift a rolling part is a wheel.
+- **In the air** a body meets walls from its own height (`footprintClamp`; the walk had followed the
+  ground under it, so a bike two blocks up was stopped by a two-block wall) and is drawn where it is
+  (the ground fit had drawn a jumping bike on the ground three blocks under itself, the booth's photo
+  showed it; a car off a cliff was drawn sunk toward the ground too).
+- Gate: 212 JUnit (18 new), 154 GameTests (7 new, `BikeGameTests`; the wall test failed on the old
+  footprint, the drawing assertion on the old pose), and the bikes' booths on real Space presses.
+  Rotorcraft (37), Submersibles (23), Trailblazer (11), Trailer (5) and Farmer's Pickup (7) GameTests
+  pass on it. Network 10 unchanged. Not seen: a jump on the box.
+
 ## 1.18.3 — released 2026-10-22 in pack 1.92.0 (the helicopter friends' asks; D-0045, D-0046)
 
 From Rusty's friends, flying on the box: nothing held could be used in a Huey, and no rotor was heard

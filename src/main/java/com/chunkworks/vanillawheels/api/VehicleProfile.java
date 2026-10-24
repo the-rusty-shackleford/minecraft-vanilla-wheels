@@ -18,6 +18,9 @@
 package com.chunkworks.vanillawheels.api;
 
 import com.chunkworks.vanillawheels.domain.Dial;
+import com.chunkworks.vanillawheels.domain.Jump;
+import com.chunkworks.vanillawheels.domain.Lean;
+import com.chunkworks.vanillawheels.domain.Linkage;
 import com.chunkworks.vanillawheels.domain.Region;
 import com.chunkworks.vanillawheels.domain.Selector;
 import com.chunkworks.vanillawheels.domain.Transform;
@@ -63,7 +66,7 @@ import net.minecraft.world.item.DyeColor;
  *     0.1 <= durability <= 100.
  */
 public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels wheels, Optional<Engine> engine,
-                             Handling handling, double climb, double mass, double durability, Kit kit) {
+                             Handling handling, double climb, double mass, double durability, Kit kit, Ride ride) {
 
     /** The least and the most a profile's durability may be. */
     public static final double MIN_DURABILITY = 0.1, MAX_DURABILITY = 100.0;
@@ -148,6 +151,131 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
     public Optional<Cargo> cargo() { return kit.cargo(); }
     public List<Door> doors() { return kit.doors(); }
     public Repair repair() { return kit.repair(); }
+    public Optional<Jump> jump() { return ride.jump().map(JumpSpec::jump); }
+    public Optional<Lean> lean() { return ride.lean().map(LeanSpec::lean); }
+    public List<Moving> moving() { return ride.moving(); }
+
+    /**
+     * How it rides beyond driving (D-0047): whether it jumps as a horse does, whether it leans as a
+     * two-wheeler does, and the parts of its own mesh that move with the ride (wheels that roll, a
+     * fork that steers, a stand that folds). One flat object in the JSON, each field absent by
+     * default: a car neither jumps nor leans, and its wheels are the wheel mesh's.
+     */
+    public record Ride(Optional<JumpSpec> jump, Optional<LeanSpec> lean, List<Moving> moving) {
+        public static final MapCodec<Ride> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                JumpSpec.CODEC.optionalFieldOf("jump").forGetter(Ride::jump),
+                LeanSpec.CODEC.optionalFieldOf("lean").forGetter(Ride::lean),
+                Moving.CODEC.listOf(0, 16).optionalFieldOf("moving", List.of()).forGetter(Ride::moving)
+        ).apply(i, Ride::new));
+
+        public static final Ride NONE = new Ride(Optional.empty(), Optional.empty(), List.of());
+
+        public Ride {
+            moving = List.copyOf(moving);
+            for (int k = 0; k < moving.size(); k++) {
+                int within = moving.get(k).within().orElse(-1);
+                if (within >= k) {
+                    throw new IllegalArgumentException("moving part " + k + " is within " + within + ": a part is within an earlier one");
+                }
+            }
+        }
+    }
+
+    /** A horse's jump (D-0047): {@code strength}, blocks a tick upward at a full bar; absent, an average horse's. */
+    public record JumpSpec(double strength) {
+        public static final Codec<JumpSpec> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.doubleRange(0.01, 2.0).optionalFieldOf("strength", Jump.AVERAGE_HORSE).forGetter(JumpSpec::strength)
+        ).apply(i, JumpSpec::new));
+
+        public Jump jump() {
+            return new Jump(strength);
+        }
+    }
+
+    /**
+     * A two-wheeler's lean (D-0047): at most {@code degrees} into a turn, and {@code parked} degrees
+     * (positive right) with nobody at the controls, onto its stand.
+     */
+    public record LeanSpec(double degrees, double parked) {
+        public static final Codec<LeanSpec> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.doubleRange(1.0, 60.0).fieldOf("degrees").forGetter(LeanSpec::degrees),
+                Codec.doubleRange(-60.0, 60.0).optionalFieldOf("parked", 0.0).forGetter(LeanSpec::parked)
+        ).apply(i, LeanSpec::new));
+
+        public LeanSpec {
+            if (Math.abs(parked) > degrees) {
+                throw new IllegalArgumentException("a parked lean of " + parked + " is past the most, " + degrees);
+            }
+        }
+
+        public Lean lean() {
+            return new Lean(Math.toRadians(degrees), Math.toRadians(parked), Lean.RATE);
+        }
+    }
+
+    /**
+     * A part of the mesh that moves with the ride (D-0047), turned about {@code axis} through
+     * {@code pivot} (mesh units, the mesh's frame): {@code by} "roll", rolling with the distance
+     * travelled as a wheel of {@code radius}; "steer", turning with the front wheels' steer about
+     * an axis up the steering head; "ridden", turned {@code degrees} about the axis while someone
+     * is at the controls (a stand folding up). {@code within} is the index of an earlier moving part
+     * that carries this one: a front wheel within its fork.
+     */
+    public record Moving(PartSelector part, Vec pivot, Vec axis, Linkage.Kind by, Optional<Double> radius, double degrees,
+                         Optional<Integer> within) {
+        private static final Codec<Linkage.Kind> KIND = Codec.STRING.comapFlatMap(s -> switch (s) {
+            case "roll" -> DataResult.success(Linkage.Kind.ROLL);
+            case "steer" -> DataResult.success(Linkage.Kind.STEER);
+            case "ridden" -> DataResult.success(Linkage.Kind.RIDDEN);
+            default -> DataResult.error(() -> "a moving part moves by roll, steer or ridden, not " + s);
+        }, k -> k.name().toLowerCase());
+
+        public static final Codec<Moving> CODEC = RecordCodecBuilder.create(i -> i.group(
+                PartSelector.CODEC.fieldOf("part").forGetter(Moving::part),
+                VEC.fieldOf("pivot").forGetter(Moving::pivot),
+                VEC.fieldOf("axis").forGetter(Moving::axis),
+                KIND.fieldOf("by").forGetter(Moving::by),
+                Codec.doubleRange(0.01, 64.0).optionalFieldOf("radius").forGetter(Moving::radius),
+                Codec.doubleRange(-360.0, 360.0).optionalFieldOf("degrees", 0.0).forGetter(Moving::degrees),
+                Codec.intRange(0, 15).optionalFieldOf("within").forGetter(Moving::within)
+        ).apply(i, Moving::new));
+
+        public Moving {
+            if (axis.length() < 1e-6) {
+                throw new IllegalArgumentException("a moving part turns about an axis, not " + axis);
+            }
+            if (by == Linkage.Kind.ROLL && radius.isEmpty()) {
+                throw new IllegalArgumentException("a rolling part has a radius");
+            }
+        }
+
+        /** effects: returns this part's joint in the game's local frame, blocks, under {@code t} at {@code scale} */
+        public Linkage.Joint joint(Transform t, double scale) {
+            Vec localPivot = t.apply(pivot).times(scale);
+            Vec localAxis = t.applyDirection(axis).normalized();
+            double amount = switch (by) {
+                case ROLL -> radius.orElseThrow() * scale;
+                case STEER -> 1.0;
+                // Mirrored as a door's swing is: the reflection reverses the turn.
+                case RIDDEN -> Math.toRadians(degrees) * (t.isReflection() ? -1.0 : 1.0);
+            };
+            return new Linkage.Joint(localPivot, localAxis, by, amount, within.orElse(-1));
+        }
+    }
+
+    /**
+     * effects: returns how many wheels the lift builds this with: one a position when the wheel mesh
+     * draws them; else one a rolling part of its own mesh (D-0047: a motorcycle's two); none for skids
+     * or feet (D-0030)
+     */
+    public int wheelParts() {
+        return wheels.drawn() ? wheels.parts() : (int) moving().stream().filter(m -> m.by() == Linkage.Kind.ROLL).count();
+    }
+
+    /** effects: returns the moving parts as one linkage in the game's local frame, blocks */
+    public Linkage linkage() {
+        return new Linkage(moving().stream().map(m -> m.joint(toLocal(), scale())).toList());
+    }
 
     /** A datapack-owned repair ingredient and the material count for a completely broken vehicle. */
     public record Repair(net.minecraft.world.item.crafting.Ingredient ingredient, int fullCost) {
@@ -571,7 +699,8 @@ public record VehicleProfile(Look look, Body body, List<Seat> seats, Wheels whee
             Codec.doubleRange(0.0, 4.0).optionalFieldOf("climb", 1.0).forGetter(VehicleProfile::climb),
             Codec.doubleRange(0.05, 50.0).optionalFieldOf("mass", 1.0).forGetter(VehicleProfile::mass),
             Codec.doubleRange(MIN_DURABILITY, MAX_DURABILITY).optionalFieldOf("durability", 1.0).forGetter(VehicleProfile::durability),
-            Kit.MAP_CODEC.forGetter(VehicleProfile::kit)
+            Kit.MAP_CODEC.forGetter(VehicleProfile::kit),
+            Ride.MAP_CODEC.forGetter(VehicleProfile::ride)
     ).apply(i, VehicleProfile::new));
 
     public VehicleProfile {

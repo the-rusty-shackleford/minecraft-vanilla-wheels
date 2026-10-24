@@ -46,6 +46,14 @@ vehicle up to the wall, the rule from when the Pickup was longer than the deck, 
 left a Trailblazer two blocks behind the middle ("too far back"). A body too long to leave a
 quarter block at both ends still backs up to the wall with its nose over the front edge.
 
+**1.19.0** (unreleased; D-0047): a vehicle may **jump as a ridden horse does** -- hold the jump key,
+the jump bar fills in place of the experience bar, let go to jump, a full bar three blocks up -- may
+**lean as a two-wheeler** does, and may turn **parts of its own mesh** with the ride: wheels that roll, a
+fork that steers with its wheel in it, a stand that folds up (see [Two wheels and a jump](#two-wheels-and-a-jump-1190)).
+On a vehicle that jumps the jump key never drifts. A body in the air meets walls from its own height
+and is drawn where it is, not on the ground under it.
+For the Scrambler and the Iron Horse. Network 10, unchanged.
+
 A vehicle protocol for NeoForge 1.21.1. A vehicle is a datapack entry, a mesh and a
 texture; this mod owns every line of Java. It drives, climbs, carries riders and cargo,
 burns fuel, shows its gauges on a physical dash, lights the road, honks, plays records,
@@ -507,7 +515,14 @@ and it is mirrored once at load, vectors and angles with it; a Blockbench model 
   "glass": {"group": "windshield"},
   "cockpit": {"group": ["cage", "windshield_frame", "mirrors"]},   // not drawn from a rider's own eyes (optional); glass it names too stays glass to everyone else
   "rider_scale": 0.7,                                              // everyone aboard is this size (optional, 1)
-  "sounds": {"engine": "vanillawheels:engine.petrol"}
+  "sounds": {"engine": "vanillawheels:engine.petrol"},
+  "jump": {"strength": 0.7},                          // jumps as a ridden horse does (optional; absent strength, an average horse's; 1.19.0)
+  "lean": {"degrees": 35, "parked": -8},              // a two-wheeler's lean: at most, and onto its stand parked, positive right (optional; 1.19.0)
+  "moving": [                                         // parts of the mesh that move with the ride (optional; 1.19.0)
+    {"part": {"group": "steering"}, "pivot": [0, 19, 6], "axis": [0, 0.9, -0.44], "by": "steer"},
+    {"part": {"group": "wheel_front"}, "pivot": [0, 6.2, 13.4], "axis": [1, 0, 0], "by": "roll", "radius": 6.2, "within": 0},
+    {"part": {"group": "kickstand"}, "pivot": [2.8, 7.4, -4.3], "axis": [1, 0, 0], "by": "ridden", "degrees": 70}
+  ]
 }
 ```
 
@@ -535,6 +550,32 @@ The optional `repair` field names a normal ingredient and the whole-vehicle cost
 `"repair": {"ingredient": {"tag": "c:ingots/steel"}, "full_cost": 20}`.
 The count must be 1–64; omitted policies default to 20 steel. Vehicle packs can
 select iron or other ingredients independently of their chassis crafting recipe.
+
+## Two wheels and a jump (1.19.0)
+
+D-0047. Three optional profile blocks, for a motorcycle and anything else that needs them.
+
+- **`jump`**: the vehicle is the game's `PlayerRideableJumping`, so its driver jumps it exactly as a
+  horse's rider does: hold the jump key, the jump bar fills where the experience bar was, let go. A bar
+  of p percent jumps at 0.4 + 0.4 p / 90 of `strength`, all of it from 90 percent; in the air it falls
+  under the game's gravity and drag, as a horse does. An average horse's 0.7 rises 3.12 blocks at a full
+  bar and 0.62 at a tap. A jump asked for in the air is made on landing. The jump key never drifts on a
+  vehicle that jumps. Landing hurts nobody aboard below the suspension's seven blocks of fall.
+- **`lean`**: wheels in a line say nothing about roll, so the body leans as a rider leans it: upright
+  going straight, into a turn as far as balancing it needs (at most `degrees`), and onto its stand,
+  `parked` degrees (positive right), with nobody at the controls and the wheels still. Pitch and height
+  still come from the ground.
+- **`moving`**: parts of the body's own mesh, each turned about `axis` through `pivot` (mesh units) by
+  `roll` (with the distance travelled, as a wheel of `radius`), `steer` (with the front wheels' steer,
+  about an axis up the steering head) or `ridden` (`degrees` about the axis while someone is at the
+  controls). `within` names an earlier part that carries this one: the front wheel within its fork.
+  A roll axis may be written either way along the axle and a steer axis either way along the head; a
+  part's lenses light and its paint takes the dye as a door's do. With wheels drawn this way, set
+  `"drawn": false` on `wheels`: the positions are then only where it touches the ground.
+
+A body more than its climb off the ground, or in a jump, meets walls from its own height, as the game
+lifts a box before moving it across, so a jump clears what it is over; and it is drawn where it is,
+where the ground fit had drawn it on the ground under it.
 
 ## Layering a protocol on this one (1.12.0)
 

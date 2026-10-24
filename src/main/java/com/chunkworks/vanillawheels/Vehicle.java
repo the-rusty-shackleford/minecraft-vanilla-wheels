@@ -29,6 +29,8 @@ import com.chunkworks.vanillawheels.domain.Drive;
 import com.chunkworks.vanillawheels.domain.FuelDebt;
 import com.chunkworks.vanillawheels.domain.Impact;
 import com.chunkworks.vanillawheels.domain.Input;
+import com.chunkworks.vanillawheels.domain.Jump;
+import com.chunkworks.vanillawheels.domain.Lean;
 import com.chunkworks.vanillawheels.domain.LiftMotion;
 import com.chunkworks.vanillawheels.domain.RayBox;
 import com.chunkworks.vanillawheels.domain.Seats;
@@ -68,6 +70,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
+import net.minecraft.world.entity.PlayerRideableJumping;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.Pose;
@@ -111,7 +114,7 @@ import org.jetbrains.annotations.Nullable;
  * hand. Hit boxes beyond the square the game gives an entity are
  * {@link Part}s, so the hood and bed of a long truck are clickable.
  */
-public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, ContainerEntity {
+public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, ContainerEntity, PlayerRideableJumping {
     private static final EntityDataAccessor<String> DATA_PROFILE = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> DATA_PAINT = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_FUEL = SynchedEntityData.defineId(Vehicle.class, EntityDataSerializers.INT);
@@ -229,6 +232,16 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** The doors' swing on the client, 0 shut to 1 open, eased toward the synced state. */
     private float doorSwing;
     private float doorSwingO;
+    /** The controls on the client, 0 nobody at them to 1 taken, eased: what turns a stand up (D-0047). */
+    private float ridden;
+    private float riddenO;
+    /** The bar's percent of a jump asked for and not yet made, on the side at the wheel; -1 for none (D-0047). Made on the ground, as a horse's. */
+    private int pendingJump = -1;
+    /** Whether a jump launched on the side at the wheel has yet to land (D-0047): the body is drawn where it is until it does. */
+    private boolean leapt;
+    /** A two-wheeler's lean as last drawn, radians, positive right, and the heading it was drawn at (D-0047). */
+    private double leanRoll;
+    private double leanHeading = Double.NaN;
     /** The ground under the axles and the sides as last probed, relative to the body. */
     /** The chest lid on the client, 0 shut to 1 open, eased toward whether anyone has the storage open. */
     /** The chests' lids on the client, 0 shut to 1 open each, eased toward whether anyone has the chest open. */
@@ -758,6 +771,47 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     /** effects: returns the doors' swing, 0 shut to 1 open, for drawing */
     public float doorSwing(float partialTick) {
         return Mth.lerp(partialTick, doorSwingO, doorSwing);
+    }
+
+    /** effects: returns how far the controls are taken, 0 nobody at them to 1 taken, eased, for drawing (D-0047); 0 on the server */
+    public float ridden(float partialTick) {
+        return Mth.lerp(partialTick, riddenO, ridden);
+    }
+
+    // --- the jump (D-0047) ------------------------------------------------
+
+    /** effects: returns whether this jumps as a horse does: its profile says so. The game then fills the jump bar for its driver. */
+    @Override
+    public boolean canJump() {
+        VehicleProfile p = profile();
+        return p != null && p.jump().isPresent();
+    }
+
+    /**
+     * effects: asks for a jump with a bar of {@code power} percent, made the next tick this stands on
+     * the ground at the wheel, as a horse's: the game calls this on the driver's client as they let
+     * the jump key go, and the side at the wheel launches it; nothing for a vehicle that does not jump
+     */
+    @Override
+    public void onPlayerJump(int power) {
+        if (canJump()) {
+            pendingJump = Math.max(0, power);
+        }
+    }
+
+    /**
+     * effects: nothing: the server hears that its driver jumped, and keeps the jump by taking their
+     * client's moves as it takes every move (D-0007), stood on the ground only where the ground is
+     */
+    @Override
+    public void handleStartJump(int power) {}
+
+    @Override
+    public void handleStopJump() {}
+
+    /** effects: returns whether a jump has been asked for and not yet made */
+    public boolean jumpPending() {
+        return pendingJump >= 0;
     }
 
     /** effects: returns how far chest {@code index}'s lid is open, 0 shut to 1 open, eased the way the game eases a chest's */
@@ -1427,6 +1481,8 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         if (level().isClientSide()) {
             wrenchWatch.observe(condition());
             doorSwing = Mth.clamp(doorSwing + (doorsOpen() ? 0.15f : -0.15f), 0.0f, 1.0f);
+            riddenO = ridden;
+            ridden = Mth.clamp(ridden + (getControllingPassenger() != null ? 0.15f : -0.15f), 0.0f, 1.0f);
             int open = entityData.get(DATA_OPEN);
             for (int i = 0; i < lid.length; i++) {
                 lid[i] = Mth.clamp(lid[i] + ((open & (1 << i)) != 0 ? 0.1f : -0.1f), 0.0f, 1.0f);
@@ -1529,9 +1585,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             Controls.report(this, drive, in, step.effects());
         }
         setYRot((float) Math.toDegrees(drive.heading()));
-        Vec3 motion = getDeltaMovement();
-        double vy = onGround() && motion.y <= 0 ? -0.04 : motion.y - 0.08;
-        setDeltaMovement(drive.velocityX(), vy, drive.velocityZ());
+        setDeltaMovement(drive.velocityX(), verticalAtTheWheel(p), drive.velocityZ());
         move(MoverType.SELF, getDeltaMovement());
         if (onGround() && getDeltaMovement().y < 0) {
             setDeltaMovement(getDeltaMovement().x, 0, getDeltaMovement().z);
@@ -1563,6 +1617,31 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
         }
     }
 
+    /**
+     * effects: returns this tick's upward move at the wheel. A vehicle that jumps (D-0047) moves as a
+     * horse does: on the ground a jump asked for launches it at the profile's strength times the
+     * bar's share, and in the air gravity then drag, so it rises and falls as the horse would; a
+     * jump asked for in the air waits for the ground, as a horse's does. Any other falls under
+     * gravity alone, and stands pressed to the ground.
+     */
+    private double verticalAtTheWheel(VehicleProfile p) {
+        Vec3 motion = getDeltaMovement();
+        java.util.Optional<Jump> jump = p.jump();
+        if (jump.isPresent() && pendingJump >= 0 && onGround()) {
+            double launch = jump.get().launch(pendingJump);
+            pendingJump = -1;
+            leapt = true;
+            return launch;
+        }
+        if (onGround()) {
+            leapt = false;
+        }
+        if (onGround() && motion.y <= 0) {
+            return -0.04;
+        }
+        return jump.isPresent() ? Jump.airborne(motion.y) : motion.y - 0.08;
+    }
+
     /** effects: poses the body after a tick at the wheel: on the ground under it ({@link #rideTheGround}), shared with every other side; a protocol built on this one (D-0030) poses its own */
     protected void poseAtTheWheel(VehicleProfile p) {
         rideTheGround(p);
@@ -1585,7 +1664,29 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      */
     protected void rideTheGround(VehicleProfile p) {
         pose = Terrain.step(columns(), frame(), shape(p), getY(), pose == null ? Terrain.Pose.level(getY() + suspension.lift()) : pose);
+        if (leapt || !grounded()) {
+            // In the air (D-0047): drawn where it is. The fit holds the drawn height to the ground under
+            // it, and its probe reaches only so far down, so a jumping bike was drawn on the ground three
+            // blocks under itself, and a car off a cliff sunk toward the ground it had not reached.
+            pose = new Terrain.Pose(pose.pitch(), pose.roll(), getY(), pose.pitchV(), pose.rollV());
+        }
         suspension = pose.suspension(getY());
+        p.lean().ifPresent(this::lean);
+    }
+
+    /**
+     * effects: rolls the drawn body as a two-wheeler's (D-0047), in place of the ground's roll, which
+     * wheels in a line cannot give: into the turn it is making as far as balancing it needs, upright
+     * going straight, and onto its stand with nobody at the controls and the wheels still
+     */
+    private void lean(Lean lean) {
+        double heading = drive.heading();
+        double turn = Double.isNaN(leanHeading) ? 0.0 : Drive.wrap(heading - leanHeading);
+        leanHeading = heading;
+        boolean parked = getControllingPassenger() == null && scripted == null && Math.abs(drive.speed()) < 1.0e-3;
+        double target = parked ? lean.parked() : lean.balanced(drive.speed(), turn);
+        leanRoll = lean.toward(leanRoll, target);
+        suspension = new Suspension(suspension.lift(), suspension.pitch(), leanRoll);
     }
 
     /**
@@ -2277,18 +2378,22 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      */
     protected Vec3 footprintClamp(Vec3 delta) {
         VehicleProfile p = profile();
-        if (p == null || (Math.abs(delta.x) < 1.0E-7 && Math.abs(delta.z) < 1.0E-7) || footprintBlockedAt(p, getX(), getZ())) {
+        if (p == null || (Math.abs(delta.x) < 1.0E-7 && Math.abs(delta.z) < 1.0E-7)) {
             return delta;
         }
-        if (!footprintBlockedAt(p, getX() + delta.x, getZ() + delta.z)) {
+        // In the air -- over its climb off the ground, as a jump takes it (D-0047) -- the body meets
+        // walls from where it is, not from the ground under it: the game lifts a box before it moves
+        // it across, so a wall below the body plus its climb, after this tick's rise, is no wall.
+        double floor = onGround() || grounded() ? Double.NEGATIVE_INFINITY : getY() + Math.max(0.0, delta.y);
+        if (footprintBlockedAt(p, getX(), getZ(), floor) || !footprintBlockedAt(p, getX() + delta.x, getZ() + delta.z, floor)) {
             return delta;
         }
         // As far as it goes along the move, or along either axis alone -- whichever carries it
         // furthest: a wall met at a slant is slid along, as the game slides a box, instead of
         // stopping the body dead at a corner's graze.
-        double t = clampAlong(p, delta.x, delta.z);
-        double tx = clampAlong(p, delta.x, 0.0);
-        double tz = clampAlong(p, 0.0, delta.z);
+        double t = clampAlong(p, delta.x, delta.z, floor);
+        double tx = clampAlong(p, delta.x, 0.0, floor);
+        double tz = clampAlong(p, 0.0, delta.z, floor);
         double along = t * Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         double xOnly = tx * Math.abs(delta.x), zOnly = tz * Math.abs(delta.z);
         if (xOnly > along && xOnly >= zOnly) {
@@ -2301,17 +2406,17 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
     }
 
     /** effects: returns the share of the move ({@code dx}, {@code dz}) from here that leaves every footprint point clear of a wall, a little short of the wall itself */
-    private double clampAlong(VehicleProfile p, double dx, double dz) {
+    private double clampAlong(VehicleProfile p, double dx, double dz, double floor) {
         if (Math.abs(dx) < 1.0E-7 && Math.abs(dz) < 1.0E-7) {
             return 0.0;
         }
-        if (!footprintBlockedAt(p, getX() + dx, getZ() + dz)) {
+        if (!footprintBlockedAt(p, getX() + dx, getZ() + dz, floor)) {
             return 1.0;
         }
         double lo = 0.0, hi = 1.0;
         for (int i = 0; i < 7; i++) {
             double mid = (lo + hi) / 2.0;
-            if (footprintBlockedAt(p, getX() + dx * mid, getZ() + dz * mid)) {
+            if (footprintBlockedAt(p, getX() + dx * mid, getZ() + dz * mid, floor)) {
                 hi = mid;
             } else {
                 lo = mid;
@@ -2340,9 +2445,10 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
      * taller than the climb is one; a lintel the hull passes under or a canopy over it is none, since
      * only a block spanning the line counts; and a garage door's housing over the line does not make
      * its side track under it a wall across the doorway. The ground is still a block's full bounds,
-     * as the box that climbs onto it meets them.
+     * as the box that climbs onto it meets them. The ground is never taken lower than {@code floor}:
+     * a body in the air walks from its own height (D-0047).
      */
-    private boolean footprintBlockedAt(VehicleProfile p, double x, double z) {
+    private boolean footprintBlockedAt(VehicleProfile p, double x, double z, double floor) {
         double hw = p.body().width() / 2.0, hl = p.body().length() / 2.0;
         double yaw = Math.toRadians(getYRot());
         double c = Math.cos(yaw), s = Math.sin(yaw);
@@ -2356,7 +2462,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
             double dx = px * c - pz * s;
             double dz = pz * c + px * s;
             int steps = Math.max(1, Mth.ceil(Math.sqrt(dx * dx + dz * dz) / WALK));
-            double ground = getY();
+            double ground = Math.max(getY(), floor);
             for (int i = 1; i <= steps; i++) {
                 double sx = x + dx * i / steps, sz = z + dz * i / steps;
                 double line = ground + climb;
@@ -2376,7 +2482,7 @@ public class Vehicle extends VehicleEntity implements HasCustomInventoryScreen, 
                     }
                 }
                 if (top > Double.NEGATIVE_INFINITY) {
-                    ground = top;
+                    ground = Math.max(top, floor);
                 }
             }
         }

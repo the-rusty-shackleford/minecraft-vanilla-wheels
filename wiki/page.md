@@ -37,6 +37,13 @@ back. The longer the drift, the bigger the boost.
 
 ![Skid marks behind a drift](img/drift.webp)
 
+### Motorcycles: jumping and leaning
+
+A motorcycle (the [Scrambler](/wiki/scrambler), the [Iron Horse](/wiki/iron-horse)) does not drift.
+**Hold jump** and the **jump bar** fills where your experience bar was, exactly as on a horse; **let
+go** and it jumps with what the bar held, three blocks up at a full bar. It leans into its turns, and
+landing a jump never hurts anyone aboard.
+
 ### The dash
 
 The speed and fuel needles on the dashboard really move. From inside, the windshield
@@ -146,7 +153,7 @@ then it costs nothing. In creative it's free.
 A vehicle is built from its parts on a **Mechanic Lift**:
 
 - a **chassis** (each vehicle's own recipe; the item names the vehicle);
-- one **wheel** per wheel: eight leather around a steel ingot;
+- one **wheel** per wheel: eight leather around a steel ingot (a motorcycle takes two);
 - an **engine**, if it has one: two redstone, a redstone torch, a diamond and five steel.
 
 The lift itself is two pistons, three iron blocks, a redstone block and three smooth stone.

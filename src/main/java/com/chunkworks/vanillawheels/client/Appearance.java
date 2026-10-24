@@ -20,9 +20,11 @@ package com.chunkworks.vanillawheels.client;
 import com.chunkworks.vanillawheels.api.VehicleProfile;
 import com.chunkworks.vanillawheels.domain.BakedMesh;
 import com.chunkworks.vanillawheels.domain.Dial;
+import com.chunkworks.vanillawheels.domain.Linkage;
 import com.chunkworks.vanillawheels.domain.Mesh;
 import com.chunkworks.vanillawheels.domain.Parts;
 import com.chunkworks.vanillawheels.domain.Rotation;
+import com.chunkworks.vanillawheels.domain.Selector;
 import com.chunkworks.vanillawheels.domain.Transform;
 import com.chunkworks.vanillawheels.domain.Vec;
 import java.util.ArrayList;
@@ -53,6 +55,9 @@ public final class Appearance {
     /** A door:what swings on the hinge, split into the painted part (drawn with the paint), the lamps (drawn bright when lit) and the rest. */
     public record Hinge(BakedMesh mesh, BakedMesh painted, BakedMesh lamps, Rotation open) {}
 
+    /** A moving part of the body's own mesh (D-0047), split as a door is: its lenses, its painted panels and the rest. */
+    public record Moved(BakedMesh mesh, BakedMesh painted, BakedMesh lamps) {}
+
     /** A wheel's place in blocks, whether it steers, and which side it is on (right-side wheels are turned round). */
     public record WheelSlot(Vec at, boolean steers, boolean right) {}
 
@@ -72,6 +77,10 @@ public final class Appearance {
     public final BakedMesh cockpit;
     public final List<Needle> needles;
     public final List<Hinge> doors;
+    /** The moving parts, one a joint of {@link #linkage}, in the profile's order (D-0047). */
+    public final List<Moved> moving;
+    /** How the moving parts turn, in blocks in the local frame. */
+    public final Linkage linkage;
     public final BakedMesh wheel;
     public final List<WheelSlot> wheels;
     public final double wheelRadius;
@@ -84,10 +93,18 @@ public final class Appearance {
         Mesh local = frame.transformed(t).orientedOutward();
         // Each piece is cut from what the pieces before it left (Parts), so a door's lenses and
         // painted panels swing with the door and are not drawn a second time on the body.
+        // The moving parts are cut after the doors, as doors are, the deepest first: a wheel before the
+        // fork that carries it, whose selector names the wheel's faces too (D-0047).
+        Linkage links = p.linkage();
+        List<Integer> order = links.cutOrder();
+        List<Selector> hinged = new ArrayList<>(p.doors().stream().map(d -> d.part().transformed(t).selector()).toList());
+        for (int k : order) {
+            hinged.add(p.moving().get(k).part().transformed(t).selector());
+        }
         Parts cut = Parts.cut(local,
                 extras.stream().map(sel -> sel.transformed(t).selector()).toList(),
                 p.gauges().stream().map(g -> g.part().transformed(t).selector()).toList(),
-                p.doors().stream().map(d -> d.part().transformed(t).selector()).toList(),
+                hinged,
                 p.headlights().flatMap(VehicleProfile.Headlights::part).map(sel -> sel.transformed(t).selector()),
                 p.glass().map(sel -> sel.transformed(t).selector()),
                 p.cockpit().map(sel -> sel.transformed(t).selector()),
@@ -106,6 +123,13 @@ public final class Appearance {
             ds.add(new Hinge(BakedMesh.of(door.rest(), scale), BakedMesh.of(door.painted(), scale), BakedMesh.of(door.lamps(), scale),
                     new Rotation(open.pivot().times(scale), open.axis(), open.radians())));
         }
+        Moved[] moved = new Moved[order.size()];
+        for (int n = 0; n < order.size(); n++) {
+            Parts.Door piece = cut.doors().get(p.doors().size() + n);
+            moved[order.get(n)] = new Moved(BakedMesh.of(piece.rest(), scale), BakedMesh.of(piece.painted(), scale), BakedMesh.of(piece.lamps(), scale));
+        }
+        this.moving = List.of(moved);
+        this.linkage = links;
         this.texture = p.texture().or(() -> MeshLibrary.INSTANCE.embeddedTexture(p.mesh())).orElse(MISSING);
         this.wheelTexture = p.wheelMesh().flatMap(MeshLibrary.INSTANCE::embeddedTexture).orElse(this.texture);
         this.extras = cut.extras().stream().map(m -> BakedMesh.of(m, scale)).toList();

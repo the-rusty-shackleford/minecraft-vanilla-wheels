@@ -175,7 +175,7 @@ public final class LiftMenu extends AbstractContainerMenu {
     private LiftStatus.Build build(LiftBlockEntity lift) {
         ResourceLocation id = chassisVehicle();
         VehicleProfile p = id == null ? null : lift.profile(id);
-        boolean matches = p != null && (owner.hasInfiniteMaterials() || new Assembly(p.wheels().parts(), p.engine().isPresent())
+        boolean matches = p != null && (owner.hasInfiniteMaterials() || new Assembly(p.wheelParts(), p.engine().isPresent())
                 .accepts(true, parts.getItem(WHEELS).getCount(), !parts.getItem(ENGINE).isEmpty()));
         // A chassis selects the vehicle; creative needs no wheels or engine.
         return LiftStatus.build(lift.busy(), matches, p != null && lift.occupied(p));
@@ -235,7 +235,7 @@ public final class LiftMenu extends AbstractContainerMenu {
             }
             if (!player.hasInfiniteMaterials()) {
                 parts.removeItem(CHASSIS, 1);
-                if (p.wheels().parts() > 0) parts.removeItem(WHEELS, p.wheels().parts());
+                if (p.wheelParts() > 0) parts.removeItem(WHEELS, p.wheelParts());
                 if (p.engine().isPresent()) parts.removeItem(ENGINE, 1);
             }
             lift.build(vehicle);

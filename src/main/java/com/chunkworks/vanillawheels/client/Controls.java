@@ -59,7 +59,8 @@ public final class Controls {
         }
         int throttle = player.input.up ? 1 : player.input.down ? -1 : 0;
         int steer = player.input.right ? 1 : player.input.left ? -1 : 0;
-        return new Input(throttle, steer, Keys.driftDown(), vehicle.grounded(), vehicle.hasFuel());
+        // On a vehicle that jumps the jump key is the game's, filling the jump bar as on a horse (D-0047): it never drifts.
+        return new Input(throttle, steer, Keys.driftDown() && !vehicle.canJump(), vehicle.grounded(), vehicle.hasFuel());
     }
 
     /** effects: sends the server what changed, and shows the driver the effects */
